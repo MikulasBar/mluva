@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::token_tree::statement::{Stmt, VarAssign};
+use crate::token_tree::statement::{IfStatement, Stmt, VarAssign};
 use crate::value::Value;
 
 pub type Memory = HashMap<String, Value>;
@@ -20,6 +20,13 @@ pub fn interpret(stmts: Vec<Stmt>) {
                 let value = mem.get(&ident).unwrap();
 
                 println!("{}", value);
+            },
+
+            Stmt::If(IfStatement{cond, stmts}) => {
+                let cond = cond.eval(&mem);
+                if cond {
+                    interpret(stmts);
+                }
             },
         }
     }

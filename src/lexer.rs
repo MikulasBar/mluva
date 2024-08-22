@@ -19,12 +19,23 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             '#' => {
                 chars.next();
 
-                while chars.peek() != Some(&'#') {
+                while chars.peek() != Some(&'\n') {
                     chars.next();
                 }
                 chars.next();
                 
                 continue;
+            }
+
+            '{' => {
+                chars.next();
+                Token::BraceL
+            }
+
+            
+            '}' => {
+                chars.next();
+                Token::BraceR
             }
 
             // semicolon
@@ -81,13 +92,15 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
 fn match_kw(ident: String) -> Token {
     match ident.as_str() {
-        "number" => Token::DataType(DataType::Num),
-        "bool" => Token::DataType(DataType::Bool),
+        "number"=> Token::DataType(DataType::Num),
+        "bool"  => Token::DataType(DataType::Bool),
 
-        "true" => Token::Bool(true),
+        "true"  => Token::Bool(true),
         "false" => Token::Bool(false),
         
         "print" => Token::Print,
-        _ => Token::Ident(ident)
+        "if"    => Token::If,
+
+        _       => Token::Ident(ident)
     }
 }

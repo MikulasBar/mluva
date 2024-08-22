@@ -1,9 +1,12 @@
+use std::ops::Deref;
+
 use crate::value::Value;
 use crate::token::Token;
 use crate::interpreter::Memory;
 use crate::parser::TokenIter;
 use crate::expect_pat;
 use crate::data_type::*;
+use crate::scope::DataTypeScope as DTScope;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -59,12 +62,12 @@ impl NumExpr {
     }
 
     /// expects single expr -- only Num, Var
-    pub fn expect_single(tokens: &mut TokenIter, datatypes: &DataTypeMap) -> Self {
+    fn expect_single(tokens: &mut TokenIter, scope: &DTScope) -> Self {
         match tokens.peek().unwrap() {
             Token::Ident(_) => {
                 expect_pat!(Token::Ident(ident) in ITER tokens);
                 // check correct datatype -- num
-                expect_pat!(DataType::Num in MAP datatypes; &ident);
+                expect_pat!(DataType::Num in MAP scope; &ident);
                 ident.into()
             },
 
@@ -77,7 +80,12 @@ impl NumExpr {
         }
     }
 
-    pub fn parse(tokens: &mut TokenIter, datatypes: &DataTypeMap, prev: NumExpr) -> Self {
+    pub fn parse(tokens: &mut TokenIter, scope: &DTScope) -> Self {
+        let expr = Self::expect_single(tokens, scope);
+        Self::parse_helper(tokens, scope, expr)
+    }
+
+    fn parse_helper(tokens: &mut TokenIter, scope: &DTScope, prev: NumExpr) -> Self {
         match tokens.peek().unwrap() {
             Token::Plus => {
                 expect_pat!(Token::Plus in ITER tokens);
@@ -90,24 +98,8 @@ impl NumExpr {
             _ => return prev,
         }
 
-        let expr = match tokens.peek().unwrap() {
-            Token::Ident(_) => {
-                expect_pat!(Token::Ident(ident) in ITER tokens);
-                // check the correct datatype -- number
-                expect_pat!(&DataType::Num in MAP datatypes; &ident);
-                
-                ident.into()
-            },
-
-            Token::Num(_) => {
-                expect_pat!(Token::Num(num) in ITER tokens);
-                num.into()
-            },
-
-            _ => panic!(),
-        };
-
-        let rest = Self::parse(tokens, datatypes, expr);
+        let expr = Self::expect_single(tokens, scope);
+        let rest = Self::parse_helper(tokens, scope, expr);
         Self::add(prev, rest)
     }
 }
@@ -145,12 +137,12 @@ impl BoolExpr {
     }
 
     /// expects single expr -- only Bool, Var 
-    pub fn expect_single(tokens: &mut TokenIter, datatypes: &DataTypeMap) -> Self {
+    fn expect_single(tokens: &mut TokenIter, scope: &DTScope) -> Self {
         match tokens.peek().unwrap() {
             Token::Ident(_) => {
                 expect_pat!(Token::Ident(ident) in ITER tokens);
                 // check the correct datatype -- bool
-                expect_pat!(&DataType::Bool in MAP datatypes; &ident);
+                expect_pat!(&DataType::Bool in MAP scope; &ident);
 
                 ident.into()
             },
@@ -164,7 +156,12 @@ impl BoolExpr {
         }
     }
 
-    pub fn parse(tokens: &mut TokenIter, datatypes: &DataTypeMap, prev: BoolExpr) -> BoolExpr {
+    pub fn parse(tokens: &mut TokenIter, scope: &DTScope) -> BoolExpr {
+        let expr = Self::expect_single(tokens, scope);
+        Self::parse_helper(tokens, scope, expr)
+    }
+
+    fn parse_helper(tokens: &mut TokenIter, scope: &DTScope, prev: BoolExpr) -> BoolExpr {
         prev
     }
 }
