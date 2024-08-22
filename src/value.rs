@@ -1,5 +1,6 @@
 
 
+use core::panic;
 use std::fmt::Display;
 
 #[derive(Debug, Clone, Copy)]
@@ -9,10 +10,15 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn get_num(&self) -> u64 {
+    pub fn expect_num(&self) -> u64 {
         let Value::Num(num) = self else {panic!()};
         *num
     }
+
+    pub fn expect_bool(&self) -> bool {
+        let Value::Bool(bool) = self else {panic!()};
+        *bool
+    } 
 }
 
 

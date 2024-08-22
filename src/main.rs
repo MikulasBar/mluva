@@ -4,6 +4,7 @@ mod interpreter;
 mod token;
 mod value;
 mod token_tree;
+mod data_type;
 mod macros;
 
 
@@ -15,7 +16,7 @@ use interpreter::interpret;
 fn main() {
     let input = include_str!("./test.ph");
     let tokens = tokenize(input);
-    let ast = parse(tokens);
+    let stmts = parse(tokens);
 
-    interpret(ast);
+    interpret(stmts);
 }

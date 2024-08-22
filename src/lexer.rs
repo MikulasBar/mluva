@@ -1,3 +1,4 @@
+use crate::data_type::DataType;
 use crate::token::Token;
 use crate::pat;
 
@@ -80,9 +81,13 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
 fn match_kw(ident: String) -> Token {
     match ident.as_str() {
-        "print" => Token::Print,
+        "number" => Token::DataType(DataType::Num),
+        "bool" => Token::DataType(DataType::Bool),
+
         "true" => Token::Bool(true),
         "false" => Token::Bool(false),
+        
+        "print" => Token::Print,
         _ => Token::Ident(ident)
     }
 }

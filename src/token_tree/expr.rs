@@ -3,6 +3,7 @@ use crate::token::Token;
 use crate::interpreter::Memory;
 use crate::parser::TokenIter;
 use crate::expect_pat;
+use crate::data_type::*;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -48,7 +49,7 @@ impl NumExpr {
     pub fn eval(&self, mem: &Memory) -> u64 {
         match self {
             Self::Num(num) => *num,
-            Self::Var(ident) => mem.get(ident).unwrap().get_num(),
+            Self::Var(ident) => mem.get(ident).unwrap().expect_num(),
             Self::Add(lhs, rhs) => lhs.eval(mem) + rhs.eval(mem),
         }
     }
@@ -57,10 +58,29 @@ impl NumExpr {
         Self::Add(Box::new(lhs), Box::new(rhs))
     }
 
-    pub fn parse(tokens: &mut TokenIter, prev: NumExpr) -> NumExpr {
+    /// expects single expr -- only Num, Var
+    pub fn expect_single(tokens: &mut TokenIter, datatypes: &DataTypeMap) -> Self {
+        match tokens.peek().unwrap() {
+            Token::Ident(_) => {
+                expect_pat!(Token::Ident(ident) in ITER tokens);
+                // check correct datatype -- num
+                expect_pat!(DataType::Num in MAP datatypes; &ident);
+                ident.into()
+            },
+
+            Token::Num(_) => {
+                expect_pat!(Token::Num(num) in ITER tokens);
+                num.into()
+            },
+
+            _ => panic!(),
+        }
+    }
+
+    pub fn parse(tokens: &mut TokenIter, datatypes: &DataTypeMap, prev: NumExpr) -> Self {
         match tokens.peek().unwrap() {
             Token::Plus => {
-                expect_pat!(Token::Plus in tokens);
+                expect_pat!(Token::Plus in ITER tokens);
             },
 
             // we dont care what the token is
@@ -72,19 +92,22 @@ impl NumExpr {
 
         let expr = match tokens.peek().unwrap() {
             Token::Ident(_) => {
-                expect_pat!(Token::Ident(ident) in tokens);
+                expect_pat!(Token::Ident(ident) in ITER tokens);
+                // check the correct datatype -- number
+                expect_pat!(&DataType::Num in MAP datatypes; &ident);
+                
                 ident.into()
             },
 
             Token::Num(_) => {
-                expect_pat!(Token::Num(num) in tokens);
+                expect_pat!(Token::Num(num) in ITER tokens);
                 num.into()
             },
 
             _ => panic!(),
         };
 
-        let rest = Self::parse(tokens, expr);
+        let rest = Self::parse(tokens, datatypes, expr);
         Self::add(prev, rest)
     }
 }
@@ -110,20 +133,55 @@ mod num_expr_froms {
 #[derive(Debug, Clone)]
 pub enum BoolExpr {
     Bool(bool),
+    Var(String),
 }
 
 impl BoolExpr {
     pub fn eval(&self, mem: &Memory) -> bool {
-        match *self {
-            Self::Bool(bool) => bool,
+        match self {
+            Self::Bool(bool) => *bool,
+            Self::Var(ident) => mem.get(ident).unwrap().expect_bool()
         }
     }
 
-    pub fn parse(tokens: &mut TokenIter, prev: bool) -> BoolExpr {
-        Self::Bool(prev)
+    /// expects single expr -- only Bool, Var 
+    pub fn expect_single(tokens: &mut TokenIter, datatypes: &DataTypeMap) -> Self {
+        match tokens.peek().unwrap() {
+            Token::Ident(_) => {
+                expect_pat!(Token::Ident(ident) in ITER tokens);
+                // check the correct datatype -- bool
+                expect_pat!(&DataType::Bool in MAP datatypes; &ident);
+
+                ident.into()
+            },
+
+            Token::Bool(_) => {
+                expect_pat!(Token::Bool(bool) in ITER tokens);
+                bool.into()
+            },
+
+            _ => panic!(),
+        }
+    }
+
+    pub fn parse(tokens: &mut TokenIter, datatypes: &DataTypeMap, prev: BoolExpr) -> BoolExpr {
+        prev
     }
 }
 
 
+mod bool_expr_froms {
+    use super::*;
 
+    impl From<bool> for BoolExpr {
+        fn from(value: bool) -> Self {
+            Self::Bool(value)
+        }
+    }
 
+    impl From<String> for BoolExpr {
+        fn from(value: String) -> Self {
+            Self::Var(value)
+        }
+    }
+}

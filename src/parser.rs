@@ -1,17 +1,18 @@
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
+use crate::data_type::{self, DataType, DataTypeMap};
 use crate::token::Token;
-use crate::expect_pat;
 use crate::token_tree::{statement::Stmt, expr::*};
+use crate::expect_pat;
 
 
 pub type TokenIter = Peekable<IntoIter<Token>>;
 
-
 pub fn parse(tokens: Vec<Token>) -> Vec<Stmt> {
     let mut stmts = vec![];
     let mut tokens = tokens.into_iter().peekable();
+    let mut datatypes: DataTypeMap = DataTypeMap::new();
 
     while let Some(token) = tokens.peek() {
         let stmt = match token {
@@ -21,22 +22,39 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Stmt> {
                 continue;
             },
 
+            // var declaration
+            Token::DataType(_) => {
+                expect_pat!(Token::DataType(data_type)  in ITER tokens);
+                expect_pat!(Token::Ident(ident)         in ITER tokens);
+                expect_pat!(Token::Assign               in ITER tokens);
+
+                datatypes.insert(ident.clone(), data_type);
+                let expr = parse_expr(&mut tokens, &datatypes, data_type);
+
+                expect_pat!(Token::Semi                 in ITER tokens);
+
+                Stmt::var_assign(ident, expr)
+            },
+
             // var assign
             Token::Ident(_) => {
-                expect_pat!(Token::Ident(ident)    in tokens);
-                expect_pat!(Token::Assign          in tokens);
+                expect_pat!(Token::Ident(ident)    in ITER tokens);
+                expect_pat!(Token::Assign          in ITER tokens);
 
-                let expr = parse_expr(&mut tokens);
-                expect_pat!(Token::Semi            in tokens);
+                expect_pat!(&data_type             in MAP datatypes; &ident);
+                
+                let expr = parse_expr(&mut tokens, &datatypes, data_type);
+
+                expect_pat!(Token::Semi            in ITER tokens);
                 
                 Stmt::var_assign(ident, expr)
             },
             
             // print
             Token::Print => {
-                expect_pat!(Token::Print           in tokens);
-                expect_pat!(Token::Ident(ident)    in tokens);
-                expect_pat!(Token::Semi            in tokens);
+                expect_pat!(Token::Print           in ITER tokens);
+                expect_pat!(Token::Ident(ident)    in ITER tokens);
+                expect_pat!(Token::Semi            in ITER tokens);
 
                 Stmt::print(ident)
             },
@@ -51,41 +69,17 @@ pub fn parse(tokens: Vec<Token>) -> Vec<Stmt> {
 }
 
 
-fn parse_expr(tokens: &mut TokenIter) -> Expr {
-    let expr = match tokens.peek().unwrap() {
-        Token::Num(_) => {
-            expect_pat!(Token::Num(value) in tokens);
-            NumExpr::parse(tokens, NumExpr::Num(value)).into()
+fn parse_expr(tokens: &mut TokenIter, datatypes: &DataTypeMap, data_type: DataType) -> Expr {
+    match data_type {
+        DataType::Num => {
+            let expr = NumExpr::expect_single(tokens, datatypes);
+            NumExpr::parse(tokens, datatypes, expr).into()
         },
 
-        Token::Bool(_) => {
-            expect_pat!(Token::Bool(value) in tokens);
-            BoolExpr::parse(tokens, value).into()
-        }
-
-        Token::Ident(_) => {
-            expect_pat!(Token::Ident(ident) in tokens);
-            parse_ident(tokens, ident)
+        DataType::Bool => {
+            let expr = BoolExpr::expect_single(tokens, datatypes);
+            BoolExpr::parse(tokens, datatypes, expr).into()
         },
-
-        _ => panic!(),
-    };
-
-    expr
-}
-
-
-fn parse_ident(tokens: &mut TokenIter, prev: String) -> Expr {
-    match tokens.peek().unwrap() {
-        Token::Plus => {
-            NumExpr::parse(tokens, NumExpr::Var(prev)).into()
-        },
-        
-        // same as in num expr
-        // we dont care what token is this
-        // we care about that the expression cannot continue to grow
-        // the parse function check if the statement is ended by semicolon
-        _ => return Expr::Var(prev),
     }
 }
 

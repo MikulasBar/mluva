@@ -18,8 +18,13 @@ macro_rules! pat {
 
 #[macro_export]
 macro_rules! expect_pat {
-    ($pat:pat in $iter:expr) => {
+    ($pat:pat in ITER $iter:expr) => {
         let $pat = $iter.next().unwrap()
+            else {panic!()};
+    };
+
+    ($pat:pat in MAP $map:expr; $key:expr) => {
+        let $pat = $map.get($key).unwrap()
             else {panic!()};
     };
 }
