@@ -1,9 +1,10 @@
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-use crate::ast::*;
 use crate::token::Token;
 use crate::expect_pat;
+use crate::token_tree::{statement::Stmt, expr::*};
+
 
 pub type TokenIter = Peekable<IntoIter<Token>>;
 

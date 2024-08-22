@@ -1,41 +1,8 @@
-use std::collections::HashMap;
-use crate::{expect_pat, parser::TokenIter, token::Token};
-use value::Value;
-
-
-
-pub type Memory = HashMap<String, Value>;
-
-#[derive(Debug, Clone)]
-pub enum Stmt {
-    VarAssign(VarAssign),
-    Print(String),
-}
-
-impl Stmt {
-    pub fn var_assign(ident: String, expr: Expr) -> Self {
-        Self::VarAssign(VarAssign::new(ident, expr))
-    }
-    pub fn print(ident: String) -> Self {
-        Self::Print(ident)
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct VarAssign {
-    pub ident: String,
-    pub expr: Expr,
-}
-
-impl VarAssign {
-    pub fn new(ident: String, expr: Expr) -> Self {
-        Self {
-            ident,
-            expr,
-        }
-    }
-}
-
+use crate::value::Value;
+use crate::token::Token;
+use crate::interpreter::Memory;
+use crate::parser::TokenIter;
+use crate::expect_pat;
 
 #[derive(Debug, Clone)]
 pub enum Expr {
@@ -156,55 +123,6 @@ impl BoolExpr {
         Self::Bool(prev)
     }
 }
-
-
-
-
-
-pub mod value {
-    use std::fmt::Display;
-
-    #[derive(Debug, Clone, Copy)]
-    pub enum Value {
-        Num(u64),
-        Bool(bool),
-    }
-    
-    impl Value {
-        pub fn get_num(&self) -> u64 {
-            let Value::Num(num) = self else {panic!()};
-            *num
-        }
-    }
-    
-    
-    mod value_froms {
-        use super::*;
-    
-        impl From<u64> for Value {
-            fn from(value: u64) -> Self {
-                Self::Num(value)
-            }
-        }
-    
-        impl From<bool> for Value {
-            fn from(value: bool) -> Self {
-                Self::Bool(value)
-            }
-        }
-    }
-
-    impl Display for Value {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                Self::Num(num)      => write!(f, "{}", num),
-                Self::Bool(bool)    => write!(f, "{}", bool),
-            }
-        }
-    }
-}
-
-
 
 
 

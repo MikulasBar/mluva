@@ -1,4 +1,9 @@
-use crate::ast::{Stmt, VarAssign, Memory};
+use std::collections::HashMap;
+
+use crate::token_tree::statement::{Stmt, VarAssign};
+use crate::value::Value;
+
+pub type Memory = HashMap<String, Value>;
 
 
 pub fn interpret(stmts: Vec<Stmt>) {
