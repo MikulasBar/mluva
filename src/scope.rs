@@ -1,11 +1,11 @@
-
 use std::{collections::HashMap, hash::Hash};
 
-use crate::data_type::{self, DataType, DataTypeMap};
+use crate::value::Value;
 
+use super::data_type::{self, DataType, DataTypeMap};
 
 pub type DataTypeScope = Scope<DataTypeMap>;
-
+pub type MemoryScope = Scope<HashMap<String, Value>>;
 
 pub struct Scope<T> {
     scopes: Vec<T>,
@@ -30,17 +30,20 @@ impl<T: Default> Scope<T> {
 }
 
 
-impl Scope<DataTypeMap> {
-    pub fn insert(&mut self, ident: String, data_type: DataType) {
+impl<K, V> Scope<HashMap<K, V>>
+where
+    K: Eq + Hash
+{
+    pub fn insert(&mut self, key: K, value: V) {
         if let Some(scope) = self.scopes.last_mut() {
-            scope.insert(ident, data_type);
+            scope.insert(key, value);
         }
     }
 
-    pub fn get(&self, ident: &str) -> Option<&DataType> {
+    pub fn get(&self, key: &K) -> Option<&V> {
         for scope in self.scopes.iter().rev() {
-            if let Some(data_type) = scope.get(ident) {
-                return Some(data_type);
+            if let Some(value) = scope.get(key) {
+                return Some(value);
             }
         }
         None

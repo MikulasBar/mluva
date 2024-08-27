@@ -1,11 +1,11 @@
 use crate::data_type::DataType;
 
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
     Semi,
     Assign,
     Plus,
+    Eq,
     Print,
     If,
     BraceL,

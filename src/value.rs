@@ -3,7 +3,9 @@
 use core::panic;
 use std::fmt::Display;
 
-#[derive(Debug, Clone, Copy)]
+use crate::expect_pat;
+
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum Value {
     Num(u64),
     Bool(bool),
@@ -11,14 +13,24 @@ pub enum Value {
 
 impl Value {
     pub fn expect_num(&self) -> u64 {
-        let Value::Num(num) = self else {panic!()};
+        expect_pat!(Value::Num(num) in VAL self);
         *num
     }
 
     pub fn expect_bool(&self) -> bool {
-        let Value::Bool(bool) = self else {panic!()};
+        expect_pat!(Value::Bool(bool) in VAL self);
         *bool
-    } 
+    }
+
+
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Self::Bool(_))
+    }
+
+    
+    pub fn is_num(&self) -> bool {
+        matches!(self, Self::Num(_))
+    }
 }
 
 

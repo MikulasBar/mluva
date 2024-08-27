@@ -47,7 +47,12 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             // assign
             '=' => {
                 chars.next();
-                Token::Assign
+                if let Some('=') = chars.peek() {
+                    chars.next();
+                    Token::Eq
+                } else {
+                    Token::Assign
+                }
             },
 
             // plus

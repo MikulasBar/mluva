@@ -1,34 +1,41 @@
 use std::collections::HashMap;
 
-use crate::token_tree::statement::{IfStatement, Stmt, VarAssign};
+use crate::token_tree::*;
 use crate::value::Value;
+use crate::scope::MemoryScope;
 
-pub type Memory = HashMap<String, Value>;
 
+pub fn interpret(stmts: Vec<TypedStmt>) {
+    let mut scope = MemoryScope::new();
 
-pub fn interpret(stmts: Vec<Stmt>) {
-    let mut mem: Memory = Memory::new();
+    interpret_helper(stmts, &mut scope);
+}
+
+pub fn interpret_helper(stmts: Vec<TypedStmt>, scope: &mut MemoryScope) {
+    scope.enter();
 
     for s in stmts {
         match s {
-            Stmt::VarAssign(VarAssign{ident, expr}) => {
-                let value = expr.eval(&mem).into();
-                mem.insert(ident, value);
+            TypedStmt::VarAssign(ident, expr) => {
+                let value = expr.eval(scope);
+                scope.insert(ident, value);
             },
 
-            Stmt::Print(ident) => {
-                let value = mem.get(&ident).unwrap();
+            TypedStmt::Print(expr) => {
+                let value = expr.eval(scope);
 
                 println!("{}", value);
             },
 
-            Stmt::If(IfStatement{cond, stmts}) => {
-                let cond = cond.eval(&mem);
+            TypedStmt::If(cond, stmts) => {
+                let cond = cond.eval(scope).expect_bool();
                 if cond {
-                    interpret(stmts);
+                    interpret_helper(stmts, scope);
                 }
             },
         }
     }
+
+    scope.exit()
 }
 

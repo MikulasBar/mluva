@@ -27,4 +27,9 @@ macro_rules! expect_pat {
         let $pat = $map.get($key).unwrap()
             else {panic!()};
     };
+
+    ($pat:pat in VAL $val:expr) => {
+        let $pat = $val
+            else {panic!()};
+    };
 }

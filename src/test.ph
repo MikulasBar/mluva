@@ -15,14 +15,21 @@ print b;
 ###########################
 x = 2;
 
-if true {
+if x == 2 {
     x = 1;
     print x;
+    print 2 + 9 + 3;
+    print false;
 }
 
-if false {
+if false == false {
     x = 0;
     print x;
+
+    if true {
+        bool x = true;
+        print x;
+    }
 }
 
 print x;
