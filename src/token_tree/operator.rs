@@ -6,6 +6,8 @@ use crate::scope::MemoryScope;
 pub enum BinOp {
     Add,
     Sub,
+    Mul,
+    Div,
     Eq,
 }
 
@@ -15,23 +17,20 @@ impl BinOp {
         let rhs = rhs.eval(scope);
 
         match self {
-            Self::Add => {
-                let lhs = lhs.expect_num();
-                let rhs = rhs.expect_num();
-                Value::Num(lhs + rhs)
-            },
-
-            Self::Sub => {
-                let lhs = lhs.expect_num();
-                let rhs = rhs.expect_num();
-                Value::Num(lhs - rhs)
-            },
-
-            Self::Eq => {
-                Value::Bool(lhs == rhs)
-            },
-
-            _ => todo!()
+            Self::Add => apply_num_op(lhs, rhs, |l, r| l + r),
+            Self::Sub => apply_num_op(lhs, rhs, |l, r| l - r),
+            Self::Mul => apply_num_op(lhs, rhs, |l, r| l * r),
+            Self::Div => apply_num_op(lhs, rhs, |l, r| l / r),
+            Self::Eq => Value::Bool(lhs == rhs),
         }
     }
+}
+
+fn apply_num_op<F>(lhs: Value, rhs: Value, op: F) -> Value
+where
+    F: FnOnce(u64, u64) -> u64
+{
+    let lhs = lhs.expect_num();
+    let rhs = rhs.expect_num();
+    Value::Num( op(lhs, rhs) )
 }

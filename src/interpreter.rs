@@ -23,7 +23,6 @@ pub fn interpret_helper(stmts: Vec<TypedStmt>, scope: &mut MemoryScope) {
 
             TypedStmt::Print(expr) => {
                 let value = expr.eval(scope);
-
                 println!("{}", value);
             },
 

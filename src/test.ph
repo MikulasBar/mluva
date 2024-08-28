@@ -1,18 +1,6 @@
 number x = 4 + 5;
 number y = x + x;
 
-# x = 6;
-
-# print x;
-# print y;
-
-# bool a = true;
-# bool b = false;
-
-# print a;
-# print b;
-
-###########################
 x = 2;
 
 if x == 1 + 1 {
@@ -36,4 +24,5 @@ print x;
 
 # Prints 3
 print 5 - 4 + 1 - 1 - 1 + 3;
-
+# Prints 6
+print 4 / x + x * 5 - 1 * x * 3;

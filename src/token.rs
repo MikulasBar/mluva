@@ -6,6 +6,8 @@ pub enum Token {
     Assign,
     Plus,
     Minus,
+    Asterisk,
+    Slash,
     Eq,
     Print,
     If,

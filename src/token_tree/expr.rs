@@ -82,7 +82,7 @@ impl Expr {
 
     /// Parse add and subtract `BinOp`
     fn parse_add(tokens: &mut TokenIter) -> Self {
-        let mut lhs = Self::parse_atom(tokens);
+        let mut lhs = Self::parse_mul(tokens);
 
         while let Some(token) = tokens.peek() {
             let op = match token {
@@ -93,7 +93,27 @@ impl Expr {
             };
 
             tokens.next();
-            let rhs = Self::parse_atom(tokens); // TODO this wouldnt work in the future, change this to Self::parse 
+            let rhs = Self::parse_mul(tokens); // TODO this wouldnt work in the future, change this to Self::parse 
+            lhs = Self::bin_op(op, lhs, rhs);
+        }
+
+        lhs
+    }
+
+    /// Parse multiply and divide `BinOp`
+    fn parse_mul(tokens: &mut TokenIter) -> Self {
+        let mut lhs = Self::parse_atom(tokens);
+        
+        while let Some(token) = tokens.peek() {
+            let op = match token {
+                Token::Asterisk => BinOp::Mul,
+                Token::Slash => BinOp::Div,
+                // we break the loop cause we dont want panic if the expression ends
+                _ => break,
+            };
+
+            tokens.next();
+            let rhs = Self::parse_atom(tokens);
             lhs = Self::bin_op(op, lhs, rhs);
         }
 
@@ -142,7 +162,7 @@ impl Expr {
                 let rhs_t = rhs.get_type();
 
                 match (op, lhs_t, rhs_t) {
-                    (BinOp::Add | BinOp::Sub, DataType::Num, DataType::Num) => {
+                    (BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div, DataType::Num, DataType::Num) => {
                         TypedExpr::bin_op(op, lhs, rhs, DataType::Num)
                     },
 

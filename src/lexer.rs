@@ -9,12 +9,6 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
     while let Some(&char) = chars.peek() {
         let token = match char {
-            // whitespaces -> skip
-            pat!(WS) => {
-                chars.next();
-                continue;
-            },
-
             // comment
             '#' => {
                 chars.next();
@@ -26,25 +20,24 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 
                 continue;
             }
-
+            
             '{' => {
                 chars.next();
                 Token::BraceL
             }
-
+            
             
             '}' => {
                 chars.next();
                 Token::BraceR
             }
-
-            // semicolon
+            
             ';' => {
                 chars.next();
                 Token::Semi
             },
-
-            // assign
+            
+            // assign / eq
             '=' => {
                 chars.next();
                 if let Some('=') = chars.peek() {
@@ -54,42 +47,56 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                     Token::Assign
                 }
             },
-
-            // plus
+            
             '+' => {
                 chars.next();
                 Token::Plus
             },
-
-            // minus
+            
             '-' => {
                 chars.next();
                 Token::Minus
             },
-
+            
+            '*' => {
+                chars.next();
+                Token::Asterisk
+            },
+            
+            '/' => {
+                chars.next();
+                Token::Slash
+            },
+            
             // number 
             pat!(NUM) => {
                 let mut number = String::new();
-
+                
                 while let Some(&digit @ pat!(NUM)) = chars.peek() {
                     number.push(digit);
                     chars.next();
                 }
-
+                
                 Token::Num(number.parse().unwrap())
             },
-
+            
             // identifier
             pat!(IDENT) => {
                 let mut ident = String::new();
-
+                
                 while let Some(&ch @ pat!(IDENT)) = chars.peek() {
                     ident.push(ch);
                     chars.next();
                 }
-
+                
                 match_kw(ident)
             }
+            
+            // whitespaces -> skip
+            pat!(WS) => {
+                chars.next();
+                continue;
+            },
 
             _ => panic!()
         };
