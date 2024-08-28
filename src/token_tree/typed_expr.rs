@@ -19,7 +19,7 @@ impl TypedExpr {
         match self {
             &Self::Num(num, _)              => num.into(),
             &Self::Bool(bool, _)            => bool.into(),
-            Self::Var(ident, _)             => *mem.get(ident).unwrap(),
+            Self::Var(ident, _)             => mem[ident],
             Self::BinOp(op, lhs, rhs, _)    => op.apply(&*lhs, &*rhs, mem),
         }
     }

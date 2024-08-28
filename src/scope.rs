@@ -1,5 +1,5 @@
 use core::panic;
-use std::{collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash, ops::Index};
 
 use crate::value::Value;
 
@@ -61,3 +61,14 @@ where
         None
     }    
 }
+
+impl<K, V> Index<&K> for Scope<HashMap<K, V>>
+where
+    K: Eq + Hash + Clone
+{
+    type Output = V;
+
+    fn index(&self, key: &K) -> &Self::Output {
+        self.get(key).unwrap()
+    }
+} 

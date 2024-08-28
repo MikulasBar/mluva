@@ -37,7 +37,7 @@ impl Expr {
             | Self::BinOp(bin_op_pat!(NUM -> NUM), _, _)
                 => true,
 
-            Self::Var(var) => scope.get(var).unwrap().is_num(),
+            Self::Var(var) => scope[var].is_num(),
 
             _ => false,
         }
@@ -51,27 +51,22 @@ impl Expr {
             | Self::BinOp(bin_op_pat!(ANY -> BOOL), _, _)
                 => true,
 
-            Self::Var(var) => scope.get(var).unwrap().is_bool(),
+            Self::Var(var) => scope[var].is_bool(),
 
             _ => false,
         }
     }
     
     pub fn parse(tokens: &mut TokenIter) -> Self {
-        Self::parse_eq(tokens)
+        Self::parse_comp(tokens)
     }
 
     /// Parse eq and neq `BinOp`
-    fn parse_eq(tokens: &mut TokenIter) -> Self {
+    fn parse_comp(tokens: &mut TokenIter) -> Self {
         let mut lhs = Self::parse_add(tokens);
 
         if let Some(token) = tokens.peek() {
-            let op = match token {
-                Token::Eq  => BinOp::Eq,
-                Token::Neq => BinOp::Neq,
-                // we break the loop cause we dont want panic if the expression ends
-                _ => return lhs,
-            };
+            let Some(op) = token_to_comp_op(token) else {return lhs};
             
             tokens.next();
             let rhs = Self::parse_add(tokens);
@@ -86,12 +81,7 @@ impl Expr {
         let mut lhs = Self::parse_mul(tokens);
 
         while let Some(token) = tokens.peek() {
-            let op = match token {
-                Token::Plus  => BinOp::Add,
-                Token::Minus => BinOp::Sub,
-                // we break the loop cause we dont want panic if the expression ends
-                _ => break,
-            };
+            let Some(op) = token_to_add_op(token) else {return lhs};
 
             tokens.next();
             let rhs = Self::parse_mul(tokens); 
@@ -106,12 +96,7 @@ impl Expr {
         let mut lhs = Self::parse_atom(tokens);
         
         while let Some(token) = tokens.peek() {
-            let op = match token {
-                Token::Asterisk => BinOp::Mul,
-                Token::Slash    => BinOp::Div,
-                // we break the loop cause we dont want panic if the expression ends
-                _ => break,
-            };
+            let Some(op) = token_to_mul_op(token) else {return lhs};
 
             tokens.next();
             let rhs = Self::parse_atom(tokens);
@@ -175,5 +160,29 @@ impl Expr {
                 }
             },
         }
+    }
+}
+
+fn token_to_comp_op(token: &Token) -> Option<BinOp> {
+    match token {
+        Token::Eq => Some(BinOp::Eq),
+        Token::Neq => Some(BinOp::Neq),
+        _ => None,
+    }
+}
+
+fn token_to_add_op(token: &Token) -> Option<BinOp> {
+    match token {
+        Token::Plus => Some(BinOp::Add),
+        Token::Minus => Some(BinOp::Sub),
+        _ => None,
+    }
+}
+
+fn token_to_mul_op(token: &Token) -> Option<BinOp> {
+    match token {
+        Token::Asterisk => Some(BinOp::Mul),
+        Token::Slash => Some(BinOp::Div),
+        _ => None,
     }
 }
