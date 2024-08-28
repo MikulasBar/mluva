@@ -80,20 +80,27 @@ impl Expr {
         lhs
     }
 
+    /// Parse add and subtract `BinOp`
     fn parse_add(tokens: &mut TokenIter) -> Self {
         let mut lhs = Self::parse_atom(tokens);
 
-        while let Some(Token::Plus) = tokens.peek() {
-            expect_pat!(Token::Plus in ITER tokens);
+        while let Some(token) = tokens.peek() {
+            let op = match token {
+                Token::Plus  => BinOp::Add,
+                Token::Minus => BinOp::Sub,
+                // we break the loop cause we dont want panic if the expression ends
+                _ => break,
+            };
 
-            let rhs = Self::parse_atom(tokens);
-            lhs = Self::bin_op(BinOp::Add, lhs, rhs);
+            tokens.next();
+            let rhs = Self::parse_atom(tokens); // TODO this wouldnt work in the future, change this to Self::parse 
+            lhs = Self::bin_op(op, lhs, rhs);
         }
 
         lhs
     }
 
-    // will parse atom expr such as Ident, Num, Bool, not ops
+    /// Parse atom expr such as Ident, Num, Bool, not ops.
     fn parse_atom(tokens: &mut TokenIter) -> Self {
         match tokens.peek().unwrap() {
             Token::Bool(_) => {
@@ -135,8 +142,8 @@ impl Expr {
                 let rhs_t = rhs.get_type();
 
                 match (op, lhs_t, rhs_t) {
-                    (BinOp::Add, DataType::Num, DataType::Num) => {
-                        TypedExpr::bin_op(BinOp::Add, lhs, rhs, DataType::Num)
+                    (BinOp::Add | BinOp::Sub, DataType::Num, DataType::Num) => {
+                        TypedExpr::bin_op(op, lhs, rhs, DataType::Num)
                     },
 
                     (BinOp::Eq, _, _) => {

@@ -5,26 +5,33 @@ use crate::scope::MemoryScope;
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum BinOp {
     Add,
+    Sub,
     Eq,
 }
 
 impl BinOp {
-    pub fn apply(&self, lhs: &TypedExpr, rhs: &TypedExpr, mem: &MemoryScope) -> Value {
-        let lhs_t = lhs.get_type();
-        let rhs_t = rhs.get_type();
+    pub fn apply(&self, lhs: &TypedExpr, rhs: &TypedExpr, scope: &MemoryScope) -> Value {
+        let lhs = lhs.eval(scope);
+        let rhs = rhs.eval(scope);
 
-        match (self, lhs_t, rhs_t) {
-            (Self::Add, DataType::Num, DataType::Num) => {
-                let lhs = lhs.eval(mem).expect_num();
-                let rhs = rhs.eval(mem).expect_num();
+        match self {
+            Self::Add => {
+                let lhs = lhs.expect_num();
+                let rhs = rhs.expect_num();
                 Value::Num(lhs + rhs)
             },
-            (Self::Eq, _, _) => {
-                let lhs = lhs.eval(mem);
-                let rhs = rhs.eval(mem);
+
+            Self::Sub => {
+                let lhs = lhs.expect_num();
+                let rhs = rhs.expect_num();
+                Value::Num(lhs - rhs)
+            },
+
+            Self::Eq => {
                 Value::Bool(lhs == rhs)
             },
-            _ => panic!()
+
+            _ => todo!()
         }
     }
 }

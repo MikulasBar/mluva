@@ -61,6 +61,12 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 Token::Plus
             },
 
+            // minus
+            '-' => {
+                chars.next();
+                Token::Minus
+            },
+
             // number 
             pat!(NUM) => {
                 let mut number = String::new();

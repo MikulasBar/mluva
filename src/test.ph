@@ -1,24 +1,24 @@
 number x = 4 + 5;
 number y = x + x;
 
-x = 6;
+# x = 6;
 
-print x;
-print y;
+# print x;
+# print y;
 
-bool a = true;
-bool b = false;
+# bool a = true;
+# bool b = false;
 
-print a;
-print b;
+# print a;
+# print b;
 
 ###########################
 x = 2;
 
-if x == 2 {
+if x == 1 + 1 {
     x = 1;
     print x;
-    print 2 + 9 + 3;
+    print x + 9 - 3 - 2 + x;
     print false;
 }
 
@@ -33,3 +33,7 @@ if false == false {
 }
 
 print x;
+
+# Prints 3
+print 5 - 4 + 1 - 1 - 1 + 3;
+

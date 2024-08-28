@@ -5,6 +5,7 @@ pub enum Token {
     Semi,
     Assign,
     Plus,
+    Minus,
     Eq,
     Print,
     If,
