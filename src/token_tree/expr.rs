@@ -91,7 +91,7 @@ impl Expr {
         lhs
     }
 
-    /// Parse multiply and divide `BinOp`
+    /// Parse multiply, divide and modulo `BinOp`
     fn parse_mul(tokens: &mut TokenIter) -> Self {
         let mut lhs = Self::parse_atom(tokens);
         
@@ -122,6 +122,13 @@ impl Expr {
             Token::Ident(_) => {
                 expect_pat!(Token::Ident(ident) in ITER tokens);
                 Expr::Var(ident)
+            },
+
+            Token::ParenL => {
+                expect_pat!(Token::ParenL in ITER tokens);
+                let inner = Expr::parse(tokens);
+                expect_pat!(Token::ParenR in ITER tokens);
+                inner
             },
 
             // most bottom parse method, we panic because we must have at least one of these
@@ -165,24 +172,25 @@ impl Expr {
 
 fn token_to_comp_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Eq => Some(BinOp::Eq),
-        Token::Neq => Some(BinOp::Neq),
+        Token::Eq   => Some(BinOp::Eq),
+        Token::Neq  => Some(BinOp::Neq),
         _ => None,
     }
 }
 
 fn token_to_add_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Plus => Some(BinOp::Add),
-        Token::Minus => Some(BinOp::Sub),
+        Token::Plus     => Some(BinOp::Add),
+        Token::Minus    => Some(BinOp::Sub),
         _ => None,
     }
 }
 
 fn token_to_mul_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Asterisk => Some(BinOp::Mul),
-        Token::Slash => Some(BinOp::Div),
+        Token::Asterisk     => Some(BinOp::Mul),
+        Token::Slash        => Some(BinOp::Div),
+        Token::Percentage   => Some(BinOp::Modulo),
         _ => None,
     }
 }

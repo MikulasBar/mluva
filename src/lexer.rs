@@ -26,10 +26,19 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 Token::BraceL
             }
             
-            
             '}' => {
                 chars.next();
                 Token::BraceR
+            }
+
+            '(' => {
+                chars.next();
+                Token::ParenL
+            }
+            
+            ')' => {
+                chars.next();
+                Token::ParenR
             }
             
             ';' => {
@@ -76,6 +85,11 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             '/' => {
                 chars.next();
                 Token::Slash
+            },
+
+            '%' => {
+                chars.next();
+                Token::Percentage
             },
             
             // number 

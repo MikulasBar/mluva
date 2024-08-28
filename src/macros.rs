@@ -19,11 +19,16 @@ macro_rules! str_pat {
 #[macro_export]
 macro_rules! bin_op_pat {
     (ANY -> BOOL) => {
-        BinOp::Eq | BinOp::Neq
+        BinOp::Eq
+        | BinOp::Neq
     };
 
     (NUM -> NUM) => {
-        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div
+        BinOp::Add
+        | BinOp::Sub
+        | BinOp::Mul
+        | BinOp::Div
+        | BinOp::Modulo
     };
 }
 

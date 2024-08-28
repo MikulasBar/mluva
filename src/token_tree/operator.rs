@@ -1,5 +1,5 @@
 use super::TypedExpr;
-use crate::{data_type::DataType, value::Value};
+use crate::value::Value;
 use crate::scope::MemoryScope;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -8,6 +8,7 @@ pub enum BinOp {
     Sub,
     Mul,
     Div,
+    Modulo,
     Eq,
     Neq,
 }
@@ -18,12 +19,13 @@ impl BinOp {
         let rhs = rhs.eval(scope);
 
         match self {
-            Self::Add => apply_num_op(lhs, rhs, |l, r| l + r),
-            Self::Sub => apply_num_op(lhs, rhs, |l, r| l - r),
-            Self::Mul => apply_num_op(lhs, rhs, |l, r| l * r),
-            Self::Div => apply_num_op(lhs, rhs, |l, r| l / r),
-            Self::Eq => Value::Bool(lhs == rhs),
-            Self::Neq => Value::Bool(lhs != rhs),
+            Self::Add       => apply_num_op(lhs, rhs, |l, r| l + r),
+            Self::Sub       => apply_num_op(lhs, rhs, |l, r| l - r),
+            Self::Mul       => apply_num_op(lhs, rhs, |l, r| l * r),
+            Self::Div       => apply_num_op(lhs, rhs, |l, r| l / r),
+            Self::Modulo    => apply_num_op(lhs, rhs, |l, r| l % r),
+            Self::Eq        => Value::Bool(lhs == rhs),
+            Self::Neq       => Value::Bool(lhs != rhs),
         }
     }
 }
