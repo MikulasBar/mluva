@@ -1,10 +1,11 @@
+use core::panic;
 use std::{collections::HashMap, hash::Hash};
 
 use crate::value::Value;
 
-use super::data_type::{self, DataType, DataTypeMap};
+use super::data_type::{self, DataType};
 
-pub type DataTypeScope = Scope<DataTypeMap>;
+pub type DataTypeScope = Scope<HashMap<String, DataType>>;
 pub type MemoryScope = Scope<HashMap<String, Value>>;
 
 pub struct Scope<T> {
@@ -32,12 +33,23 @@ impl<T: Default> Scope<T> {
 
 impl<K, V> Scope<HashMap<K, V>>
 where
-    K: Eq + Hash
+    K: Eq + Hash + Clone
 {
-    pub fn insert(&mut self, key: K, value: V) {
+    pub fn insert_new(&mut self, key: K, value: V) {
         if let Some(scope) = self.scopes.last_mut() {
             scope.insert(key, value);
         }
+    }
+
+    pub fn change(&mut self, key: &K, value: V) {
+        for scope in self.scopes.iter_mut().rev() {
+            if scope.contains_key(key) {
+                scope.insert(key.clone(), value);
+                return;
+            }
+        }
+
+        panic!()
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {

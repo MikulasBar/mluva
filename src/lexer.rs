@@ -1,6 +1,6 @@
 use crate::data_type::DataType;
 use crate::token::Token;
-use crate::pat;
+use crate::str_pat;
 
 
 pub fn tokenize(input: &str) -> Vec<Token> {
@@ -36,6 +36,16 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 chars.next();
                 Token::Semi
             },
+
+            '!' => {
+                chars.next();
+                if let Some('=') = chars.peek() {
+                    chars.next();
+                    Token::Neq
+                } else {
+                    panic!()
+                }
+            }
             
             // assign / eq
             '=' => {
@@ -69,10 +79,10 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             },
             
             // number 
-            pat!(NUM) => {
+            str_pat!(NUM) => {
                 let mut number = String::new();
                 
-                while let Some(&digit @ pat!(NUM)) = chars.peek() {
+                while let Some(&digit @ str_pat!(NUM)) = chars.peek() {
                     number.push(digit);
                     chars.next();
                 }
@@ -81,10 +91,10 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             },
             
             // identifier
-            pat!(IDENT) => {
+            str_pat!(IDENT) => {
                 let mut ident = String::new();
                 
-                while let Some(&ch @ pat!(IDENT)) = chars.peek() {
+                while let Some(&ch @ str_pat!(IDENT)) = chars.peek() {
                     ident.push(ch);
                     chars.next();
                 }
@@ -93,7 +103,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             }
             
             // whitespaces -> skip
-            pat!(WS) => {
+            str_pat!(WS) => {
                 chars.next();
                 continue;
             },
@@ -118,6 +128,7 @@ fn match_kw(ident: String) -> Token {
         
         "print" => Token::Print,
         "if"    => Token::If,
+        "while" => Token::While,
 
         _       => Token::Ident(ident)
     }

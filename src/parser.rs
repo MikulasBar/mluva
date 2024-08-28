@@ -59,7 +59,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
             // print
             Token::Print => {
                 expect_pat!(Token::Print            in ITER tokens);
-                
+
                 let expr = Expr::parse(tokens);
 
                 expect_pat!(Token::Semi             in ITER tokens);
@@ -76,7 +76,18 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
 
                 let stmts = parse_helper(tokens, Token::BraceR);
                 Stmt::If(cond, stmts)
-            }
+            },
+
+            Token::While => {
+                expect_pat!(Token::While in ITER tokens);
+
+                let cond = Expr::parse(tokens);
+
+                expect_pat!(Token::BraceL           in ITER tokens);
+
+                let stmts = parse_helper(tokens, Token::BraceR);
+                Stmt::While(cond, stmts)
+            },
             
             _ => panic!(),
         };

@@ -21,16 +21,6 @@ impl Value {
         expect_pat!(Value::Bool(bool) in VAL self);
         *bool
     }
-
-
-    pub fn is_bool(&self) -> bool {
-        matches!(self, Self::Bool(_))
-    }
-
-    
-    pub fn is_num(&self) -> bool {
-        matches!(self, Self::Num(_))
-    }
 }
 
 

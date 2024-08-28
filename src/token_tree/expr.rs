@@ -5,7 +5,7 @@ use crate::scope::DataTypeScope;
 use crate::value::Value;
 use crate::token::Token;
 use crate::parser::TokenIter;
-use crate::{data_type, expect_pat};
+use crate::{bin_op_pat, data_type, expect_pat};
 use crate::token_tree::operator::BinOp;
 
 use super::TypedExpr;
@@ -34,7 +34,7 @@ impl Expr {
     pub fn is_num_expr(&self, scope: &DataTypeScope) -> bool {
         match self {
             Self::Num(_)
-            | Self::BinOp(BinOp::Add, _, _)
+            | Self::BinOp(bin_op_pat!(NUM -> NUM), _, _)
                 => true,
 
             Self::Var(var) => scope.get(var).unwrap().is_num(),
@@ -48,7 +48,7 @@ impl Expr {
     pub fn is_bool_expr(&self, scope: &DataTypeScope) -> bool {
         match self {
             Self::Bool(_)
-            | Self::BinOp(BinOp::Eq, _, _)
+            | Self::BinOp(bin_op_pat!(ANY -> BOOL), _, _)
                 => true,
 
             Self::Var(var) => scope.get(var).unwrap().is_bool(),
@@ -61,20 +61,21 @@ impl Expr {
         Self::parse_eq(tokens)
     }
 
+    /// Parse eq and neq `BinOp`
     fn parse_eq(tokens: &mut TokenIter) -> Self {
         let mut lhs = Self::parse_add(tokens);
 
         if let Some(token) = tokens.peek() {
-            match token {
-                Token::Eq => {
-                    expect_pat!(Token::Eq in ITER tokens);
-
-                    let rhs = Self::parse_add(tokens);
-                    lhs = Self::bin_op(BinOp::Eq, lhs, rhs)
-                },
-
-                _ => (),
-            }
+            let op = match token {
+                Token::Eq  => BinOp::Eq,
+                Token::Neq => BinOp::Neq,
+                // we break the loop cause we dont want panic if the expression ends
+                _ => return lhs,
+            };
+            
+            tokens.next();
+            let rhs = Self::parse_add(tokens);
+            lhs = Self::bin_op(op, lhs, rhs)
         }
 
         lhs
@@ -93,7 +94,7 @@ impl Expr {
             };
 
             tokens.next();
-            let rhs = Self::parse_mul(tokens); // TODO this wouldnt work in the future, change this to Self::parse 
+            let rhs = Self::parse_mul(tokens); 
             lhs = Self::bin_op(op, lhs, rhs);
         }
 
@@ -107,7 +108,7 @@ impl Expr {
         while let Some(token) = tokens.peek() {
             let op = match token {
                 Token::Asterisk => BinOp::Mul,
-                Token::Slash => BinOp::Div,
+                Token::Slash    => BinOp::Div,
                 // we break the loop cause we dont want panic if the expression ends
                 _ => break,
             };
@@ -162,12 +163,12 @@ impl Expr {
                 let rhs_t = rhs.get_type();
 
                 match (op, lhs_t, rhs_t) {
-                    (BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div, DataType::Num, DataType::Num) => {
+                    (bin_op_pat!(NUM -> NUM), DataType::Num, DataType::Num) => {
                         TypedExpr::bin_op(op, lhs, rhs, DataType::Num)
                     },
 
-                    (BinOp::Eq, _, _) => {
-                        TypedExpr::bin_op(BinOp::Eq, lhs, rhs, DataType::Bool)
+                    (bin_op_pat!(ANY -> BOOL), _, _) => {
+                        TypedExpr::bin_op(op, lhs, rhs, DataType::Bool)
                     },
 
                     _ => panic!(),

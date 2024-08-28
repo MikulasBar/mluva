@@ -2,7 +2,7 @@
 
 
 #[macro_export]
-macro_rules! pat {
+macro_rules! str_pat {
     (WS) => {
         ' ' | '\n' | '\r' | '\t'
     };
@@ -13,6 +13,17 @@ macro_rules! pat {
 
     (NUM) => {
         '0'..='9'
+    };
+}
+
+#[macro_export]
+macro_rules! bin_op_pat {
+    (ANY -> BOOL) => {
+        BinOp::Eq | BinOp::Neq
+    };
+
+    (NUM -> NUM) => {
+        BinOp::Add | BinOp::Sub | BinOp::Mul | BinOp::Div
     };
 }
 

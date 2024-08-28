@@ -9,6 +9,7 @@ pub enum BinOp {
     Mul,
     Div,
     Eq,
+    Neq,
 }
 
 impl BinOp {
@@ -22,6 +23,7 @@ impl BinOp {
             Self::Mul => apply_num_op(lhs, rhs, |l, r| l * r),
             Self::Div => apply_num_op(lhs, rhs, |l, r| l / r),
             Self::Eq => Value::Bool(lhs == rhs),
+            Self::Neq => Value::Bool(lhs != rhs),
         }
     }
 }

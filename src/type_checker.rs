@@ -42,8 +42,8 @@ fn check_stmt(stmt: Stmt, scope: &mut DataTypeScope) -> TypedStmt {
                 panic!()
             }
 
-            scope.insert(ident.clone(), data_type);
-            TypedStmt::VarAssign(ident, expr.to_typed(scope))
+            scope.insert_new(ident.clone(), data_type);
+            TypedStmt::VarDeclare(ident, expr.to_typed(scope))
         },
 
         Stmt::VarAssign(ident, expr) => {
@@ -60,6 +60,13 @@ fn check_stmt(stmt: Stmt, scope: &mut DataTypeScope) -> TypedStmt {
             TypedStmt::Print(expr.to_typed(scope))
         },
 
-        _ => todo!(),
+        Stmt::While(cond, stmts) => {
+            if !cond.is_bool_expr(scope) {
+                panic!()
+            }
+
+            let stmts = type_check_helper(stmts, scope);
+            TypedStmt::While(cond.to_typed(scope), stmts)
+        }
     }
 }

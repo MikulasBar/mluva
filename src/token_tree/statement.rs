@@ -9,4 +9,5 @@ pub enum Stmt {
     VarDeclare(DataType, String, Expr),
     Print(Expr),
     If(Expr, Vec<Stmt>),
+    While(Expr, Vec<Stmt>),
 }
