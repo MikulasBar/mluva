@@ -15,7 +15,7 @@ use type_checker::type_check;
 use interpreter::interpret;
 
 fn main() {
-    let input = include_str!("./test.ph");
+    let input = include_str!("./test.mv");
     let tokens = tokenize(input);
     let stmts = parse(tokens);
     let stmts = type_check(stmts);

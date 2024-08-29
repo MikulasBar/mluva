@@ -3,5 +3,5 @@
 version = 3
 
 [[package]]
-name = "photon"
+name = "mluva"
 version = "0.1.0"
