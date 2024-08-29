@@ -24,36 +24,17 @@ impl Expr {
         Self::BinOp(op, Box::new(lhs), Box::new(rhs))
     }
 
-    pub fn is_data_type(&self,  data_type: DataType, scope: &DataTypeScope) -> bool {
-        match data_type {
-            DataType::Bool => self.is_bool_expr(scope),
-            DataType::Num => self.is_num_expr(scope),
-        }
-    }
-
-    pub fn is_num_expr(&self, scope: &DataTypeScope) -> bool {
+    pub fn get_type(&self, scope: &DataTypeScope) -> DataType {
         match self {
-            Self::Num(_)
-            | Self::BinOp(bin_op_pat!(NUM -> NUM), _, _)
-                => true,
+            Self::Num(_) | 
+            Self::BinOp(bin_op_pat!(NUM -> NUM), _, _)
+                => DataType::Num,
 
-            Self::Var(var) => scope[var].is_num(),
+            Self::Bool(_) | 
+            Self::BinOp(bin_op_pat!(ANY -> BOOL), _, _)
+                => DataType::Bool,
 
-            _ => false,
-        }
-    }
-
-    /// Checks if the expr is representing bool value.
-    /// That is not only the [`Expr::Bool`], but as well as `BinOp(_, Eq, _)` and so on ...
-    pub fn is_bool_expr(&self, scope: &DataTypeScope) -> bool {
-        match self {
-            Self::Bool(_)
-            | Self::BinOp(bin_op_pat!(ANY -> BOOL), _, _)
-                => true,
-
-            Self::Var(var) => scope[var].is_bool(),
-
-            _ => false,
+            Self::Var(ident) => *scope.get(ident).unwrap()
         }
     }
     

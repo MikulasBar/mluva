@@ -31,7 +31,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
                 continue;
             },
 
-            // var declaration
+            // var declaration with explicit type
             Token::DataType(_) => {
                 expect_pat!(Token::DataType(data_type)  in ITER tokens);
                 expect_pat!(Token::Ident(ident)         in ITER tokens);
@@ -41,8 +41,20 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
 
                 expect_pat!(Token::EOL             in ITER tokens);
 
-                Stmt::VarDeclare(data_type, ident, expr)
+                Stmt::VarDeclare(Some(data_type), ident, expr)
             },
+
+            Token::Let => {
+                expect_pat!(Token::Let  in ITER tokens);
+                expect_pat!(Token::Ident(ident)         in ITER tokens);
+                expect_pat!(Token::Assign               in ITER tokens);
+
+                let expr = Expr::parse(tokens);
+
+                expect_pat!(Token::EOL             in ITER tokens);
+
+                Stmt::VarDeclare(None, ident, expr)
+            }
 
             // var assign
             Token::Ident(_) => {

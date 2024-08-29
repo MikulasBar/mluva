@@ -46,6 +46,16 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 Token::ParenR
             }
 
+            '[' => {
+                chars.next();
+                Token::BracketL
+            }
+            
+            ']' => {
+                chars.next();
+                Token::BracketR
+            }
+
             '!' => {
                 chars.next();
                 if let Some('=') = chars.peek() {
@@ -140,8 +150,10 @@ fn match_kw(ident: String) -> Token {
         "true"  => Token::Bool(true),
         "false" => Token::Bool(false),
         
+        "let"   => Token::Let,
         "print" => Token::Print,
         "if"    => Token::If,
+        // "else"  => Token::Else, 
         "while" => Token::While,
 
         _       => Token::Ident(ident)

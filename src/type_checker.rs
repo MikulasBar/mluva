@@ -1,3 +1,4 @@
+use crate::data_type::{self, DataType};
 use crate::token_tree::{typed_expr, Stmt, TypedStmt};
 use crate::scope::{self, DataTypeScope};
 
@@ -29,7 +30,7 @@ fn type_check_helper(stmts: Vec<Stmt>, scope: &mut DataTypeScope) -> Vec<TypedSt
 fn check_stmt(stmt: Stmt, scope: &mut DataTypeScope) -> TypedStmt {
     match stmt {
         Stmt::If(cond, stmts) => {
-            if !cond.is_bool_expr(scope) {
+            if !cond.get_type(scope).is_bool() {
                 panic!()
             }
 
@@ -38,18 +39,28 @@ fn check_stmt(stmt: Stmt, scope: &mut DataTypeScope) -> TypedStmt {
         },
 
         Stmt::VarDeclare(data_type, ident, expr) => {
-            if !expr.is_data_type(data_type, scope) {
-                panic!()
-            }
+            // if the declration has explicit type or not
+            // check the type if yes
+            // if no then do essentialy nothing
+            let data_type = if let Some(data_type) = data_type {
+                if expr.get_type(scope) != data_type {
+                    panic!()
+                }
 
+                data_type
+            } else {
+                expr.get_type(scope)
+            };
+
+            let expr = expr.to_typed(scope);
             scope.insert_new(ident.clone(), data_type);
-            TypedStmt::VarDeclare(ident, expr.to_typed(scope))
+            TypedStmt::VarDeclare(ident, expr)
         },
 
         Stmt::VarAssign(ident, expr) => {
             let data_type = scope.get(&ident).unwrap();
 
-            if !expr.is_data_type(*data_type, scope) {
+            if expr.get_type(scope) != *data_type {
                 panic!()
             }
             
@@ -61,7 +72,7 @@ fn check_stmt(stmt: Stmt, scope: &mut DataTypeScope) -> TypedStmt {
         },
 
         Stmt::While(cond, stmts) => {
-            if !cond.is_bool_expr(scope) {
+            if !cond.get_type(scope).is_bool() {
                 panic!()
             }
 
