@@ -6,13 +6,13 @@ use crate::str_pat;
 pub fn tokenize(input: &str) -> Vec<Token> {
     let mut tokens = vec![];
     let mut chars = input.chars().peekable();
-
+    
     while let Some(&char) = chars.peek() {
         let token = match char {
             // comment
             '#' => {
                 chars.next();
-
+                
                 while chars.peek() != Some(&'\n') {
                     chars.next();
                 }
@@ -21,6 +21,11 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 continue;
             }
             
+            ';' | '\n' => {
+                chars.next();
+                Token::EOL
+            },
+
             '{' => {
                 chars.next();
                 Token::BraceL
@@ -40,11 +45,6 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 chars.next();
                 Token::ParenR
             }
-            
-            ';' => {
-                chars.next();
-                Token::Semi
-            },
 
             '!' => {
                 chars.next();
@@ -134,8 +134,8 @@ pub fn tokenize(input: &str) -> Vec<Token> {
 
 fn match_kw(ident: String) -> Token {
     match ident.as_str() {
-        "number"=> Token::DataType(DataType::Num),
-        "bool"  => Token::DataType(DataType::Bool),
+        "Number"=> Token::DataType(DataType::Num),
+        "Bool"  => Token::DataType(DataType::Bool),
 
         "true"  => Token::Bool(true),
         "false" => Token::Bool(false),

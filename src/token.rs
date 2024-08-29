@@ -2,7 +2,7 @@ use crate::data_type::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
-    Semi,
+    EOL,
     Assign,
     Plus,
     Minus,
@@ -13,6 +13,7 @@ pub enum Token {
     Percentage,
     Print,
     If,
+    Else,
     While,
     ParenL,
     ParenR,

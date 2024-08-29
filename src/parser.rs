@@ -25,8 +25,8 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
         }
 
         let stmt = match token {
-            // lonely semicolon
-            Token::Semi => {
+            // lonely EOLcolon
+            Token::EOL => {
                 tokens.next();
                 continue;
             },
@@ -39,7 +39,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
 
                 let expr = Expr::parse(tokens);
 
-                expect_pat!(Token::Semi             in ITER tokens);
+                expect_pat!(Token::EOL             in ITER tokens);
 
                 Stmt::VarDeclare(data_type, ident, expr)
             },
@@ -51,7 +51,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
                 
                 let expr = Expr::parse(tokens);
 
-                expect_pat!(Token::Semi             in ITER tokens);
+                expect_pat!(Token::EOL             in ITER tokens);
                 
                 Stmt::VarAssign(ident, expr)
             },
@@ -62,7 +62,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Vec<Stmt> {
 
                 let expr = Expr::parse(tokens);
 
-                expect_pat!(Token::Semi             in ITER tokens);
+                expect_pat!(Token::EOL             in ITER tokens);
 
                 Stmt::Print(expr)
             },
