@@ -1,4 +1,4 @@
-use super::TypedExpr;
+use super::Expr;
 use crate::scope::MemoryScope;
 use crate::value::Value;
 
@@ -14,7 +14,7 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn apply(&self, lhs: &TypedExpr, rhs: &TypedExpr, scope: &MemoryScope) -> Value {
+    pub fn apply(&self, lhs: &Expr, rhs: &Expr, scope: &MemoryScope) -> Value {
         let lhs = lhs.eval(scope);
         let rhs = rhs.eval(scope);
 

@@ -1,15 +1,10 @@
-use std::panic::PanicInfo;
-
 use crate::data_type::DataType;
-use crate::scope::DataTypeScope;
-use crate::value::Value;
+use crate::scope::{DataTypeScope, MemoryScope};
 use crate::token::Token;
 use crate::parser::TokenIter;
-use crate::{bin_op_pat, data_type, expect_pat};
+use crate::value::Value;
+use crate::{bin_op_pat, expect_pat};
 use crate::token_tree::operator::BinOp;
-
-use super::TypedExpr;
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -35,6 +30,15 @@ impl Expr {
                 => DataType::Bool,
 
             Self::Var(ident) => *scope.get(ident).unwrap()
+        }
+    }
+
+    pub fn eval(&self, mem: &MemoryScope) -> Value {
+        match self {
+            &Self::Num(num)              => num.into(),
+            &Self::Bool(bool)            => bool.into(),
+            Self::Var(ident)             => mem[ident],
+            Self::BinOp(op, lhs, rhs)    => op.apply(&*lhs, &*rhs, mem),
         }
     }
     
@@ -114,39 +118,6 @@ impl Expr {
 
             // most bottom parse method, we panic because we must have at least one of these
             _ => panic!(),
-        }
-    }
-
-    /// Convert `Expr` to `TypedExpr`.
-    /// And check the types.
-    pub fn to_typed(self, scope: &DataTypeScope) -> TypedExpr {
-        match self {
-            Self::Bool(bool) => TypedExpr::Bool(bool, DataType::Bool),
-            Self::Num(num) => TypedExpr::Num(num, DataType::Num),
-            Self::Var(var) => {
-                let data_type = scope.get(&var).unwrap();
-                TypedExpr::Var(var, *data_type)
-            },
-
-            Self::BinOp(op, lhs, rhs) => {
-                let lhs = lhs.to_typed(scope);
-                let rhs = rhs.to_typed(scope);
-
-                let lhs_t = lhs.get_type();
-                let rhs_t = rhs.get_type();
-
-                match (op, lhs_t, rhs_t) {
-                    (bin_op_pat!(NUM -> NUM), DataType::Num, DataType::Num) => {
-                        TypedExpr::bin_op(op, lhs, rhs, DataType::Num)
-                    },
-
-                    (bin_op_pat!(ANY -> BOOL), _, _) => {
-                        TypedExpr::bin_op(op, lhs, rhs, DataType::Bool)
-                    },
-
-                    _ => panic!(),
-                }
-            },
         }
     }
 }

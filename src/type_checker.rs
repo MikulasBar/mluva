@@ -1,82 +1,73 @@
-use crate::token_tree::{Stmt, TypedStmt};
+use crate::data_type::DataType;
+use crate::token_tree::Stmt;
 use crate::scope::DataTypeScope;
+use crate::type_check_error::TypeCheckError;
 
-
-pub fn type_check(stmts: Vec<Stmt>) -> Vec<TypedStmt> {
+pub fn type_check(stmts: &[Stmt]) -> Result<(), TypeCheckError> {
     let mut scope = DataTypeScope::new();
 
-    type_check_helper(stmts, &mut scope)
+    type_check_helper(&stmts, &mut scope)
 }
 
-fn type_check_helper(stmts: Vec<Stmt>, scope: &mut DataTypeScope) -> Vec<TypedStmt> {
+fn type_check_helper(stmts: &[Stmt], scope: &mut DataTypeScope) -> Result<(), TypeCheckError> {
     scope.enter();
-    
-    let stmts = stmts.into_iter()
-        .map(|s| {
-            check_stmt(s, scope)
-        })
-        .collect();
+
+    for s in stmts {
+        check_stmt(s, scope)?;
+    }
 
     scope.exit();
 
-    stmts
+    Ok(())
 }
 
-
-
-
-
-fn check_stmt(stmt: Stmt, scope: &mut DataTypeScope) -> TypedStmt {
+fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckError> {
     match stmt {
+        Stmt::Print(_) => (),
         Stmt::If(cond, stmts) => {
-            if !cond.get_type(scope).is_bool() {
-                panic!()
+            let cond = cond.get_type(scope);
+            if !cond.is_bool() {
+                return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
             }
 
-            let stmts = type_check_helper(stmts, scope);
-            TypedStmt::If(cond.to_typed(scope), stmts)
+            return type_check_helper(stmts, scope);
         },
 
         Stmt::VarDeclare(data_type, ident, expr) => {
-            // if the declration has explicit type or not
+            // if the declaration has explicit type or not
             // check the type if yes
             // if no then do essentialy nothing
+            let expr_type = expr.get_type(scope);
             let data_type = if let Some(data_type) = data_type {
-                if expr.get_type(scope) != data_type {
-                    panic!()
+                if expr_type != *data_type {
+                    return Err(TypeCheckError::WrongType{expected: *data_type, found: expr_type});
                 }
 
-                data_type
+                *data_type
             } else {
-                expr.get_type(scope)
+                expr_type
             };
 
-            let expr = expr.to_typed(scope);
             scope.insert_new(ident.clone(), data_type);
-            TypedStmt::VarDeclare(ident, expr)
         },
 
         Stmt::VarAssign(ident, expr) => {
             let data_type = scope.get(&ident).unwrap();
 
             if expr.get_type(scope) != *data_type {
-                panic!()
+                return Err(TypeCheckError::WrongType{expected: *data_type, found: expr.get_type(scope)});
             }
-            
-            TypedStmt::VarAssign(ident, expr.to_typed(scope))
-        },
-
-        Stmt::Print(expr) => {
-            TypedStmt::Print(expr.to_typed(scope))
         },
 
         Stmt::While(cond, stmts) => {
-            if !cond.get_type(scope).is_bool() {
-                panic!()
+            let cond = cond.get_type(scope);
+            if !cond.is_bool() {
+                return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
             }
 
-            let stmts = type_check_helper(stmts, scope);
-            TypedStmt::While(cond.to_typed(scope), stmts)
+            return type_check_helper(stmts, scope);
         }
     }
+
+    Ok(())
 }

@@ -4,8 +4,6 @@
 //! and that will convert them into typed variants
 
 
-pub mod typed_expr;
-pub mod typed_statement;
 
 pub mod expr;
 pub mod statement;
@@ -16,7 +14,4 @@ pub mod operator;
 pub use self::{
     expr::Expr,
     statement::Stmt,
-
-    typed_expr::TypedExpr,
-    typed_statement::TypedStmt,
 };
