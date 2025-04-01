@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DataType {
@@ -13,7 +11,7 @@ impl DataType {
         matches!(self, Self::Bool)
     }
 
-    pub fn is_num(&self) -> bool {
-        matches!(self, Self::Num)
-    }
+    // pub fn is_num(&self) -> bool {
+    //     matches!(self, Self::Num)
+    // }
 }

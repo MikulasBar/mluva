@@ -1,6 +1,5 @@
-use crate::data_type::{self, DataType};
-use crate::token_tree::{typed_expr, Stmt, TypedStmt};
-use crate::scope::{self, DataTypeScope};
+use crate::token_tree::{Stmt, TypedStmt};
+use crate::scope::DataTypeScope;
 
 
 pub fn type_check(stmts: Vec<Stmt>) -> Vec<TypedStmt> {

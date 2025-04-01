@@ -3,7 +3,7 @@ use std::{collections::HashMap, hash::Hash, ops::Index};
 
 use crate::value::Value;
 
-use super::data_type::{self, DataType};
+use super::data_type::DataType;
 
 pub type DataTypeScope = Scope<HashMap<String, DataType>>;
 pub type MemoryScope = Scope<HashMap<String, Value>>;

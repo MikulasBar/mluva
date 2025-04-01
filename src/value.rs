@@ -1,6 +1,5 @@
 
 
-use core::panic;
 use std::fmt::Display;
 
 use crate::expect_pat;
