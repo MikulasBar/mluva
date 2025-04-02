@@ -7,6 +7,5 @@ pub enum TypeCheckError {
         expected: DataType,
         found: DataType,
     },
-    // UndefinedType,
-    // Unknown,
+    VariableNotFound(String),
 }

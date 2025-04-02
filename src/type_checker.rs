@@ -1,5 +1,6 @@
+use crate::bin_op_pat;
 use crate::data_type::DataType;
-use crate::token_tree::Stmt;
+use crate::token_tree::{Expr, Stmt, BinOp};
 use crate::scope::DataTypeScope;
 use crate::type_check_error::TypeCheckError;
 
@@ -23,9 +24,11 @@ fn type_check_helper(stmts: &[Stmt], scope: &mut DataTypeScope) -> Result<(), Ty
 
 fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckError> {
     match stmt {
-        Stmt::Print(_) => (),
+        Stmt::Print(e) => {
+            check_expr(e, scope)?;
+        },
         Stmt::If(cond, stmts) => {
-            let cond = cond.get_type(scope);
+            let cond = check_expr(cond, scope)?;
             if !cond.is_bool() {
                 return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
             }
@@ -37,7 +40,7 @@ fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckErr
             // if the declaration has explicit type or not
             // check the type if yes
             // if no then do essentialy nothing
-            let expr_type = expr.get_type(scope);
+            let expr_type = check_expr(expr, scope)?;
             let data_type = if let Some(data_type) = data_type {
                 if expr_type != *data_type {
                     return Err(TypeCheckError::WrongType{expected: *data_type, found: expr_type});
@@ -52,15 +55,19 @@ fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckErr
         },
 
         Stmt::VarAssign(ident, expr) => {
-            let data_type = scope.get(&ident).unwrap();
+            let Some(&data_type) = scope.get(&ident) else {
+                return Err(TypeCheckError::VariableNotFound(ident.clone()));
+            };
 
-            if expr.get_type(scope) != *data_type {
-                return Err(TypeCheckError::WrongType{expected: *data_type, found: expr.get_type(scope)});
+            let expr_type = check_expr(expr, scope)?;
+
+            if expr_type != data_type {
+                return Err(TypeCheckError::WrongType{expected: data_type, found: expr_type});
             }
         },
 
         Stmt::While(cond, stmts) => {
-            let cond = cond.get_type(scope);
+            let cond = check_expr(cond, scope)?;
             if !cond.is_bool() {
                 return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
             }
@@ -70,4 +77,39 @@ fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckErr
     }
 
     Ok(())
+}
+
+fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCheckError> {
+    match expr {
+        Expr::Var(ident) => {
+            let Some(data_type) = scope.get(ident) else {
+                return Err(TypeCheckError::VariableNotFound(ident.clone()));
+            };
+
+            Ok(data_type.clone())
+        },
+        Expr::Num(_) => Ok(DataType::Num),
+        Expr::Bool(_) => Ok(DataType::Bool),
+        Expr::BinOp(op, a, b) => {
+            let a = check_expr(a, scope)?;
+            let b = check_expr(b, scope)?;
+            match op {
+                bin_op_pat!(NUM -> NUM) => {
+                    if a != DataType::Num {
+                        return Err(TypeCheckError::WrongType{expected: DataType::Num, found: a});
+                    }
+
+                    if b != DataType::Num {
+                        return Err(TypeCheckError::WrongType{expected: DataType::Num, found: b});
+                    }
+
+                    Ok(DataType::Num)
+                },
+
+                bin_op_pat!(ANY -> BOOL) => {
+                    Ok(DataType::Bool)
+                },
+            }
+        },
+    }
 }

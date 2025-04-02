@@ -23,7 +23,7 @@ impl Value {
 }
 
 
-mod value_froms {
+mod froms {
     use super::*;
 
     impl From<u64> for Value {

@@ -1,9 +1,8 @@
-use crate::data_type::DataType;
-use crate::scope::{DataTypeScope, MemoryScope};
+use crate::scope::MemoryScope;
 use crate::token::Token;
 use crate::parser::TokenIter;
 use crate::value::Value;
-use crate::{bin_op_pat, expect_pat};
+use crate::expect_pat;
 use crate::token_tree::operator::BinOp;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -15,22 +14,8 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn bin_op(op: BinOp, lhs: Self, rhs: Self) -> Self {
+    pub fn new_bin_op(op: BinOp, lhs: Self, rhs: Self) -> Self {
         Self::BinOp(op, Box::new(lhs), Box::new(rhs))
-    }
-
-    pub fn get_type(&self, scope: &DataTypeScope) -> DataType {
-        match self {
-            Self::Num(_) | 
-            Self::BinOp(bin_op_pat!(NUM -> NUM), _, _)
-                => DataType::Num,
-
-            Self::Bool(_) | 
-            Self::BinOp(bin_op_pat!(ANY -> BOOL), _, _)
-                => DataType::Bool,
-
-            Self::Var(ident) => *scope.get(ident).unwrap()
-        }
     }
 
     pub fn eval(&self, mem: &MemoryScope) -> Value {
@@ -55,7 +40,7 @@ impl Expr {
             
             tokens.next();
             let rhs = Self::parse_add(tokens);
-            lhs = Self::bin_op(op, lhs, rhs)
+            lhs = Self::new_bin_op(op, lhs, rhs)
         }
 
         lhs
@@ -70,7 +55,7 @@ impl Expr {
 
             tokens.next();
             let rhs = Self::parse_mul(tokens); 
-            lhs = Self::bin_op(op, lhs, rhs);
+            lhs = Self::new_bin_op(op, lhs, rhs);
         }
 
         lhs
@@ -85,7 +70,7 @@ impl Expr {
 
             tokens.next();
             let rhs = Self::parse_atom(tokens);
-            lhs = Self::bin_op(op, lhs, rhs);
+            lhs = Self::new_bin_op(op, lhs, rhs);
         }
 
         lhs

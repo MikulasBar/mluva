@@ -25,6 +25,6 @@ while x != 1 {
 Bool x = false
 Number y = 0
 
-# print x + y
+print x + y
 print x
 

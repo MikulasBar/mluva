@@ -14,4 +14,5 @@ pub mod operator;
 pub use self::{
     expr::Expr,
     statement::Stmt,
+    operator::BinOp,
 };
