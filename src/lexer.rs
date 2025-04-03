@@ -21,6 +21,23 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 
                 continue;
             }
+
+            '\'' => {
+                chars.next();
+                let mut string = String::new();
+                
+                while let Some(&ch) = chars.peek() {
+                    if ch == '\'' {
+                        chars.next();
+                        break;
+                    } else {
+                        string.push(ch);
+                        chars.next();
+                    }
+                }
+
+                Token::StringLiteral(string)
+            } 
             
             ';' | '\n' => {
                 chars.next();
@@ -139,6 +156,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
         tokens.push(token);
     }
 
+    tokens.push(Token::EOL);
+
     Ok(tokens)
 }
 
@@ -147,6 +166,7 @@ fn match_kw(ident: String) -> Token {
     match ident.as_str() {
         "Number"=> Token::DataType(DataType::Num),
         "Bool"  => Token::DataType(DataType::Bool),
+        "String" => Token::DataType(DataType::String),
 
         "true"  => Token::Bool(true),
         "false" => Token::Bool(false),

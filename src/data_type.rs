@@ -3,6 +3,7 @@
 pub enum DataType {
     Num,
     Bool,
+    String,
 }
 
 

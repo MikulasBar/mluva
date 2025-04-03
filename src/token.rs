@@ -25,6 +25,7 @@ pub enum Token {
     EOF,
     DataType(DataType),
     Ident(String),
+    StringLiteral(String),
     Num(u64),
     Bool(bool),
 }

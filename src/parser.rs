@@ -25,7 +25,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stm
         }
 
         let stmt = match token {
-            // lonely EOLcolon
+            // lonely EOL
             Token::EOL => {
                 tokens.next();
                 continue;

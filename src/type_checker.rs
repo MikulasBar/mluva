@@ -90,6 +90,7 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
         },
         Expr::Num(_) => Ok(DataType::Num),
         Expr::Bool(_) => Ok(DataType::Bool),
+        Expr::StringLiteral(_) => Ok(DataType::String),
         Expr::BinOp(op, a, b) => {
             let a = check_expr(a, scope)?;
             let b = check_expr(b, scope)?;

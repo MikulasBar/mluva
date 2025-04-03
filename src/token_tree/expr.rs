@@ -13,6 +13,7 @@ pub enum Expr {
     Bool(bool),
     Var(String),
     BinOp(BinOp, Box<Self>, Box<Self>),
+    StringLiteral(String),
 }
 
 impl Expr {
@@ -32,6 +33,7 @@ impl Expr {
                 }
             }
             Self::BinOp(op, lhs, rhs) => return op.apply(&*lhs, &*rhs, mem),
+            Self::StringLiteral(string) => string.clone().into(),
         };
 
         Ok(result)
@@ -107,6 +109,11 @@ impl Expr {
             Token::Num(_) => {
                 expect_pat!(Token::Num(num) in ITER tokens);
                 Ok(Expr::Num(num))
+            }
+
+            Token::StringLiteral(_) => {
+                expect_pat!(Token::StringLiteral(string) in ITER tokens);
+                Ok(Expr::StringLiteral(string))
             }
 
             Token::Ident(_) => {

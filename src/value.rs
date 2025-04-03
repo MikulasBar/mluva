@@ -4,10 +4,11 @@ use std::fmt::Display;
 
 use crate::expect_pat;
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Num(u64),
     Bool(bool),
+    String(String),
 }
 
 impl Value {
@@ -37,6 +38,12 @@ mod froms {
             Self::Bool(value)
         }
     }
+
+    impl From<String> for Value {
+        fn from(value: String) -> Self {
+            Self::String(value)
+        }
+    }
 }
 
 impl Display for Value {
@@ -44,6 +51,7 @@ impl Display for Value {
         match self {
             Self::Num(num)      => write!(f, "{}", num),
             Self::Bool(bool)    => write!(f, "{}", bool),
+            Self::String(string) => write!(f, "{}", string),
         }
     }
 }

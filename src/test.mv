@@ -6,18 +6,21 @@
 # print a # Prints 15
 
 
-let x = 23
+# let x = 23
 
-print x
+# print x
 
-while x != 1 {
-    if x % 2 == 1 {
-        x = 3 * x + 1
-    }
+# while x != 1 {
+#     if x % 2 == 1 {
+#         x = 3 * x + 1
+#     }
 
-    if x % 2 == 0 {
-        x = x / 2
-    }
+#     if x % 2 == 0 {
+#         x = x / 2
+#     }
 
-    print x
-}
+#     print x
+# }
+
+let a = 'Hello, world!'
+print a
