@@ -1,9 +1,10 @@
 use crate::data_type::DataType;
+use crate::parse_error::ParseError;
 use crate::token::Token;
 use crate::str_pat;
 
 
-pub fn tokenize(input: &str) -> Vec<Token> {
+pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
     let mut tokens = vec![];
     let mut chars = input.chars().peekable();
     
@@ -62,7 +63,7 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                     chars.next();
                     Token::Neq
                 } else {
-                    panic!()
+                    return Err(ParseError::UnexpectedChar(char));
                 }
             }
             
@@ -132,13 +133,13 @@ pub fn tokenize(input: &str) -> Vec<Token> {
                 continue;
             },
 
-            _ => panic!()
+            _ => return Err(ParseError::UnexpectedChar(char)),
         };
 
         tokens.push(token);
     }
 
-    tokens
+    Ok(tokens)
 }
 
 

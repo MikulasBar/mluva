@@ -3,6 +3,7 @@ use crate::token::Token;
 use crate::parser::TokenIter;
 use crate::value::Value;
 use crate::expect_pat;
+use crate::parse_error::ParseError;
 use crate::token_tree::operator::BinOp;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,71 +28,71 @@ impl Expr {
         }
     }
     
-    pub fn parse(tokens: &mut TokenIter) -> Self {
+    pub fn parse(tokens: &mut TokenIter) -> Result<Self, ParseError> {
         Self::parse_comp(tokens)
     }
 
     /// Parse eq and neq `BinOp`
-    fn parse_comp(tokens: &mut TokenIter) -> Self {
-        let mut lhs = Self::parse_add(tokens);
+    fn parse_comp(tokens: &mut TokenIter) -> Result<Self, ParseError> {
+        let mut lhs = Self::parse_add(tokens)?;
 
         if let Some(token) = tokens.peek() {
-            let Some(op) = token_to_comp_op(token) else {return lhs};
+            let Some(op) = token_to_comp_op(token) else {return Ok(lhs)};
             
             tokens.next();
-            let rhs = Self::parse_add(tokens);
+            let rhs = Self::parse_add(tokens)?;
             lhs = Self::new_bin_op(op, lhs, rhs)
         }
 
-        lhs
+        Ok(lhs)
     }
 
     /// Parse add and subtract `BinOp`
-    fn parse_add(tokens: &mut TokenIter) -> Self {
-        let mut lhs = Self::parse_mul(tokens);
+    fn parse_add(tokens: &mut TokenIter) -> Result<Self, ParseError> {
+        let mut lhs = Self::parse_mul(tokens)?;
 
         while let Some(token) = tokens.peek() {
-            let Some(op) = token_to_add_op(token) else {return lhs};
+            let Some(op) = token_to_add_op(token) else {return Ok(lhs)};
 
             tokens.next();
-            let rhs = Self::parse_mul(tokens); 
+            let rhs = Self::parse_mul(tokens)?; 
             lhs = Self::new_bin_op(op, lhs, rhs);
         }
 
-        lhs
+        Ok(lhs)
     }
 
     /// Parse multiply, divide and modulo `BinOp`
-    fn parse_mul(tokens: &mut TokenIter) -> Self {
-        let mut lhs = Self::parse_atom(tokens);
+    fn parse_mul(tokens: &mut TokenIter) -> Result<Self, ParseError> {
+        let mut lhs = Self::parse_atom(tokens)?;
         
         while let Some(token) = tokens.peek() {
-            let Some(op) = token_to_mul_op(token) else {return lhs};
+            let Some(op) = token_to_mul_op(token) else {return Ok(lhs)};
 
             tokens.next();
-            let rhs = Self::parse_atom(tokens);
+            let rhs = Self::parse_atom(tokens)?;
             lhs = Self::new_bin_op(op, lhs, rhs);
         }
 
-        lhs
+        Ok(lhs)
     }
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
-    fn parse_atom(tokens: &mut TokenIter) -> Self {
+    fn parse_atom(tokens: &mut TokenIter) -> Result<Self, ParseError> {
         match tokens.peek().unwrap() {
             Token::Bool(_) => {
                 expect_pat!(Token::Bool(bool) in ITER tokens);
-                Expr::Bool(bool)
+                Ok(Expr::Bool(bool))
             },
 
             Token::Num(_) => {
                 expect_pat!(Token::Num(num) in ITER tokens);
-                Expr::Num(num)
+                Ok(Expr::Num(num))
             },
 
             Token::Ident(_) => {
                 expect_pat!(Token::Ident(ident) in ITER tokens);
-                Expr::Var(ident)
+                Ok(Expr::Var(ident))
             },
 
             Token::ParenL => {
@@ -101,8 +102,9 @@ impl Expr {
                 inner
             },
 
-            // most bottom parse method, we panic because we must have at least one of these
-            _ => panic!(),
+            _ => {
+                return Err(ParseError::UnexpectedToken(tokens.next().unwrap()));
+            }
         }
     }
 }
