@@ -5,4 +5,5 @@ use crate::token::Token;
 pub enum ParseError {
     UnexpectedChar(char),
     UnexpectedToken(Token),
+    UnexpectedEndOfInput,
 }

@@ -10,6 +10,7 @@ mod data_type;
 mod scope;
 mod type_check_error;
 mod parse_error;
+mod interpreter_error;
 
 use lexer::tokenize;
 use parser::parse;
@@ -33,7 +34,12 @@ fn main() {
         return;
     }
 
-    interpret(stmts);
+    let result = interpret(stmts);
+
+    if let Err(e) = result {
+        eprintln!("Interpret error: {:?}", e);
+        return;
+    }
 }
 
 

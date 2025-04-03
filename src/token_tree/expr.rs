@@ -1,10 +1,11 @@
+use crate::expect_pat;
+use crate::interpreter_error::InterpreterError;
+use crate::parse_error::ParseError;
+use crate::parser::TokenIter;
 use crate::scope::MemoryScope;
 use crate::token::Token;
-use crate::parser::TokenIter;
-use crate::value::Value;
-use crate::expect_pat;
-use crate::parse_error::ParseError;
 use crate::token_tree::operator::BinOp;
+use crate::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -19,15 +20,23 @@ impl Expr {
         Self::BinOp(op, Box::new(lhs), Box::new(rhs))
     }
 
-    pub fn eval(&self, mem: &MemoryScope) -> Value {
-        match self {
-            &Self::Num(num)              => num.into(),
-            &Self::Bool(bool)            => bool.into(),
-            Self::Var(ident)             => mem[ident],
-            Self::BinOp(op, lhs, rhs)    => op.apply(&*lhs, &*rhs, mem),
-        }
+    pub fn eval(&self, mem: &MemoryScope) -> Result<Value, InterpreterError> {
+        let result = match self {
+            &Self::Num(num) => num.into(),
+            &Self::Bool(bool) => bool.into(),
+            Self::Var(ident) => {
+                if let Some(value) = mem.get(ident) {
+                    value.clone()
+                } else {
+                    return Err(InterpreterError::UndefinedVariable(ident.clone()));
+                }
+            }
+            Self::BinOp(op, lhs, rhs) => return op.apply(&*lhs, &*rhs, mem),
+        };
+
+        Ok(result)
     }
-    
+
     pub fn parse(tokens: &mut TokenIter) -> Result<Self, ParseError> {
         Self::parse_comp(tokens)
     }
@@ -37,8 +46,10 @@ impl Expr {
         let mut lhs = Self::parse_add(tokens)?;
 
         if let Some(token) = tokens.peek() {
-            let Some(op) = token_to_comp_op(token) else {return Ok(lhs)};
-            
+            let Some(op) = token_to_comp_op(token) else {
+                return Ok(lhs);
+            };
+
             tokens.next();
             let rhs = Self::parse_add(tokens)?;
             lhs = Self::new_bin_op(op, lhs, rhs)
@@ -52,10 +63,12 @@ impl Expr {
         let mut lhs = Self::parse_mul(tokens)?;
 
         while let Some(token) = tokens.peek() {
-            let Some(op) = token_to_add_op(token) else {return Ok(lhs)};
+            let Some(op) = token_to_add_op(token) else {
+                return Ok(lhs);
+            };
 
             tokens.next();
-            let rhs = Self::parse_mul(tokens)?; 
+            let rhs = Self::parse_mul(tokens)?;
             lhs = Self::new_bin_op(op, lhs, rhs);
         }
 
@@ -65,9 +78,11 @@ impl Expr {
     /// Parse multiply, divide and modulo `BinOp`
     fn parse_mul(tokens: &mut TokenIter) -> Result<Self, ParseError> {
         let mut lhs = Self::parse_atom(tokens)?;
-        
+
         while let Some(token) = tokens.peek() {
-            let Some(op) = token_to_mul_op(token) else {return Ok(lhs)};
+            let Some(op) = token_to_mul_op(token) else {
+                return Ok(lhs);
+            };
 
             tokens.next();
             let rhs = Self::parse_atom(tokens)?;
@@ -79,28 +94,32 @@ impl Expr {
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
     fn parse_atom(tokens: &mut TokenIter) -> Result<Self, ParseError> {
-        match tokens.peek().unwrap() {
+        let Some(token) = tokens.peek() else {
+            return Err(ParseError::UnexpectedEndOfInput);
+        };
+
+        match token {
             Token::Bool(_) => {
                 expect_pat!(Token::Bool(bool) in ITER tokens);
                 Ok(Expr::Bool(bool))
-            },
+            }
 
             Token::Num(_) => {
                 expect_pat!(Token::Num(num) in ITER tokens);
                 Ok(Expr::Num(num))
-            },
+            }
 
             Token::Ident(_) => {
                 expect_pat!(Token::Ident(ident) in ITER tokens);
                 Ok(Expr::Var(ident))
-            },
+            }
 
             Token::ParenL => {
                 expect_pat!(Token::ParenL in ITER tokens);
                 let inner = Expr::parse(tokens);
                 expect_pat!(Token::ParenR in ITER tokens);
                 inner
-            },
+            }
 
             _ => {
                 return Err(ParseError::UnexpectedToken(tokens.next().unwrap()));
@@ -111,25 +130,25 @@ impl Expr {
 
 fn token_to_comp_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Eq   => Some(BinOp::Eq),
-        Token::Neq  => Some(BinOp::Neq),
+        Token::Eq => Some(BinOp::Eq),
+        Token::Neq => Some(BinOp::Neq),
         _ => None,
     }
 }
 
 fn token_to_add_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Plus     => Some(BinOp::Add),
-        Token::Minus    => Some(BinOp::Sub),
+        Token::Plus => Some(BinOp::Add),
+        Token::Minus => Some(BinOp::Sub),
         _ => None,
     }
 }
 
 fn token_to_mul_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Asterisk     => Some(BinOp::Mul),
-        Token::Slash        => Some(BinOp::Div),
-        Token::Percentage   => Some(BinOp::Modulo),
+        Token::Asterisk => Some(BinOp::Mul),
+        Token::Slash => Some(BinOp::Div),
+        Token::Percentage => Some(BinOp::Modulo),
         _ => None,
     }
 }

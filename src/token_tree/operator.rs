@@ -1,4 +1,5 @@
 use super::Expr;
+use crate::interpreter_error::InterpreterError;
 use crate::scope::MemoryScope;
 use crate::value::Value;
 
@@ -14,19 +15,26 @@ pub enum BinOp {
 }
 
 impl BinOp {
-    pub fn apply(&self, lhs: &Expr, rhs: &Expr, scope: &MemoryScope) -> Value {
-        let lhs = lhs.eval(scope);
-        let rhs = rhs.eval(scope);
+    pub fn apply(&self, lhs: &Expr, rhs: &Expr, scope: &MemoryScope) -> Result<Value, InterpreterError> {
+        let lhs = lhs.eval(scope)?;
+        let rhs = rhs.eval(scope)?;
 
-        match self {
+        let result = match self {
             Self::Add => apply_num_op(lhs, rhs, |l, r| l + r),
             Self::Sub => apply_num_op(lhs, rhs, |l, r| l - r),
             Self::Mul => apply_num_op(lhs, rhs, |l, r| l * r),
-            Self::Div => apply_num_op(lhs, rhs, |l, r| l / r),
+            Self::Div => {
+                if rhs == Value::Num(0) {
+                    return Err(InterpreterError::ValueError);
+                }
+                apply_num_op(lhs, rhs, |l, r| l / r)
+            },
             Self::Modulo => apply_num_op(lhs, rhs, |l, r| l % r),
             Self::Eq => Value::Bool(lhs == rhs),
             Self::Neq => Value::Bool(lhs != rhs),
-        }
+        };
+
+        Ok(result)
     }
 }
 

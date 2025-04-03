@@ -18,12 +18,12 @@ macro_rules! str_pat {
 
 #[macro_export]
 macro_rules! bin_op_pat {
-    (ANY -> BOOL) => {
+    (COMPARISON) => {
         BinOp::Eq
         | BinOp::Neq
     };
 
-    (NUM -> NUM) => {
+    (NUMERIC) => {
         BinOp::Add
         | BinOp::Sub
         | BinOp::Mul

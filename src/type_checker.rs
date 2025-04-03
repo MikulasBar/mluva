@@ -94,7 +94,7 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
             let a = check_expr(a, scope)?;
             let b = check_expr(b, scope)?;
             match op {
-                bin_op_pat!(NUM -> NUM) => {
+                bin_op_pat!(NUMERIC) => {
                     if a != DataType::Num {
                         return Err(TypeCheckError::WrongType{expected: DataType::Num, found: a});
                     }
@@ -106,7 +106,7 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
                     Ok(DataType::Num)
                 },
 
-                bin_op_pat!(ANY -> BOOL) => {
+                bin_op_pat!(COMPARISON) => {
                     Ok(DataType::Bool)
                 },
             }
