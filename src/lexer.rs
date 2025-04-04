@@ -5,18 +5,25 @@ use crate::str_pat;
 
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
+    // println!("Tokenizing input: {:?}", input);
     let mut tokens = vec![];
     let mut chars = input.chars().peekable();
     
     while let Some(&char) = chars.peek() {
+        // println!("Current char: {:?}", char);
         let token = match char {
             // comment
             '#' => {
                 chars.next();
                 
-                while chars.peek() != Some(&'\n') {
-                    chars.next();
+                while chars.peek().is_some() {
+                    if let '\n' = chars.peek().unwrap() {
+                        break;
+                    } else {
+                        chars.next();
+                    }
                 }
+
                 chars.next();
                 
                 continue;
@@ -41,7 +48,16 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
             
             ';' | '\n' => {
                 chars.next();
+                if let Some(&Token::EOL) | None = tokens.last() {
+                    continue;
+                }
                 Token::EOL
+            },
+
+            // whitespaces -> skip
+            str_pat!(WS) => {
+                chars.next();
+                continue;
             },
 
             '{' => {
@@ -129,7 +145,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                     chars.next();
                 }
                 
-                Token::Num(number.parse().unwrap())
+                Token::Int(number.parse().unwrap())
             },
             
             // identifier
@@ -143,12 +159,6 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 
                 match_kw(ident)
             }
-            
-            // whitespaces -> skip
-            str_pat!(WS) => {
-                chars.next();
-                continue;
-            },
 
             _ => return Err(ParseError::UnexpectedChar(char)),
         };
@@ -164,7 +174,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
 
 fn match_kw(ident: String) -> Token {
     match ident.as_str() {
-        "Number"=> Token::DataType(DataType::Num),
+        "Int"=> Token::DataType(DataType::Int),
         "Bool"  => Token::DataType(DataType::Bool),
         "String" => Token::DataType(DataType::String),
 

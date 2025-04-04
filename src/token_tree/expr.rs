@@ -9,7 +9,7 @@ use crate::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Num(u64),
+    Int(u64),
     Bool(bool),
     Var(String),
     BinOp(BinOp, Box<Self>, Box<Self>),
@@ -23,7 +23,7 @@ impl Expr {
 
     pub fn eval(&self, mem: &MemoryScope) -> Result<Value, InterpreterError> {
         let result = match self {
-            &Self::Num(num) => num.into(),
+            &Self::Int(num) => num.into(),
             &Self::Bool(bool) => bool.into(),
             Self::Var(ident) => {
                 if let Some(value) = mem.get(ident) {
@@ -106,9 +106,9 @@ impl Expr {
                 Ok(Expr::Bool(bool))
             }
 
-            Token::Num(_) => {
-                expect_pat!(Token::Num(num) in ITER tokens);
-                Ok(Expr::Num(num))
+            Token::Int(_) => {
+                expect_pat!(Token::Int(num) in ITER tokens);
+                Ok(Expr::Int(num))
             }
 
             Token::StringLiteral(_) => {

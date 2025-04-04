@@ -88,7 +88,7 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
 
             Ok(data_type.clone())
         },
-        Expr::Num(_) => Ok(DataType::Num),
+        Expr::Int(_) => Ok(DataType::Int),
         Expr::Bool(_) => Ok(DataType::Bool),
         Expr::StringLiteral(_) => Ok(DataType::String),
         Expr::BinOp(op, a, b) => {
@@ -96,15 +96,15 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
             let b = check_expr(b, scope)?;
             match op {
                 bin_op_pat!(NUMERIC) => {
-                    if a != DataType::Num {
-                        return Err(TypeCheckError::WrongType{expected: DataType::Num, found: a});
+                    if a != DataType::Int {
+                        return Err(TypeCheckError::WrongType{expected: DataType::Int, found: a});
                     }
 
-                    if b != DataType::Num {
-                        return Err(TypeCheckError::WrongType{expected: DataType::Num, found: b});
+                    if b != DataType::Int {
+                        return Err(TypeCheckError::WrongType{expected: DataType::Int, found: b});
                     }
 
-                    Ok(DataType::Num)
+                    Ok(DataType::Int)
                 },
 
                 bin_op_pat!(COMPARISON) => {

@@ -18,16 +18,19 @@ use type_checker::type_check;
 use interpreter::interpret;
 
 fn main() {
+    // println!("Starting interpreter...");
     let input = include_str!("./test.mv");
     let tokens = tokenize(input).unwrap_or_else(|e| {
         eprintln!("Tokenize error: {:?}", e);
         std::process::exit(1);
     });
+    println!("Tokens: {:?}", tokens);
     
     let stmts = parse(tokens).unwrap_or_else(|e| {
         eprintln!("Parse error: {:?}", e);
         std::process::exit(1);
     });
+    println!("Parsed statements: {:?}", stmts);
 
     if let Err(e) = type_check(&stmts) {
         eprintln!("Type check error: {:?}", e);

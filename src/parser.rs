@@ -19,6 +19,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stm
     let mut stmts = vec![];
 
     while let Some(token) = tokens.peek() {
+        // println!("Parsing token: {:?}", token);
         if *token == critical_token {
             tokens.next();
             break;
