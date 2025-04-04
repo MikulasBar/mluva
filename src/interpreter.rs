@@ -1,4 +1,4 @@
-use crate::interpreter_error::InterpreterError;
+use crate::errors::InterpreterError;
 use crate::token_tree::*;
 use crate::scope::MemoryScope;
 

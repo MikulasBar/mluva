@@ -4,13 +4,11 @@ mod token;
 mod value;
 mod macros;
 mod parser;
-mod type_checker;
 mod token_tree;
 mod data_type;
 mod scope;
-mod type_check_error;
-mod parse_error;
-mod interpreter_error;
+mod errors;
+mod type_checker;
 
 use lexer::tokenize;
 use parser::parse;
@@ -24,13 +22,13 @@ fn main() {
         eprintln!("Tokenize error: {:?}", e);
         std::process::exit(1);
     });
-    println!("Tokens: {:?}", tokens);
+    // println!("Tokens: {:?}", tokens);
     
     let stmts = parse(tokens).unwrap_or_else(|e| {
         eprintln!("Parse error: {:?}", e);
         std::process::exit(1);
     });
-    println!("Parsed statements: {:?}", stmts);
+    // println!("Parsed statements: {:?}", stmts);
 
     if let Err(e) = type_check(&stmts) {
         eprintln!("Type check error: {:?}", e);

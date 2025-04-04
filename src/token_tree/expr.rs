@@ -1,6 +1,5 @@
 use crate::expect_pat;
-use crate::interpreter_error::InterpreterError;
-use crate::parse_error::ParseError;
+use crate::errors::*;
 use crate::parser::TokenIter;
 use crate::scope::MemoryScope;
 use crate::token::Token;
@@ -10,6 +9,7 @@ use crate::value::Value;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Int(u64),
+    Float(f64),
     Bool(bool),
     Var(String),
     BinOp(BinOp, Box<Self>, Box<Self>),
@@ -24,6 +24,7 @@ impl Expr {
     pub fn eval(&self, mem: &MemoryScope) -> Result<Value, InterpreterError> {
         let result = match self {
             &Self::Int(num) => num.into(),
+            &Self::Float(num) => num.into(),
             &Self::Bool(bool) => bool.into(),
             Self::Var(ident) => {
                 if let Some(value) = mem.get(ident) {
@@ -109,6 +110,11 @@ impl Expr {
             Token::Int(_) => {
                 expect_pat!(Token::Int(num) in ITER tokens);
                 Ok(Expr::Int(num))
+            }
+
+            Token::Float(_) => {
+                expect_pat!(Token::Float(num) in ITER tokens);
+                Ok(Expr::Float(num))
             }
 
             Token::StringLiteral(_) => {

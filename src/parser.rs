@@ -1,7 +1,7 @@
 use std::iter::Peekable;
 use std::vec::IntoIter;
 
-use crate::parse_error::ParseError;
+use crate::errors::ParseError;
 use crate::token::Token;
 use crate::token_tree::{Stmt, expr::*};
 use crate::expect_pat;

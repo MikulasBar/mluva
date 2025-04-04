@@ -1,8 +1,9 @@
 use crate::data_type::DataType;
-use crate::parse_error::ParseError;
+use crate::errors::ParseError;
 use crate::token::Token;
 use crate::str_pat;
 
+type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
     // println!("Tokenizing input: {:?}", input);
@@ -10,7 +11,6 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
     let mut chars = input.chars().peekable();
     
     while let Some(&char) = chars.peek() {
-        // println!("Current char: {:?}", char);
         let token = match char {
             // comment
             '#' => {
@@ -29,22 +29,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 continue;
             }
 
-            '\'' => {
-                chars.next();
-                let mut string = String::new();
-                
-                while let Some(&ch) = chars.peek() {
-                    if ch == '\'' {
-                        chars.next();
-                        break;
-                    } else {
-                        string.push(ch);
-                        chars.next();
-                    }
-                }
-
-                Token::StringLiteral(string)
-            } 
+            '\'' => tokenize_string(&mut chars),
             
             ';' | '\n' => {
                 chars.next();
@@ -136,29 +121,8 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 Token::Percentage
             },
             
-            // number 
-            str_pat!(NUM) => {
-                let mut number = String::new();
-                
-                while let Some(&digit @ str_pat!(NUM)) = chars.peek() {
-                    number.push(digit);
-                    chars.next();
-                }
-                
-                Token::Int(number.parse().unwrap())
-            },
-            
-            // identifier
-            str_pat!(IDENT) => {
-                let mut ident = String::new();
-                
-                while let Some(&ch @ str_pat!(IDENT)) = chars.peek() {
-                    ident.push(ch);
-                    chars.next();
-                }
-                
-                match_kw(ident)
-            }
+            str_pat!(NUM) => tokenize_number(&mut chars),
+            str_pat!(IDENT) => tokenize_ident(&mut chars),
 
             _ => return Err(ParseError::UnexpectedChar(char)),
         };
@@ -172,9 +136,62 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
 }
 
 
+fn tokenize_string(chars: &mut CharIter) -> Token {
+    chars.next(); // consume the opening quote
+    let mut string = String::new();
+    
+    while let Some(&ch) = chars.peek() {
+        if ch == '\'' {
+            chars.next(); // consume the closing quote
+            break;
+        } else {
+            string.push(ch);
+            chars.next();
+        }
+    }
+
+    Token::StringLiteral(string)
+}
+
+fn tokenize_number(chars: &mut CharIter) -> Token {
+    let mut number = String::new();
+    
+    while let Some(&digit @ str_pat!(NUM)) = chars.peek() {
+        number.push(digit);
+        chars.next();
+    }
+
+    if let Some('.') = chars.peek() {
+        chars.next();
+        number.push('.');
+
+        while let Some(&digit @ str_pat!(NUM)) = chars.peek() {
+            number.push(digit);
+            chars.next();
+        }
+
+        Token::Float(number.parse().unwrap())
+    } else {
+        Token::Int(number.parse().unwrap())
+    }
+}
+
+fn tokenize_ident(chars: &mut CharIter) -> Token {
+    let mut ident = String::new();
+    
+    while let Some(&ch @ str_pat!(IDENT)) = chars.peek() {
+        ident.push(ch);
+        chars.next();
+    }
+
+    match_kw(ident)
+}
+
+
 fn match_kw(ident: String) -> Token {
     match ident.as_str() {
-        "Int"=> Token::DataType(DataType::Int),
+        "Int" => Token::DataType(DataType::Int),
+        "Float" => Token::DataType(DataType::Float),
         "Bool"  => Token::DataType(DataType::Bool),
         "String" => Token::DataType(DataType::String),
 
@@ -184,7 +201,6 @@ fn match_kw(ident: String) -> Token {
         "let"   => Token::Let,
         "print" => Token::Print,
         "if"    => Token::If,
-        // "else"  => Token::Else, 
         "while" => Token::While,
 
         _       => Token::Ident(ident)

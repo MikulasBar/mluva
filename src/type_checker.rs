@@ -2,7 +2,7 @@ use crate::bin_op_pat;
 use crate::data_type::DataType;
 use crate::token_tree::{Expr, Stmt, BinOp};
 use crate::scope::DataTypeScope;
-use crate::type_check_error::TypeCheckError;
+use crate::errors::TypeCheckError;
 
 pub fn type_check(stmts: &[Stmt]) -> Result<(), TypeCheckError> {
     let mut scope = DataTypeScope::new();
@@ -89,6 +89,7 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
             Ok(data_type.clone())
         },
         Expr::Int(_) => Ok(DataType::Int),
+        Expr::Float(_) => Ok(DataType::Float),
         Expr::Bool(_) => Ok(DataType::Bool),
         Expr::StringLiteral(_) => Ok(DataType::String),
         Expr::BinOp(op, a, b) => {

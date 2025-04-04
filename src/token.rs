@@ -2,8 +2,9 @@ use crate::data_type::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {
+    EOF,
     EOL,
-    Assign,
+
     Plus,
     Minus,
     Asterisk,
@@ -11,21 +12,24 @@ pub enum Token {
     Eq,
     Neq,
     Percentage,
+
+    Assign,
     Print,
     If,
     Let,
-    // Else,
     While,
+
     ParenL,
     ParenR,
     BracketL,
     BracketR,
     BraceL,
     BraceR,
-    EOF,
+
     DataType(DataType),
     Ident(String),
     StringLiteral(String),
     Int(u64),
+    Float(f64),
     Bool(bool),
 }

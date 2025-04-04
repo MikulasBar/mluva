@@ -1,5 +1,5 @@
 use super::Expr;
-use crate::interpreter_error::InterpreterError;
+use crate::errors::InterpreterError;
 use crate::scope::MemoryScope;
 use crate::value::Value;
 
@@ -24,7 +24,7 @@ impl BinOp {
             Self::Sub => apply_num_op(lhs, rhs, |l, r| l - r),
             Self::Mul => apply_num_op(lhs, rhs, |l, r| l * r),
             Self::Div => {
-                if rhs == Value::Num(0) {
+                if rhs == Value::Int(0) {
                     return Err(InterpreterError::ValueError);
                 }
                 apply_num_op(lhs, rhs, |l, r| l / r)
@@ -42,7 +42,7 @@ fn apply_num_op<F>(lhs: Value, rhs: Value, op: F) -> Value
 where
     F: FnOnce(u64, u64) -> u64,
 {
-    let lhs = lhs.expect_num();
-    let rhs = rhs.expect_num();
-    Value::Num(op(lhs, rhs))
+    let lhs = lhs.expect_int();
+    let rhs = rhs.expect_int();
+    Value::Int(op(lhs, rhs))
 }
