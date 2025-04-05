@@ -4,4 +4,5 @@
 pub enum InterpreterError {
     UndefinedVariable(String),
     ValueError,
+    TypeError,
 }

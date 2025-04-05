@@ -97,15 +97,13 @@ fn check_expr(expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, TypeCh
             let b = check_expr(b, scope)?;
             match op {
                 bin_op_pat!(NUMERIC) => {
-                    if a != DataType::Int {
-                        return Err(TypeCheckError::WrongType{expected: DataType::Int, found: a});
+                    match (a, b) {
+                        (DataType::Int, DataType::Int) => Ok(DataType::Int),
+                        (DataType::Float, DataType::Float) => Ok(DataType::Float),
+                        (DataType::Int | DataType::Float, _) => return Err(TypeCheckError::WrongType{expected: a, found: b}),
+                        (_, DataType::Int | DataType::Float) => return Err(TypeCheckError::WrongType{expected: b, found: a}),
+                        _ => return Err(TypeCheckError::WrongType{expected: DataType::Int, found: a}),
                     }
-
-                    if b != DataType::Int {
-                        return Err(TypeCheckError::WrongType{expected: DataType::Int, found: b});
-                    }
-
-                    Ok(DataType::Int)
                 },
 
                 bin_op_pat!(COMPARISON) => {

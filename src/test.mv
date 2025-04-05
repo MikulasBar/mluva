@@ -6,21 +6,30 @@
 # print a # Prints 15
 
 
-Int x = 23
+# Int x = 23
 
-print x
+# print x
 
-while x != 1 {
-    if x % 2 == 1 {
-        x = 3 * x + 1
-    }
+# while x != 1 {
+#     if x % 2 == 1 {
+#         x = 3 * x + 1
+#     }
 
-    if x % 2 == 0 {
-        x = x / 2
-    }
+#     if x % 2 == 0 {
+#         x = x / 2
+#     }
 
-    print x
-}
+#     print x
+# }
 
-print x
-print 'Done!'
+# print x
+# print 'Done!'
+
+Float x = 23.12
+Float y = 45.23
+print x + y
+print x - y
+print x * y
+print x / y
+print x % y
+print x + 1.0

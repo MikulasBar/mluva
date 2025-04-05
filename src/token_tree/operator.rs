@@ -20,29 +20,43 @@ impl BinOp {
         let rhs = rhs.eval(scope)?;
 
         let result = match self {
-            Self::Add => apply_num_op(lhs, rhs, |l, r| l + r),
-            Self::Sub => apply_num_op(lhs, rhs, |l, r| l - r),
-            Self::Mul => apply_num_op(lhs, rhs, |l, r| l * r),
+            Self::Add => apply_numeric_op(lhs, rhs, |l, r| l + r, |l, r| l + r),
+            Self::Sub => apply_numeric_op(lhs, rhs, |l, r| l - r, |l, r| l - r),
+            Self::Mul => apply_numeric_op(lhs, rhs, |l, r| l * r, |l, r| l * r),
             Self::Div => {
-                if rhs == Value::Int(0) {
+                if rhs == Value::Int(0) || rhs == Value::Float(0.0) {
                     return Err(InterpreterError::ValueError);
                 }
-                apply_num_op(lhs, rhs, |l, r| l / r)
+                apply_numeric_op(lhs, rhs, |l, r| l / r, |l, r| l / r)
             },
-            Self::Modulo => apply_num_op(lhs, rhs, |l, r| l % r),
-            Self::Eq => Value::Bool(lhs == rhs),
-            Self::Neq => Value::Bool(lhs != rhs),
+            Self::Modulo => {
+                if rhs == Value::Int(0) || rhs == Value::Float(0.0) {
+                    return Err(InterpreterError::ValueError);
+                }
+                apply_numeric_op(lhs, rhs, |l, r| l % r, |l, r| l % r)
+            },
+            
+            Self::Eq => Ok(Value::Bool(lhs == rhs)),
+            Self::Neq => Ok(Value::Bool(lhs != rhs)),
         };
 
-        Ok(result)
+        result
     }
 }
 
-fn apply_num_op<F>(lhs: Value, rhs: Value, op: F) -> Value
+fn apply_numeric_op<FInt, FFloat>(
+    lhs: Value,
+    rhs: Value,
+    int_op: FInt,
+    float_op: FFloat,
+) -> Result<Value, InterpreterError>
 where
-    F: FnOnce(u64, u64) -> u64,
+    FInt: FnOnce(u64, u64) -> u64,
+    FFloat: FnOnce(f64, f64) -> f64,
 {
-    let lhs = lhs.expect_int();
-    let rhs = rhs.expect_int();
-    Value::Int(op(lhs, rhs))
+    match (lhs, rhs) {
+        (Value::Int(l), Value::Int(r)) => Ok(int_op(l, r).into()),
+        (Value::Float(l), Value::Float(r)) => Ok(float_op(l, r).into()),
+        _ => Err(InterpreterError::TypeError),
+    }
 }
