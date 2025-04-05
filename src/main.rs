@@ -10,14 +10,22 @@ mod scope;
 mod errors;
 mod type_checker;
 
+use std::io::Read;
+
 use lexer::tokenize;
 use parser::parse;
 use type_checker::type_check;
 use interpreter::interpret;
 
 fn main() {
-    let input = include_str!("./test.mv");
-    let tokens = tokenize(input).unwrap_or_else(|e| {
+    // let input = include_str!("./test.mv");
+    let mut buf = String::new();
+    let _ = std::fs::File::open("test.mv").unwrap_or_else(|e| {
+        eprintln!("Error opening file: {:?}", e);
+        std::process::exit(1);
+    }).read_to_string(&mut buf);
+
+    let tokens = tokenize(&buf).unwrap_or_else(|e| {
         eprintln!("Tokenize error: {:?}", e);
         std::process::exit(1);
     });

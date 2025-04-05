@@ -7,10 +7,10 @@ use crate::errors::TypeCheckError;
 pub fn type_check(stmts: &[Stmt]) -> Result<(), TypeCheckError> {
     let mut scope = DataTypeScope::new();
 
-    type_check_helper(&stmts, &mut scope)
+    type_check_stmts(&stmts, &mut scope)
 }
 
-fn type_check_helper(stmts: &[Stmt], scope: &mut DataTypeScope) -> Result<(), TypeCheckError> {
+fn type_check_stmts(stmts: &[Stmt], scope: &mut DataTypeScope) -> Result<(), TypeCheckError> {
     scope.enter();
 
     for s in stmts {
@@ -27,13 +27,16 @@ fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckErr
         Stmt::Print(e) => {
             check_expr(e, scope)?;
         },
-        Stmt::If(cond, stmts) => {
+        Stmt::If(cond, stmts, else_stmts) => {
             let cond = check_expr(cond, scope)?;
             if !cond.is_bool() {
                 return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
             }
 
-            return type_check_helper(stmts, scope);
+            let _ = type_check_stmts(stmts, scope)?;
+            if let Some(else_stmts) = else_stmts {
+                let _ = type_check_stmts(else_stmts, scope)?;
+            }
         },
 
         Stmt::VarDeclare(data_type, ident, expr) => {
@@ -72,7 +75,7 @@ fn check_stmt(stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), TypeCheckErr
                 return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
             }
 
-            return type_check_helper(stmts, scope);
+            return type_check_stmts(stmts, scope);
         }
     }
 

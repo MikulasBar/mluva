@@ -5,10 +5,10 @@ use crate::scope::MemoryScope;
 pub fn interpret(stmts: Vec<Stmt>) -> Result<(), InterpreterError> {
     let mut scope = MemoryScope::new();
 
-    interpret_helper(&stmts, &mut scope)
+    interpret_stmts(&stmts, &mut scope)
 }
 
-fn interpret_helper(stmts: &Vec<Stmt>, scope: &mut MemoryScope) -> Result<(), InterpreterError> {
+fn interpret_stmts(stmts: &Vec<Stmt>, scope: &mut MemoryScope) -> Result<(), InterpreterError> {
     scope.enter();
 
     for s in stmts {
@@ -28,16 +28,18 @@ fn interpret_helper(stmts: &Vec<Stmt>, scope: &mut MemoryScope) -> Result<(), In
                 println!("{}", value);
             },
 
-            Stmt::If(cond, stmts) => {
+            Stmt::If(cond, stmts, else_stmts) => {
                 let cond = cond.eval(scope)?.expect_bool();
                 if cond {
-                    interpret_helper(stmts, scope)?;
+                    interpret_stmts(stmts, scope)?;
+                } else if else_stmts.is_some(){
+                    interpret_stmts(else_stmts.as_ref().unwrap(), scope)?;
                 }
             },
 
             Stmt::While(cond, stmts) => {
                 while cond.eval(scope)?.expect_bool() {
-                    interpret_helper(stmts, scope)?;
+                    interpret_stmts(stmts, scope)?;
                 }
             },
         }

@@ -1,0 +1,43 @@
+
+
+# let i = 0;
+
+# while i != 100 {
+#     if i % 15 == 0 {
+#         print 'FizzBuzz'
+#     } else if i % 3 == 0 {
+#         print 'Fizz'
+#     } else if i % 5 == 0 {
+#         print 'Buzz'
+#     } else {
+#         print i
+#     }
+
+#     i = i + 1
+# }
+
+# Int x = 23
+
+# print x
+
+# while x != 1 {
+#     if x % 2 == 1 {
+#         x = 3 * x + 1
+#     } else {
+#         x = x / 2
+#     }
+
+#     print x
+# }
+
+# print x
+# print 'Done!'
+
+# let x = 23.12
+# let y = 45.23
+# print x + y
+# print x - y
+# print x * y
+# print x / y
+# print x % y
+# print x + 1.0

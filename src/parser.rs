@@ -12,10 +12,10 @@ pub type TokenIter = Peekable<IntoIter<Token>>;
 pub fn parse(tokens: Vec<Token>) -> Result<Vec<Stmt>, ParseError> {
     let mut tokens = tokens.into_iter().peekable();
 
-    parse_helper(&mut tokens, Token::EOF)
+    parse_stmts(&mut tokens, Token::EOF)
 }
 
-fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stmt>, ParseError> {
+fn parse_stmts(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stmt>, ParseError> {
     let mut stmts = vec![];
 
     while let Some(token) = tokens.peek() {
@@ -80,16 +80,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stm
                 Stmt::Print(expr)
             },
 
-            Token::If => {
-                expect_pat!(Token::If               in ITER tokens);
-
-                let cond = Expr::parse(tokens)?;
-
-                expect_pat!(Token::BraceL           in ITER tokens);
-
-                let stmts = parse_helper(tokens, Token::BraceR)?;
-                Stmt::If(cond, stmts)
-            },
+            Token::If => parse_if_statement(tokens)?,
 
             Token::While => {
                 expect_pat!(Token::While in ITER tokens);
@@ -98,7 +89,7 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stm
 
                 expect_pat!(Token::BraceL           in ITER tokens);
 
-                let stmts = parse_helper(tokens, Token::BraceR)?;
+                let stmts = parse_stmts(tokens, Token::BraceR)?;
                 Stmt::While(cond, stmts)
             },
             
@@ -114,3 +105,30 @@ fn parse_helper(tokens: &mut TokenIter, critical_token: Token) -> Result<Vec<Stm
 }
 
 
+
+
+fn parse_if_statement(tokens: &mut TokenIter) -> Result<Stmt, ParseError> {
+    expect_pat!(Token::If in ITER tokens);
+
+    let cond = Expr::parse(tokens)?;
+
+    expect_pat!(Token::BraceL in ITER tokens);
+
+    let stmts = parse_stmts(tokens, Token::BraceR)?;
+
+    let else_branch = if let Some(Token::Else) = tokens.peek() {
+        expect_pat!(Token::Else in ITER tokens);
+    
+        if let Some(Token::If) = tokens.peek() {
+            Some(vec![parse_if_statement(tokens)?])
+        } else {
+            expect_pat!(Token::BraceL in ITER tokens);
+            let stmts = parse_stmts(tokens, Token::BraceR)?;
+            Some(stmts)
+        }
+    } else {
+        None
+    };
+
+    Ok(Stmt::If(cond, stmts, else_branch))
+}

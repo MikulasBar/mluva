@@ -16,6 +16,7 @@ pub enum Token {
     Assign,
     Print,
     If,
+    Else,
     Let,
     While,
 
