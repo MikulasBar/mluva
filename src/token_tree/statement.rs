@@ -3,7 +3,7 @@ use super::expr::Expr;
 
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {
     VarAssign(String, Expr),
     VarDeclare(Option<DataType>, String, Expr),
@@ -12,4 +12,5 @@ pub enum Stmt {
     // condition, statements, else statements
     If(Expr, Vec<Stmt>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
+    Expr(Expr),
 }

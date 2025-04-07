@@ -9,40 +9,36 @@ mod data_type;
 mod scope;
 mod errors;
 mod type_checker;
+mod engine;
 
 use std::io::Read;
-
-use lexer::tokenize;
-use parser::parse;
-use type_checker::type_check;
-use interpreter::interpret;
+use engine::{Engine, PrintFunction};
 
 fn main() {
-    // let input = include_str!("./test.mv");
     let mut buf = String::new();
     let _ = std::fs::File::open("test.mv").unwrap_or_else(|e| {
         eprintln!("Error opening file: {:?}", e);
         std::process::exit(1);
     }).read_to_string(&mut buf);
 
-    let tokens = tokenize(&buf).unwrap_or_else(|e| {
-        eprintln!("Tokenize error: {:?}", e);
-        std::process::exit(1);
-    });
-    
-    let stmts = parse(tokens).unwrap_or_else(|e| {
-        eprintln!("Parse error: {:?}", e);
+    let mut engine = Engine::new();
+    engine.add_function(PrintFunction);
+
+    let stmts = engine.parse(&buf).unwrap_or_else(|e| {
+        eprintln!("Paring error: {:?}", e);
         std::process::exit(1);
     });
 
-    if let Err(e) = type_check(&stmts) {
+    // println!("{:?}", stmts);
+
+    let type_check_result = engine.type_check(&stmts);
+    if let Err(e) = type_check_result {
         eprintln!("Type check error: {:?}", e);
         return;
     }
 
-    let result = interpret(stmts);
-
-    if let Err(e) = result {
+    let interpret_result = engine.interpret(&stmts);
+    if let Err(e) = interpret_result {
         eprintln!("Interpret error: {:?}", e);
         return;
     }

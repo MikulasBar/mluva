@@ -8,4 +8,5 @@ pub enum TypeCheckError {
         found: DataType,
     },
     VariableNotFound(String),
+    FunctionNotFound(String),
 }

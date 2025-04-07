@@ -20,13 +20,13 @@ impl<T> Scope<T> {
     }
     
     pub fn exit(&mut self) {
-        self.scopes.pop();
+       self.scopes.pop();
     }
 }
 
 impl<T: Default> Scope<T> {
     pub fn enter(&mut self) {
-        self.scopes.push(T::default());
+       self.scopes.push(T::default());
     }
 }
 
@@ -69,6 +69,6 @@ where
 //     type Output = V;
 
 //     fn index(&self, key: &K) -> &Self::Output {
-//         self.get(key).unwrap()
+//        self.get(key).unwrap()
 //     }
 // } 

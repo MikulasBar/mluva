@@ -75,6 +75,11 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 Token::BracketR
             }
 
+            ',' => {
+                chars.next();
+                Token::Comma
+            }
+
             '!' => {
                 chars.next();
                 if let Some('=') = chars.peek() {
@@ -199,7 +204,7 @@ fn match_kw(ident: String) -> Token {
         "false" => Token::Bool(false),
         
         "let"   => Token::Let,
-        "print" => Token::Print,
+        // "print" => Token::Print,
         "if"    => Token::If,
         "else"  => Token::Else,
         "while" => Token::While,
