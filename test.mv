@@ -1,6 +1,7 @@
 
 
 print('Hello, world!')
+print(1, 2, false, 'asfaf', 45.65)
 
 # let i = 0
 

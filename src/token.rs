@@ -14,7 +14,6 @@ pub enum Token {
     Percentage,
 
     Assign,
-    Print,
     If,
     Else,
     Let,

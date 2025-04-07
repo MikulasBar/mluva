@@ -204,7 +204,6 @@ fn match_kw(ident: String) -> Token {
         "false" => Token::Bool(false),
         
         "let"   => Token::Let,
-        // "print" => Token::Print,
         "if"    => Token::If,
         "else"  => Token::Else,
         "while" => Token::While,

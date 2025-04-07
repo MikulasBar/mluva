@@ -40,9 +40,6 @@ impl<'a> TypeChecker<'a> {
 
     fn check_stmt(&mut self, stmt: &Stmt) -> Result<(), TypeCheckError> {
         match stmt {
-            Stmt::Print(e) => {
-               self.check_expr(e)?;
-            },
             Stmt::If(cond, stmts, else_stmts) => {
                 let cond = self.check_expr(cond)?;
                 if !cond.is_bool() {

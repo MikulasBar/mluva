@@ -40,11 +40,6 @@ impl<'a> Interpreter<'a> {
                    self.scope.insert_new(ident.clone(), value);
                 },
     
-                Stmt::Print(expr) => {
-                    let value = self.eval_expr(&expr)?;
-                    println!("{}", value);
-                },
-    
                 Stmt::If(cond, stmts, else_stmts) => {
                     let cond = self.eval_expr(&cond)?.expect_bool();
                     if cond {

@@ -104,17 +104,6 @@ impl<'a> Parser<'a> {
                 Token::Ident(_) => {
                    self.parse_ident_statement()?
                 },
-                
-                // print
-                Token::Print => {
-                    expect_pat!(Token::Print in self);
-
-                    let expr = self.parse_expr()?;
-
-                    expect_pat!(Token::EOL in self);
-
-                    Stmt::Print(expr)
-                },
 
                 Token::If => self.parse_if_statement()?,
 

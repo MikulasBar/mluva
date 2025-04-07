@@ -29,7 +29,7 @@ fn main() {
         std::process::exit(1);
     });
 
-    // println!("{:?}", stmts);
+    println!("{:?}", stmts);
 
     let type_check_result = engine.type_check(&stmts);
     if let Err(e) = type_check_result {
