@@ -2,12 +2,12 @@ use std::collections::HashMap;
 
 use crate::bin_op_pat;
 use crate::data_type::DataType;
-use crate::engine::ExternalFunction;
+use crate::external::ExternalFunction;
 use crate::token_tree::{Expr, Stmt, BinOp};
 use crate::scope::DataTypeScope;
 use crate::errors::TypeCheckError;
 
-type FunctionMap = HashMap<String, Box<dyn ExternalFunction>>;
+type FunctionMap = HashMap<&'static str, ExternalFunction>;
 
 pub struct TypeChecker<'a> {
     scope: DataTypeScope,
@@ -114,7 +114,7 @@ impl<'a> TypeChecker<'a> {
             Expr::StringLiteral(_) => Ok(DataType::String),
 
             Expr::FuncCall(name, args) => {
-                let Some(func) = self.functions.get(name) else {
+                let Some(func) = self.functions.get(name.as_str()) else {
                     return Err(TypeCheckError::FunctionNotFound(name.clone()));
                 };
 
@@ -124,7 +124,7 @@ impl<'a> TypeChecker<'a> {
 
                 func.check_types(&arg_types)?;
 
-                Ok(func.get_return_type())
+                Ok(func.return_type)
             }
 
             Expr::BinOp(op, a, b) => {

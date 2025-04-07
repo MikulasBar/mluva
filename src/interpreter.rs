@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
-use crate::engine::ExternalFunction;
+use crate::external::ExternalFunction;
 use crate::errors::InterpreterError;
 use crate::token_tree::*;
 use crate::scope::MemoryScope;
 use crate::value::Value;
 
-type FunctionMap = HashMap<String, Box<dyn ExternalFunction>>;
+type FunctionMap = HashMap<&'static str, ExternalFunction>;
 
 pub struct Interpreter<'a> {
     scope: MemoryScope,
@@ -81,7 +81,7 @@ impl<'a> Interpreter<'a> {
             Expr::BinOp(op, lhs, rhs) => return self.apply_operator(op, &*lhs, &*rhs),
             Expr::StringLiteral(string) => string.clone().into(),
             Expr::FuncCall(name, args) => {
-                let Some(func) = self.functions.get(name) else {
+                let Some(func) = self.functions.get(name.as_str()) else {
                     return Err(InterpreterError::UndefinedFunction(name.clone()));
                 };
 

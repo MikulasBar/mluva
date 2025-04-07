@@ -3,6 +3,8 @@
 use core::panic;
 use std::fmt::Display;
 
+use crate::data_type::DataType;
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Void,
@@ -13,13 +15,13 @@ pub enum Value {
 }
 
 impl Value {
-    pub fn get_type(&self) -> crate::data_type::DataType {
+    pub fn get_type(&self) -> DataType {
         match self {
-            Self::Void => crate::data_type::DataType::Void,
-            Self::Int(_) => crate::data_type::DataType::Int,
-            Self::Float(_) => crate::data_type::DataType::Float,
-            Self::Bool(_) => crate::data_type::DataType::Bool,
-            Self::String(_) => crate::data_type::DataType::String,
+            Self::Void => DataType::Void,
+            Self::Int(_) => DataType::Int,
+            Self::Float(_) => DataType::Float,
+            Self::Bool(_) => DataType::Bool,
+            Self::String(_) => DataType::String,
         }
     }
 

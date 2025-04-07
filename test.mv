@@ -3,6 +3,8 @@
 print('Hello, world!')
 print(1, 2, false, 'asfaf', 45.65)
 
+# print(12 + 'string')
+
 # let i = 0
 
 # while i != 100 {

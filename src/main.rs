@@ -10,9 +10,11 @@ mod scope;
 mod errors;
 mod type_checker;
 mod engine;
+mod external;
 
 use std::io::Read;
-use engine::{Engine, PrintFunction};
+use engine::Engine;
+use external::PRINT_FUNCTION;
 
 fn main() {
     let mut buf = String::new();
@@ -22,7 +24,7 @@ fn main() {
     }).read_to_string(&mut buf);
 
     let mut engine = Engine::new();
-    engine.add_function(PrintFunction);
+    engine.add_function(PRINT_FUNCTION);
 
     let stmts = engine.parse(&buf).unwrap_or_else(|e| {
         eprintln!("Paring error: {:?}", e);

@@ -1,12 +1,17 @@
 use std::collections::HashMap;
 
-use crate::{data_type::DataType, errors::{InterpreterError, ParseError, TypeCheckError}, interpreter::Interpreter, lexer::tokenize, parser::Parser, token_tree::Stmt, type_checker::TypeChecker, value::Value};
-
-
-
+use crate::{
+    errors::{InterpreterError, ParseError, TypeCheckError},
+    external::ExternalFunction,
+    interpreter::Interpreter,
+    lexer::tokenize,
+    parser::Parser,
+    token_tree::Stmt,
+    type_checker::TypeChecker,
+};
 
 pub struct Engine {
-    functions: HashMap<String, Box<dyn ExternalFunction>>,
+    functions: HashMap<&'static str, ExternalFunction>,
 }
 
 impl Engine {
@@ -16,9 +21,9 @@ impl Engine {
         }
     }
 
-    pub fn add_function(&mut self, function: impl ExternalFunction + 'static) {
-        let name = function.get_name();
-       self.functions.insert(name, Box::new(function));
+    pub fn add_function(&mut self, function: ExternalFunction) {
+        let name = function.name;
+        self.functions.insert(name, function);
     }
 
     pub fn parse(&self, input: &str) -> Result<Vec<Stmt>, ParseError> {
@@ -36,65 +41,3 @@ impl Engine {
         interpreter.interpret(stmts)
     }
 }
-
-
-pub trait ExternalFunction {
-    fn get_name(&self) -> String;
-    fn get_return_type(&self) -> DataType;
-    fn check_types(&self, args: &[DataType]) -> Result<(), TypeCheckError>;
-    fn call(&self, args: Vec<Value>) -> Result<Value, InterpreterError>;
-}
-
-
-pub struct PrintFunction;
-
-impl ExternalFunction for PrintFunction {
-    fn get_name(&self) -> String {
-        "print".to_string()
-    }
-
-    fn get_return_type(&self) -> DataType {
-        DataType::Void
-    }
-
-    fn check_types(&self, _args: &[DataType]) -> Result<(), TypeCheckError> {
-        Ok(())
-    }
-
-    fn call(&self, args: Vec<Value>) -> Result<Value, InterpreterError> {
-        for arg in args {
-            println!("{}", arg);
-        }
-        Ok(Value::Void)
-    }
-}
-
-
-
-
-// pub struct ExternalFunction {
-//     name: String,
-//     return_type: DataType,
-//     check_types: fn(&[DataType]) -> Result<(), TypeCheckError>,
-//     call: fn(Vec<Value>) -> Result<Value, InterpreterError>,
-// } 
-
-// const PRINT_FUNCTION: ExternalFunction = ExternalFunction {
-//     name: "print".to_string(),
-//     return_type: DataType::Void,
-//     check_types: |args| {
-//         if args.len() != 1 {
-//             return Err(TypeCheckError::InvalidArgumentCount);
-//         }
-//         if args[0] != DataType::String {
-//             return Err(TypeCheckError::InvalidArgumentType);
-//         }
-//         Ok(())
-//     },
-//     call: |args| {
-//         for a in args {
-//             println!("{}", a);
-//         }
-//         Ok(Value::Void)
-//     },
-// }
