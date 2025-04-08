@@ -1,13 +1,10 @@
-use crate::token_tree::operator::BinOp;
+use crate::{token_tree::operator::BinOp, value::Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Int(u64),
-    Float(f64),
-    Bool(bool),
+    Literal(Value),
     Var(String),
     BinOp(BinOp, Box<Self>, Box<Self>),
-    StringLiteral(String),
     FuncCall(String, Vec<Expr>),
 }
 

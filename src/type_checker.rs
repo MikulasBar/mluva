@@ -108,11 +108,7 @@ impl<'a> TypeChecker<'a> {
 
                 Ok(data_type.clone())
             },
-            Expr::Int(_) => Ok(DataType::Int),
-            Expr::Float(_) => Ok(DataType::Float),
-            Expr::Bool(_) => Ok(DataType::Bool),
-            Expr::StringLiteral(_) => Ok(DataType::String),
-
+            Expr::Literal(lit) => Ok(lit.get_type()),
             Expr::FuncCall(name, args) => {
                 let Some(func) = self.functions.get(name.as_str()) else {
                     return Err(TypeCheckError::FunctionNotFound(name.clone()));

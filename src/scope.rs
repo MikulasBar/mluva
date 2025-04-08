@@ -64,7 +64,7 @@ where
 
 // impl<K, V> Index<&K> for Scope<HashMap<K, V>>
 // where
-//     K: Eq + Hash + Clone
+//     K: Equal + Hash + Clone
 // {
 //     type Output = V;
 

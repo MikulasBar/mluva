@@ -68,9 +68,7 @@ impl<'a> Interpreter<'a> {
 
     fn eval_expr(&mut self, expr: &Expr) -> Result<Value, InterpreterError> {
         let result = match expr {
-            Expr::Int(num) => num.clone().into(),
-            Expr::Float(num) => num.clone().into(),
-            Expr::Bool(bool) => bool.clone().into(),
+            Expr::Literal(lit) => lit.clone().into(),
             Expr::Var(ident) => {
                 if let Some(value) = self.scope.get(&ident) {
                     value.clone()
@@ -79,7 +77,6 @@ impl<'a> Interpreter<'a> {
                 }
             }
             Expr::BinOp(op, lhs, rhs) => return self.apply_operator(op, &*lhs, &*rhs),
-            Expr::StringLiteral(string) => string.clone().into(),
             Expr::FuncCall(name, args) => {
                 let Some(func) = self.functions.get(name.as_str()) else {
                     return Err(InterpreterError::UndefinedFunction(name.clone()));
@@ -117,8 +114,8 @@ impl<'a> Interpreter<'a> {
                 apply_numeric_op(lhs, rhs, |l, r| l % r, |l, r| l % r)
             },
             
-            BinOp::Eq => Ok(Value::Bool(lhs == rhs)),
-            BinOp::Neq => Ok(Value::Bool(lhs != rhs)),
+            BinOp::Equal => Ok(Value::Bool(lhs == rhs)),
+            BinOp::NotEqual => Ok(Value::Bool(lhs != rhs)),
         };
 
         result

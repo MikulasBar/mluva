@@ -9,8 +9,8 @@ pub enum Token {
     Minus,
     Asterisk,
     Slash,
-    Eq,
-    Neq,
+    Equal,
+    NotEqual,
     Percentage,
 
     Assign,

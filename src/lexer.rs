@@ -84,7 +84,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 chars.next();
                 if let Some('=') = chars.peek() {
                     chars.next();
-                    Token::Neq
+                    Token::NotEqual
                 } else {
                     return Err(ParseError::UnexpectedChar(char));
                 }
@@ -95,7 +95,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                 chars.next();
                 if let Some('=') = chars.peek() {
                     chars.next();
-                    Token::Eq
+                    Token::Equal
                 } else {
                     Token::Assign
                 }

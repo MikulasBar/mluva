@@ -2,6 +2,7 @@ use crate::errors::ParseError;
 use crate::token::Token;
 use crate::token_tree::{expr::*, BinOp, Stmt};
 use crate::expect_pat;
+use crate::value::Value;
 
 
 pub struct Parser<'a> {
@@ -246,22 +247,22 @@ impl<'a> Parser<'a> {
         match token {
             Token::Bool(_) => {
                 expect_pat!(Token::Bool(bool) in self);
-                Ok(Expr::Bool(bool))
+                Ok(Expr::Literal(Value::Bool(bool)))
             }
 
             Token::Int(_) => {
-                expect_pat!(Token::Int(num) in self);
-                Ok(Expr::Int(num))
+                expect_pat!(Token::Int(int) in self);
+                Ok(Expr::Literal(Value::Int(int)))
             }
 
             Token::Float(_) => {
-                expect_pat!(Token::Float(num) in self);
-                Ok(Expr::Float(num))
+                expect_pat!(Token::Float(float) in self);
+                Ok(Expr::Literal(Value::Float(float)))
             }
 
             Token::StringLiteral(_) => {
                 expect_pat!(Token::StringLiteral(string) in self);
-                Ok(Expr::StringLiteral(string))
+                Ok(Expr::Literal(Value::String(string)))
             }
 
             Token::Ident(_) => {
@@ -314,8 +315,8 @@ impl<'a> Parser<'a> {
 
 fn token_to_comp_op(token: &Token) -> Option<BinOp> {
     match token {
-        Token::Eq => Some(BinOp::Eq),
-        Token::Neq => Some(BinOp::Neq),
+        Token::Equal => Some(BinOp::Equal),
+        Token::NotEqual => Some(BinOp::NotEqual),
         _ => None,
     }
 }

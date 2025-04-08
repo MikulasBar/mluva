@@ -1,21 +1,30 @@
 
 
-print('Hello, world!')
-print(1, 2, false, 'asfaf', 45.65)
 
-# print(12 + 'string')
+let x = 0
+
+while x != 1000000000 {
+    x = x + 1
+}
+
+print('Done!')
+
+# print('Hello, world!')
+# print(1, 2, false, 'asfaf', 45.65)
+
+# # print(12 + 'string')
 
 # let i = 0
 
 # while i != 100 {
-#     if (i % 15 == 0) {
-#         print 'FizzBuzz'
-#     } else if (i % 3 == 0) {
-#         print 'Fizz'
+#     if i % 15 == 0 {
+#         print('FizzBuzz')
+#     } else if i % 3 == 0 {
+#         print('Fizz')
 #     } else if i % 5 == 0 {
-#         print 'Buzz'
+#         print('Buzz')
 #     } else {
-#         print i
+#         print(i)
 #     }
 
 #     i = i + 1

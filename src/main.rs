@@ -11,26 +11,28 @@ mod errors;
 mod type_checker;
 mod engine;
 mod external;
+mod instruction;
+mod compiler;
 
 use std::io::Read;
 use engine::Engine;
 use external::PRINT_FUNCTION;
 
 fn main() {
-    let mut buf = String::new();
-    let _ = std::fs::File::open("test.mv").unwrap_or_else(|e| {
-        eprintln!("Error opening file: {:?}", e);
-        std::process::exit(1);
-    }).read_to_string(&mut buf);
+    let mut input = String::new();
+    let mut file = std::fs::File::open("test.mv").unwrap();
+    file.read_to_string(&mut input).unwrap();
 
     let mut engine = Engine::new();
     engine.add_function(PRINT_FUNCTION);
 
-    let stmts = engine.parse(&buf).unwrap_or_else(|e| {
-        eprintln!("Paring error: {:?}", e);
-        std::process::exit(1);
-    });
+    let parse_result = engine.parse(&input);
+    if let Err(e) = parse_result {
+        eprintln!("Parse error: {:?}", e);
+        return;
+    }
 
+    let stmts = parse_result.unwrap();
     println!("{:?}", stmts);
 
     let type_check_result = engine.type_check(&stmts);

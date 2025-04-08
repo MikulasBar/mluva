@@ -5,7 +5,7 @@ pub enum BinOp {
     Mul,
     Div,
     Modulo,
-    Eq,
-    Neq,
+    Equal,
+    NotEqual,
 }
 

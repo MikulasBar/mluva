@@ -23,8 +23,8 @@ macro_rules! str_pat {
 #[macro_export]
 macro_rules! bin_op_pat {
     (COMPARISON) => {
-        BinOp::Eq
-        | BinOp::Neq
+        BinOp::Equal
+        | BinOp::NotEqual
     };
 
     (NUMERIC) => {
