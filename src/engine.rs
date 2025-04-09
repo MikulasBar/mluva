@@ -1,7 +1,13 @@
-use std::collections::HashMap;
-
 use crate::{
-    compiler::Compiler, errors::{CompileError, InterpreterError}, external::ExternalFunction, function_table::FunctionTable, instruction::Instruction, interpreter::Interpreter, lexer::tokenize, parser::Parser, token_tree::Stmt, type_checker::{self, TypeChecker}
+    compiler::Compiler,
+    errors::{CompileError, InterpreterError},
+    external::ExternalFunction,
+    function_table::FunctionTable,
+    instruction::Instruction,
+    interpreter::Interpreter,
+    lexer::tokenize,
+    parser::Parser,
+    type_checker::TypeChecker,
 };
 
 pub struct Engine {
@@ -23,14 +29,18 @@ impl Engine {
         let tokens = tokenize(input)?;
         let stmts = Parser::new(&tokens).parse()?;
         TypeChecker::new(&self.function_table).check(&stmts)?;
-        
+
         let compiler = Compiler::new(&self.function_table);
         let compile_result = compiler.compile(&stmts);
 
         Ok(compile_result)
     }
 
-    pub fn interpret(&self, instructions: Vec<Instruction>, slot_used: usize) -> Result<(), InterpreterError> {
+    pub fn interpret(
+        &self,
+        instructions: Vec<Instruction>,
+        slot_used: usize,
+    ) -> Result<(), InterpreterError> {
         let mut interpreter = Interpreter::new(&self.function_table, instructions, slot_used);
         interpreter.interpret()
     }

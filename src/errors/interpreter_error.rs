@@ -1,21 +1,11 @@
-use crate::data_type::DataType;
-
-
-
 #[derive(Debug, Clone)]
 pub enum InterpreterError {
-    // UndefinedVariable(String),
-    // UndefinedFunction(String),
-    // ValueError,
-    // TypeError,
-    // WrongArgumentCount {
-    //     expected: usize,
-    //     found: usize,
-    // },
-    // WrongArgumentType {
-    //     expected: DataType,
-    //     found: DataType,
-    // },
-
     ValueStackUnderflow,
+    DivisionByZero,
+    Unknown,
+    
+    /// this is for any type error
+    /// these errors should be handled in the type checker
+    /// but I want to have a fallback for any type error
+    TypeError,
 }

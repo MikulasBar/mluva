@@ -1,12 +1,9 @@
 use core::panic;
 use std::{collections::HashMap, hash::Hash};
 
-use crate::value::Value;
-
 use super::data_type::DataType;
 
 pub type DataTypeScope = Scope<HashMap<String, DataType>>;
-pub type MemoryScope = Scope<HashMap<String, Value>>;
 
 pub struct Scope<T> {
     scopes: Vec<T>,
@@ -61,14 +58,3 @@ where
         None
     }    
 }
-
-// impl<K, V> Index<&K> for Scope<HashMap<K, V>>
-// where
-//     K: Equal + Hash + Clone
-// {
-//     type Output = V;
-
-//     fn index(&self, key: &K) -> &Self::Output {
-//        self.get(key).unwrap()
-//     }
-// } 

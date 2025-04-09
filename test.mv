@@ -1,9 +1,9 @@
 
 
 
-let x = 'Hello, world!';
+# let x = 'Hello, world!';
 
-print(x)
+# print(x)
 
 # let x = 0
 
@@ -16,7 +16,7 @@ print(x)
 # print('Hello, world!')
 # print(1, 2, false, 'asfaf', 45.65)
 
-# # print(12 + 'string')
+# print(12 + 'string')
 
 # let i = 0
 
@@ -38,7 +38,7 @@ print(x)
 
 # Int x = 23
 
-# print x
+# print(x)
 
 # while x != 1 {
 #     if x % 2 == 1 {
@@ -47,17 +47,18 @@ print(x)
 #         x = x / 2
 #     }
 
-#     print x
+#     print(x)
 # }
 
-# print x
-# print 'Done!'
+# print(x)
+# print('Done!')
+
 
 # let x = 23.12
 # let y = 45.23
-# print x + y
-# print x - y
-# print x * y
-# print x / y
-# print x % y
-# print x + 1.0
+# print(x + y)
+# print(x - y)
+# print(x * y)
+# print(x / y)
+# print(x % y)
+# print(x + 1.0)

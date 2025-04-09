@@ -1,9 +1,8 @@
 
 
-use core::panic;
 use std::fmt::Display;
 
-use crate::data_type::DataType;
+use crate::{data_type::DataType, errors::InterpreterError};
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
@@ -25,28 +24,123 @@ impl Value {
         }
     }
 
-    pub fn expect_int(&self) -> u64 {
-        let Value::Int(int) = self else {
-            panic!("Expected an integer, but got {:?}", self);
-        };
-        *int
+    pub fn is_false(&self) -> Result<bool, InterpreterError> {
+        match self {
+            Self::Bool(b) => Ok(!b),
+            _ => Err(InterpreterError::TypeError),
+        }
     }
 
-    pub fn expect_bool(&self) -> bool {
-        let Value::Bool(bool) = self else {
-            panic!("Expected an integer, but got {:?}", self);
-        };
-        *bool
-    }
+    // pub fn is_true(&self) -> Result<bool, InterpreterError> {
+    //     match self {
+    //         Self::Bool(b) => Ok(*b),
+    //         _ => Err(InterpreterError::TypeError),
+    //     }
+    // }
 
-    pub fn expect_float(&self) -> f64 {
-        let Value::Float(float) = self else {
-            panic!("Expected an integer, but got {:?}", self);
-        };
-        *float
-    }
+    // pub fn expect_int(&self) -> u64 {
+    //     let Value::Int(int) = self else {
+    //         panic!("Expected an integer, but got {:?}", self);
+    //     };
+    //     *int
+    // }
+
+    // pub fn expect_bool(&self) -> bool {
+    //     let Value::Bool(bool) = self else {
+    //         panic!("Expected an integer, but got {:?}", self);
+    //     };
+    //     *bool
+    // }
+
+    // pub fn expect_float(&self) -> f64 {
+    //     let Value::Float(float) = self else {
+    //         panic!("Expected an integer, but got {:?}", self);
+    //     };
+    //     *float
+    // }
 }
 
+// Operators
+// I don't use overloaded operators cause I don't like them and it could be missleading
+impl Value {
+    pub fn equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
+        Ok(*self == rhs)
+    }
+
+    pub fn not_equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
+        Ok(*self != rhs)
+    }
+
+    pub fn add_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => *a += b,
+            (Self::Float(a), Self::Float(b)) => *a += b,
+            _ => return Err(InterpreterError::Unknown)
+        }
+
+        Ok(())
+    }
+
+    pub fn mul_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => *a *= b,
+            (Self::Float(a), Self::Float(b)) => *a *= b,
+            _ => return Err(InterpreterError::Unknown)
+        }
+
+        Ok(())
+    }
+
+    pub fn sub_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => *a -= b,
+            (Self::Float(a), Self::Float(b)) => *a -= b,
+            _ => return Err(InterpreterError::Unknown)
+        }
+
+        Ok(())
+    }
+
+    pub fn div_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => {
+                if b == 0 {
+                    return Err(InterpreterError::DivisionByZero);
+                }
+                *a /= b
+            },
+            (Self::Float(a), Self::Float(b)) => {
+                if b == 0.0 {
+                    return Err(InterpreterError::DivisionByZero);
+                }
+                *a /= b
+            },
+            _ => return Err(InterpreterError::Unknown)
+        }
+
+        Ok(())
+    }
+
+    pub fn modulo_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => {
+                if b == 0 {
+                    return Err(InterpreterError::DivisionByZero);
+                }
+                *a %= b
+            },
+            (Self::Float(a), Self::Float(b)) => {
+                if b == 0.0 {
+                    return Err(InterpreterError::DivisionByZero);
+                }
+                *a %= b
+            },
+            _ => return Err(InterpreterError::Unknown)
+        }
+
+        Ok(())
+    }
+}
 
 mod froms {
     use super::*;
