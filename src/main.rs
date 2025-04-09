@@ -1,14 +1,6 @@
-mod lexer;
 mod interpreter;
-mod token;
 mod value;
-mod macros;
-mod parser;
-mod token_tree;
-mod data_type;
-mod scope;
 mod errors;
-mod type_checker;
 mod engine;
 mod external;
 mod instruction;

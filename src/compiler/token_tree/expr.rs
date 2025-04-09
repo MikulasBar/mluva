@@ -1,4 +1,5 @@
-use crate::{token_tree::operator::BinOp, value::Value};
+use crate::value::Value;
+use super::operator::BinOp;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {

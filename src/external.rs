@@ -1,4 +1,4 @@
-use crate::{data_type::DataType, errors::{InterpreterError, CompileError}, value::Value};
+use crate::{compiler::DataType, errors::{InterpreterError, CompileError}, value::Value};
 
 
 

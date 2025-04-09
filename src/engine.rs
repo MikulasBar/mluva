@@ -1,13 +1,10 @@
 use crate::{
-    compiler::Compiler,
     errors::{CompileError, InterpreterError},
     external::ExternalFunction,
     function_table::FunctionTable,
     instruction::Instruction,
     interpreter::Interpreter,
-    lexer::tokenize,
-    parser::Parser,
-    type_checker::TypeChecker,
+    compiler::{tokenize, Compiler, Parser, TypeChecker},
 };
 
 pub struct Engine {

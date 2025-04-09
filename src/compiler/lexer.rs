@@ -1,6 +1,6 @@
-use crate::data_type::DataType;
+use super::data_type::DataType;
 use crate::errors::CompileError;
-use crate::token::Token;
+use super::token::Token;
 use crate::str_pat;
 
 type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;

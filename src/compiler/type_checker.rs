@@ -1,9 +1,8 @@
 use crate::bin_op_pat;
-use crate::data_type::DataType;
-use crate::external::ExternalFunction;
+use super::data_type::DataType;
 use crate::function_table::FunctionTable;
-use crate::token_tree::{Expr, Stmt, BinOp};
-use crate::scope::DataTypeScope;
+use super::token_tree::{Expr, Stmt, BinOp};
+use super::scope::DataTypeScope;
 use crate::errors::CompileError;
 
 

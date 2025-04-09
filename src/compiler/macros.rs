@@ -51,3 +51,10 @@ macro_rules! expect_pat {
         };
     };
 }
+
+
+pub use {
+    str_pat,
+    bin_op_pat,
+    expect_pat,
+};

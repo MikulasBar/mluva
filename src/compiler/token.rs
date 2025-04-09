@@ -1,4 +1,4 @@
-use crate::data_type::DataType;
+use super::data_type::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Token {

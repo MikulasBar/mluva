@@ -1,4 +1,4 @@
-use crate::{data_type::DataType, token::Token};
+use crate::compiler::{data_type::DataType, token::Token};
 
 
 #[derive(Debug, Clone)]

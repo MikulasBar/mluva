@@ -2,7 +2,8 @@
 
 use std::fmt::Display;
 
-use crate::{data_type::DataType, errors::InterpreterError};
+use super::compiler::data_type::DataType;
+use crate::errors::InterpreterError;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {

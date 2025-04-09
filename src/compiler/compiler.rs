@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use crate::{function_table::FunctionTable, instruction::Instruction, token_tree::{BinOp, Expr, Stmt}};
-
+use crate::{function_table::FunctionTable, instruction::Instruction};
+use super::token_tree::{BinOp, Expr, Stmt};
 
 pub struct Compiler<'a> {
     instructions: Vec<Instruction>,

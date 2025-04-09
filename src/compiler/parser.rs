@@ -1,6 +1,6 @@
 use crate::errors::CompileError;
-use crate::token::Token;
-use crate::token_tree::{expr::*, BinOp, Stmt};
+use super::token::Token;
+use super::token_tree::{Expr, BinOp, Stmt};
 use crate::expect_pat;
 use crate::value::Value;
 
