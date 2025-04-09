@@ -1,43 +1,37 @@
 use std::collections::HashMap;
 
 use crate::{
-    errors::{InterpreterError, ParseError, TypeCheckError},
-    external::ExternalFunction,
-    interpreter::Interpreter,
-    lexer::tokenize,
-    parser::Parser,
-    token_tree::Stmt,
-    type_checker::TypeChecker,
+    compiler::Compiler, errors::{CompileError, InterpreterError}, external::ExternalFunction, function_table::FunctionTable, instruction::Instruction, interpreter::Interpreter, lexer::tokenize, parser::Parser, token_tree::Stmt, type_checker::{self, TypeChecker}
 };
 
 pub struct Engine {
-    functions: HashMap<&'static str, ExternalFunction>,
+    function_table: FunctionTable,
 }
 
 impl Engine {
     pub fn new() -> Self {
         Self {
-            functions: HashMap::new(),
+            function_table: FunctionTable::new(),
         }
     }
 
     pub fn add_function(&mut self, function: ExternalFunction) {
-        let name = function.name;
-        self.functions.insert(name, function);
+        self.function_table.insert(function);
     }
 
-    pub fn parse(&self, input: &str) -> Result<Vec<Stmt>, ParseError> {
+    pub fn compile(&self, input: &str) -> Result<(Vec<Instruction>, usize), CompileError> {
         let tokens = tokenize(input)?;
-        Parser::new(&tokens).parse()
+        let stmts = Parser::new(&tokens).parse()?;
+        TypeChecker::new(&self.function_table).check(&stmts)?;
+        
+        let compiler = Compiler::new(&self.function_table);
+        let compile_result = compiler.compile(&stmts);
+
+        Ok(compile_result)
     }
 
-    pub fn type_check(&self, stmts: &[Stmt]) -> Result<(), TypeCheckError> {
-        let mut type_checker = TypeChecker::new(&self.functions);
-        type_checker.check(stmts)
-    }
-
-    pub fn interpret(&self, stmts: &[Stmt]) -> Result<(), InterpreterError> {
-        let mut interpreter = Interpreter::new(&self.functions);
-        interpreter.interpret(stmts)
+    pub fn interpret(&self, instructions: Vec<Instruction>, slot_used: usize) -> Result<(), InterpreterError> {
+        let mut interpreter = Interpreter::new(&self.function_table, instructions, slot_used);
+        interpreter.interpret()
     }
 }

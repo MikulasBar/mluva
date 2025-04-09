@@ -44,10 +44,10 @@ macro_rules! expect_pat {
             $iter.next().unwrap()
         } else {
             // there is no token to return
-            return Err(ParseError::UnexpectedToken(Token::EOF));
+            return Err(CompileError::UnexpectedToken(Token::EOF));
         }) else {
             // the token is not the expected one
-            return Err(ParseError::UnexpectedToken($iter.next().unwrap()));
+            return Err(CompileError::UnexpectedToken($iter.next().unwrap()));
         };
     };
 }

@@ -1,13 +1,17 @@
 
 
 
-let x = 0
+let x = 'Hello, world!';
 
-while x != 1000000000 {
-    x = x + 1
-}
+print(x)
 
-print('Done!')
+# let x = 0
+
+# while x != 1000000000 {
+#     x = x + 1
+# }
+
+# print('Done!')
 
 # print('Hello, world!')
 # print(1, 2, false, 'asfaf', 45.65)

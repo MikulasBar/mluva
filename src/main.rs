@@ -13,6 +13,7 @@ mod engine;
 mod external;
 mod instruction;
 mod compiler;
+mod function_table;
 
 use std::io::Read;
 use engine::Engine;
@@ -26,22 +27,17 @@ fn main() {
     let mut engine = Engine::new();
     engine.add_function(PRINT_FUNCTION);
 
-    let parse_result = engine.parse(&input);
-    if let Err(e) = parse_result {
-        eprintln!("Parse error: {:?}", e);
+    let compile_result = engine.compile(&input);
+    if let Err(e) = compile_result {
+        eprintln!("Compile error: {:?}", e);
         return;
     }
+    let (instructions, slot_used) = compile_result.unwrap();
 
-    let stmts = parse_result.unwrap();
-    println!("{:?}", stmts);
+    println!("{:?}", instructions);
 
-    let type_check_result = engine.type_check(&stmts);
-    if let Err(e) = type_check_result {
-        eprintln!("Type check error: {:?}", e);
-        return;
-    }
+    let interpret_result = engine.interpret(instructions, slot_used);
 
-    let interpret_result = engine.interpret(&stmts);
     if let Err(e) = interpret_result {
         eprintln!("Interpret error: {:?}", e);
         return;

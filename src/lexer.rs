@@ -1,11 +1,11 @@
 use crate::data_type::DataType;
-use crate::errors::ParseError;
+use crate::errors::CompileError;
 use crate::token::Token;
 use crate::str_pat;
 
 type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
 
-pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
+pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
     // println!("Tokenizing input: {:?}", input);
     let mut tokens = vec![];
     let mut chars = input.chars().peekable();
@@ -86,7 +86,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
                     chars.next();
                     Token::NotEqual
                 } else {
-                    return Err(ParseError::UnexpectedChar(char));
+                    return Err(CompileError::UnexpectedChar(char));
                 }
             }
             
@@ -129,7 +129,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, ParseError> {
             str_pat!(NUM) => tokenize_number(&mut chars),
             str_pat!(IDENT) => tokenize_ident(&mut chars),
 
-            _ => return Err(ParseError::UnexpectedChar(char)),
+            _ => return Err(CompileError::UnexpectedChar(char)),
         };
 
         tokens.push(token);

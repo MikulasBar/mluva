@@ -1,32 +1,30 @@
-use std::collections::HashMap;
-
 use crate::bin_op_pat;
 use crate::data_type::DataType;
 use crate::external::ExternalFunction;
+use crate::function_table::FunctionTable;
 use crate::token_tree::{Expr, Stmt, BinOp};
 use crate::scope::DataTypeScope;
-use crate::errors::TypeCheckError;
+use crate::errors::CompileError;
 
-type FunctionMap = HashMap<&'static str, ExternalFunction>;
 
 pub struct TypeChecker<'a> {
     scope: DataTypeScope,
-    functions: &'a FunctionMap,
+    function_table: &'a FunctionTable,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(functions: &'a FunctionMap) -> Self {
+    pub fn new(function_table: &'a FunctionTable) -> Self {
         Self {
             scope: DataTypeScope::new(),
-            functions,
+            function_table,
         }
     }
         
-    pub fn check(&mut self, stmts: &[Stmt]) -> Result<(), TypeCheckError> {
+    pub fn check(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
        self.check_stmts(stmts)
     }
 
-    fn check_stmts(&mut self, stmts: &[Stmt]) -> Result<(), TypeCheckError> {
+    fn check_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
        self.scope.enter();
 
         for s in stmts {
@@ -38,12 +36,12 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmt(&mut self, stmt: &Stmt) -> Result<(), TypeCheckError> {
+    fn check_stmt(&mut self, stmt: &Stmt) -> Result<(), CompileError> {
         match stmt {
             Stmt::If(cond, stmts, else_stmts) => {
                 let cond = self.check_expr(cond)?;
                 if !cond.is_bool() {
-                    return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
+                    return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
                self.check_stmts(stmts)?;
@@ -59,7 +57,7 @@ impl<'a> TypeChecker<'a> {
                 let expr_type = self.check_expr(expr)?;
                 let data_type = if let Some(data_type) = data_type {
                     if expr_type != *data_type {
-                        return Err(TypeCheckError::WrongType{expected: *data_type, found: expr_type});
+                        return Err(CompileError::WrongType{expected: *data_type, found: expr_type});
                     }
 
                     *data_type
@@ -72,20 +70,20 @@ impl<'a> TypeChecker<'a> {
 
             Stmt::VarAssign(ident, expr) => {
                 let Some(&data_type) = self.scope.get(&ident) else {
-                    return Err(TypeCheckError::VariableNotFound(ident.clone()));
+                    return Err(CompileError::VariableNotFound(ident.clone()));
                 };
 
                 let expr_type = self.check_expr(expr)?;
 
                 if expr_type != data_type {
-                    return Err(TypeCheckError::WrongType{expected: data_type, found: expr_type});
+                    return Err(CompileError::WrongType{expected: data_type, found: expr_type});
                 }
             },
 
             Stmt::While(cond, stmts) => {
                 let cond = self.check_expr(cond)?;
                 if !cond.is_bool() {
-                    return Err(TypeCheckError::WrongType{expected: DataType::Bool, found: cond});
+                    return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
                 return self.check_stmts(stmts);
@@ -99,24 +97,24 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_expr(&mut self, expr: &Expr) -> Result<DataType, TypeCheckError> {
+    fn check_expr(&mut self, expr: &Expr) -> Result<DataType, CompileError> {
         match expr {
             Expr::Var(ident) => {
                 let Some(data_type) = self.scope.get(ident) else {
-                    return Err(TypeCheckError::VariableNotFound(ident.clone()));
+                    return Err(CompileError::VariableNotFound(ident.clone()));
                 };
 
                 Ok(data_type.clone())
             },
             Expr::Literal(lit) => Ok(lit.get_type()),
             Expr::FuncCall(name, args) => {
-                let Some(func) = self.functions.get(name.as_str()) else {
-                    return Err(TypeCheckError::FunctionNotFound(name.clone()));
+                let Some(func) = self.function_table.get_fn(name.as_str()) else {
+                    return Err(CompileError::FunctionNotFound(name.clone()));
                 };
 
                 let arg_types: Vec<DataType> = args.iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, TypeCheckError>>()?;
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
 
                 func.check_types(&arg_types)?;
 
@@ -131,9 +129,9 @@ impl<'a> TypeChecker<'a> {
                         match (a, b) {
                             (DataType::Int, DataType::Int) => Ok(DataType::Int),
                             (DataType::Float, DataType::Float) => Ok(DataType::Float),
-                            (DataType::Int | DataType::Float, _) => return Err(TypeCheckError::WrongType{expected: a, found: b}),
-                            (_, DataType::Int | DataType::Float) => return Err(TypeCheckError::WrongType{expected: b, found: a}),
-                            _ => return Err(TypeCheckError::WrongType{expected: DataType::Int, found: a}),
+                            (DataType::Int | DataType::Float, _) => return Err(CompileError::WrongType{expected: a, found: b}),
+                            (_, DataType::Int | DataType::Float) => return Err(CompileError::WrongType{expected: b, found: a}),
+                            _ => return Err(CompileError::WrongType{expected: DataType::Int, found: a}),
                         }
                     },
 

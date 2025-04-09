@@ -1,4 +1,4 @@
-use crate::errors::ParseError;
+use crate::errors::CompileError;
 use crate::token::Token;
 use crate::token_tree::{expr::*, BinOp, Stmt};
 use crate::expect_pat;
@@ -54,13 +54,13 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, ParseError> {
+    pub fn parse(&mut self) -> Result<Vec<Stmt>, CompileError> {
        self.parse_stmts(Token::EOF)
     }
 
     /// Parses a list of statements until the critical token is found.
     /// The critical token is not included in the returned statements.
-    fn parse_stmts(&mut self, critical_token: Token) -> Result<Vec<Stmt>, ParseError> {
+    fn parse_stmts(&mut self, critical_token: Token) -> Result<Vec<Stmt>, CompileError> {
         let mut stmts = vec![];
 
         while let Some(token) = self.peek() {
@@ -130,7 +130,7 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn parse_ident_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_ident_statement(&mut self) -> Result<Stmt, CompileError> {
         expect_pat!(Token::Ident(ident) in self);
 
         if let Some(Token::Assign) = self.peek() {
@@ -152,7 +152,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_if_statement(&mut self) -> Result<Stmt, ParseError> {
+    fn parse_if_statement(&mut self) -> Result<Stmt, CompileError> {
         expect_pat!(Token::If in self);
 
         let cond = self.parse_expr()?;
@@ -183,12 +183,12 @@ impl<'a> Parser<'a> {
 
     ////////////////// Expression parsing methods ////////////////
 
-    fn parse_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_expr(&mut self) -> Result<Expr, CompileError> {
        self.parse_comp_expr()
     }
 
     /// Parse eq and neq `BinOp`
-    fn parse_comp_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_comp_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_add_expr()?;
 
         if let Some(token) = self.peek() {
@@ -205,7 +205,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse add and subtract `BinOp`
-    fn parse_add_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_add_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_mul_expr()?;
 
         while let Some(token) = self.peek() {
@@ -222,7 +222,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse multiply, divide and modulo `BinOp`
-    fn parse_mul_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_mul_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_atom_expr()?;
 
         while let Some(token) = self.peek() {
@@ -239,9 +239,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
-    fn parse_atom_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_atom_expr(&mut self) -> Result<Expr, CompileError> {
         let Some(token) = self.peek() else {
-            return Err(ParseError::UnexpectedEndOfInput);
+            return Err(CompileError::UnexpectedEndOfInput);
         };
 
         match token {
@@ -277,12 +277,12 @@ impl<'a> Parser<'a> {
             }
 
             _ => {
-                return Err(ParseError::UnexpectedToken(self.next().unwrap()));
+                return Err(CompileError::UnexpectedToken(self.next().unwrap()));
             }
         }
     }
 
-    fn parse_ident_expr(&mut self) -> Result<Expr, ParseError> {
+    fn parse_ident_expr(&mut self) -> Result<Expr, CompileError> {
         expect_pat!(Token::Ident(ident) in self);
 
         if let Some(Token::ParenL) = self.peek() {
