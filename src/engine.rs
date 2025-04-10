@@ -27,8 +27,8 @@ impl Engine {
         let stmts = Parser::new(&tokens).parse()?;
         TypeChecker::new(&self.function_table).check(&stmts)?;
 
-        let compiler = Compiler::new(&self.function_table);
-        let compile_result = compiler.compile(&stmts);
+        let compile_result = Compiler::new(&self.function_table)
+            .compile(&stmts);
 
         Ok(compile_result)
     }

@@ -3,7 +3,7 @@ mod parser;
 mod lexer;
 pub mod token;
 mod macros;
-mod scope;
+mod data_type_scope;
 mod type_checker;
 pub mod data_type;
 mod token_tree;

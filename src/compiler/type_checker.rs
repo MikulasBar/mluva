@@ -2,7 +2,7 @@ use crate::bin_op_pat;
 use super::data_type::DataType;
 use crate::function_table::FunctionTable;
 use super::token_tree::{Expr, Stmt, BinOp};
-use super::scope::DataTypeScope;
+use super::data_type_scope::DataTypeScope;
 use crate::errors::CompileError;
 
 
@@ -43,7 +43,7 @@ impl<'a> TypeChecker<'a> {
                     return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
-               self.check_stmts(stmts)?;
+                self.check_stmts(stmts)?;
                 if let Some(else_stmts) = else_stmts {
                    self.check_stmts(else_stmts)?;
                 }
@@ -64,7 +64,7 @@ impl<'a> TypeChecker<'a> {
                     expr_type
                 };
 
-               self.scope.insert_new(ident.clone(), data_type);
+               self.scope.insert_new(ident.clone(), data_type)?;
             },
 
             Stmt::VarAssign(ident, expr) => {
