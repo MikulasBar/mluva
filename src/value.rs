@@ -31,34 +31,6 @@ impl Value {
             _ => Err(InterpreterError::TypeError),
         }
     }
-
-    // pub fn is_true(&self) -> Result<bool, InterpreterError> {
-    //     match self {
-    //         Self::Bool(b) => Ok(*b),
-    //         _ => Err(InterpreterError::TypeError),
-    //     }
-    // }
-
-    // pub fn expect_int(&self) -> u64 {
-    //     let Value::Int(int) = self else {
-    //         panic!("Expected an integer, but got {:?}", self);
-    //     };
-    //     *int
-    // }
-
-    // pub fn expect_bool(&self) -> bool {
-    //     let Value::Bool(bool) = self else {
-    //         panic!("Expected an integer, but got {:?}", self);
-    //     };
-    //     *bool
-    // }
-
-    // pub fn expect_float(&self) -> f64 {
-    //     let Value::Float(float) = self else {
-    //         panic!("Expected an integer, but got {:?}", self);
-    //     };
-    //     *float
-    // }
 }
 
 // Operators

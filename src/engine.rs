@@ -1,10 +1,10 @@
 use crate::{
+    compiler::{tokenize, Compiler, Parser, TypeChecker},
     errors::{CompileError, InterpreterError},
     external::ExternalFunction,
     function_table::FunctionTable,
-    instruction::Instruction,
     interpreter::Interpreter,
-    compiler::{tokenize, Compiler, Parser, TypeChecker},
+    interpreter_source::InterpreterSource,
 };
 
 pub struct Engine {
@@ -22,23 +22,18 @@ impl Engine {
         self.function_table.insert(function);
     }
 
-    pub fn compile(&self, input: &str) -> Result<(Vec<Instruction>, usize), CompileError> {
+    pub fn compile(&self, input: &str) -> Result<InterpreterSource, CompileError> {
         let tokens = tokenize(input)?;
         let stmts = Parser::new(&tokens).parse()?;
         TypeChecker::new(&self.function_table).check(&stmts)?;
 
-        let compile_result = Compiler::new(&self.function_table)
-            .compile(&stmts);
+        let compile_result = Compiler::new(&self.function_table).compile(&stmts);
 
         Ok(compile_result)
     }
 
-    pub fn interpret(
-        &self,
-        instructions: Vec<Instruction>,
-        slot_used: usize,
-    ) -> Result<(), InterpreterError> {
-        let mut interpreter = Interpreter::new(&self.function_table, instructions, slot_used);
+    pub fn interpret(&self, source: InterpreterSource) -> Result<(), InterpreterError> {
+        let mut interpreter = Interpreter::new(&self.function_table, source);
         interpreter.interpret()
     }
 }

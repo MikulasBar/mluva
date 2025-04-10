@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
-use crate::{function_table::FunctionTable, instruction::Instruction};
 use super::token_tree::{BinOp, Expr, Stmt};
+use crate::{
+    function_table::FunctionTable, instruction::Instruction, interpreter_source::InterpreterSource,
+};
 
 pub struct Compiler<'a> {
     instructions: Vec<Instruction>,
@@ -42,9 +44,9 @@ impl<'a> Compiler<'a> {
     }
 
     // Returns compiled instructions and number of local slots used
-    pub fn compile(mut self, stmts: &[Stmt]) -> (Vec<Instruction>, usize) {
+    pub fn compile(mut self, stmts: &[Stmt]) -> InterpreterSource {
         self.compile_stmts(stmts);
-        (self.instructions, self.next_slot)
+        InterpreterSource::new(self.instructions, self.next_slot)
     }
 
     pub fn compile_stmts(&mut self, stmts: &[Stmt]) {
@@ -60,13 +62,13 @@ impl<'a> Compiler<'a> {
                 self.compile_expr(expr);
                 let slot = self.get_slot(name);
                 self.push(Instruction::Store(slot));
-            },
+            }
 
             Stmt::Expr(expr) => {
                 self.compile_expr(expr);
                 // We need to pop the expression from stack since we don't use it anywhere.
                 self.push(Instruction::Pop);
-            },
+            }
 
             Stmt::If(cond, stmts, else_stmts) => {
                 self.compile_if_statement(cond, stmts, else_stmts.as_deref());
@@ -88,12 +90,12 @@ impl<'a> Compiler<'a> {
 
         // Compile the statements in the "if" block
         self.compile_stmts(stmts);
-        
+
         if let Some(else_stmts) = else_stmts {
             // Store the index of the jump instruction for the "else" block
             let if_jump_index = self.instructions.len();
             self.instructions.push(Instruction::Jump(0)); // Placeholder instruction
-            
+
             // Store the index of else block
             let post_if_index = self.instructions.len();
             // jump from the if condition to the else block
@@ -128,8 +130,8 @@ impl<'a> Compiler<'a> {
 
         // Jump back to the condition check
         self.push(Instruction::Jump(start_index));
-        
-        // Index of the end of the "while" block 
+
+        // Index of the end of the "while" block
         let end_index = self.instructions.len();
 
         // Update the jump instruction for the "while" block to skip over the body and the end jump
@@ -140,19 +142,19 @@ impl<'a> Compiler<'a> {
         match expr {
             Expr::Literal(v) => {
                 self.instructions.push(Instruction::Push(v.clone()));
-            },
-            
+            }
+
             Expr::Var(name) => {
                 let slot = self.get_slot(name);
                 self.instructions.push(Instruction::Load(slot));
-            },
+            }
 
             Expr::BinOp(op, lhs, rhs) => {
                 self.compile_expr(lhs);
                 self.compile_expr(rhs);
                 let op_instruction = bin_op_to_instruction(op);
                 self.instructions.push(op_instruction);
-            },
+            }
 
             Expr::FuncCall(name, args) => {
                 for arg in args {
@@ -171,9 +173,6 @@ impl<'a> Compiler<'a> {
         }
     }
 }
-
-
-
 
 fn bin_op_to_instruction(op: &BinOp) -> Instruction {
     match op {

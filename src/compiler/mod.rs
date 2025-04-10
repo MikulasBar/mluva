@@ -8,7 +8,6 @@ mod type_checker;
 pub mod data_type;
 mod token_tree;
 
-
 pub use data_type::DataType;
 pub use compiler::Compiler;
 pub use parser::Parser;

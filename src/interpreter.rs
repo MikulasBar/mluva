@@ -1,6 +1,7 @@
 use crate::errors::InterpreterError;
 use crate::function_table::FunctionTable;
 use crate::instruction::Instruction;
+use crate::interpreter_source::InterpreterSource;
 use crate::value::Value;
 
 pub struct Interpreter<'a> {
@@ -12,13 +13,13 @@ pub struct Interpreter<'a> {
 }
 
 impl<'a> Interpreter<'a> {
-    pub fn new(function_table: &'a FunctionTable, instructions: Vec<Instruction>, slot_used: usize) -> Self {
+    pub fn new(function_table: &'a FunctionTable, source: InterpreterSource) -> Self {
         Self {
             function_table,
-            instructions,
+            instructions: source.instructions,
             index: 0,
             stack: vec![],
-            slots: vec![Value::Void; slot_used],
+            slots: vec![Value::Void; source.local_slots],
         }
     }
 

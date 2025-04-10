@@ -6,6 +6,7 @@ mod external;
 mod instruction;
 mod compiler;
 mod function_table;
+mod interpreter_source;
 
 use std::io::Read;
 use engine::Engine;
@@ -24,11 +25,11 @@ fn main() {
         eprintln!("Compile error: {:?}", e);
         return;
     }
-    let (instructions, slot_used) = compile_result.unwrap();
+    let interpreter_source = compile_result.unwrap();
 
-    println!("{:?}", instructions);
+    println!("{:?}", interpreter_source);
 
-    let interpret_result = engine.interpret(instructions, slot_used);
+    let interpret_result = engine.interpret(interpreter_source);
 
     if let Err(e) = interpret_result {
         eprintln!("Interpret error: {:?}", e);
