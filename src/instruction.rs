@@ -14,6 +14,10 @@ pub enum Instruction {
     Modulo,
     Equal,
     NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
 
     /// Jumps to a specific index in instruction list
     Jump(usize),

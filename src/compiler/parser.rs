@@ -317,6 +317,10 @@ fn token_to_comp_op(token: &Token) -> Option<BinOp> {
     match token {
         Token::Equal => Some(BinOp::Equal),
         Token::NotEqual => Some(BinOp::NotEqual),
+        Token::Less => Some(BinOp::Less),
+        Token::LessEqual => Some(BinOp::LessEqual),
+        Token::Greater => Some(BinOp::Greater),
+        Token::GreaterEqual => Some(BinOp::GreaterEqual),
         _ => None,
     }
 }
@@ -333,7 +337,7 @@ fn token_to_mul_op(token: &Token) -> Option<BinOp> {
     match token {
         Token::Asterisk => Some(BinOp::Mul),
         Token::Slash => Some(BinOp::Div),
-        Token::Percentage => Some(BinOp::Modulo),
+        Token::Modulo => Some(BinOp::Modulo),
         _ => None,
     }
 }

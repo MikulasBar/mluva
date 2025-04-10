@@ -100,6 +100,26 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                     Token::Assign
                 }
             },
+
+            '>' => {
+                chars.next();
+                if let Some('=') = chars.peek() {
+                    chars.next();
+                    Token::GreaterEqual
+                } else {
+                    Token::Greater
+                }
+            }
+
+            '<' => {
+                chars.next();
+                if let Some('=') = chars.peek() {
+                    chars.next();
+                    Token::LessEqual
+                } else {
+                    Token::Less
+                }
+            }
             
             '+' => {
                 chars.next();
@@ -123,7 +143,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
 
             '%' => {
                 chars.next();
-                Token::Percentage
+                Token::Modulo
             },
             
             str_pat!(NUM) => tokenize_number(&mut chars),

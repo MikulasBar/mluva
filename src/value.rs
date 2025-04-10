@@ -44,6 +44,38 @@ impl Value {
         Ok(*self != rhs)
     }
 
+    pub fn less(&self, rhs: Self) -> Result<bool, InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => Ok(*a < b),
+            (Self::Float(a), Self::Float(b)) => Ok(*a < b),
+            _ => Err(InterpreterError::TypeError)
+        }
+    }
+
+    pub fn less_equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => Ok(*a <= b),
+            (Self::Float(a), Self::Float(b)) => Ok(*a <= b),
+            _ => Err(InterpreterError::TypeError)
+        }
+    }
+
+    pub fn greater(&self, rhs: Self) -> Result<bool, InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => Ok(*a > b),
+            (Self::Float(a), Self::Float(b)) => Ok(*a > b),
+            _ => Err(InterpreterError::TypeError)
+        }
+    }
+
+    pub fn greater_equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
+        match (self, rhs) {
+            (Self::Int(a), Self::Int(b)) => Ok(*a >= b),
+            (Self::Float(a), Self::Float(b)) => Ok(*a >= b),
+            _ => Err(InterpreterError::TypeError)
+        }
+    }
+
     pub fn add_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => *a += b,

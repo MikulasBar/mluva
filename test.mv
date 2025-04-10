@@ -1,5 +1,22 @@
 
 
+let x = 0
+
+if x > 0 {
+    print('x is positive')
+}
+
+if x < 0 {
+    print('x is negative')
+}
+
+if x >= 0 {
+    print('x is non-negative')
+}
+
+if x <= 0 {
+    print('x is non-positive')
+}
 
 # let x = 0
 
@@ -21,21 +38,21 @@
 # print('Hello, world!')
 # print(1, 2, false, 'asfaf', 45.65)
 
-let i = 0
+# let i = 0
 
-while i != 100 {
-    if i % 15 == 0 {
-        print('FizzBuzz')
-    } else if i % 3 == 0 {
-        print('Fizz')
-    } else if i % 5 == 0 {
-        print('Buzz')
-    } else {
-        print(i)
-    }
+# while i < 100 {
+#     if i % 15 == 0 {
+#         print('FizzBuzz')
+#     } else if i % 3 == 0 {
+#         print('Fizz')
+#     } else if i % 5 == 0 {
+#         print('Buzz')
+#     } else {
+#         print(i)
+#     }
 
-    i = i + 1
-}
+#     i = i + 1
+# }
 
 
 

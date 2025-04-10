@@ -137,6 +137,16 @@ impl<'a> TypeChecker<'a> {
                     bin_op_pat!(COMPARISON) => {
                         Ok(DataType::Bool)
                     },
+
+                    bin_op_pat!(NUMERIC_COMPARISON) => {
+                        match (a, b) {
+                            (DataType::Int, DataType::Int) => Ok(DataType::Bool),
+                            (DataType::Float, DataType::Float) => Ok(DataType::Bool),
+                            (DataType::Int | DataType::Float, _) => return Err(CompileError::WrongType{expected: a, found: b}),
+                            (_, DataType::Int | DataType::Float) => return Err(CompileError::WrongType{expected: b, found: a}),
+                            _ => return Err(CompileError::WrongType{expected: DataType::Int, found: a}),
+                        }
+                    }
                 }
             },
         }

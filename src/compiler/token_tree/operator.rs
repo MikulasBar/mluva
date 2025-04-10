@@ -7,5 +7,9 @@ pub enum BinOp {
     Modulo,
     Equal,
     NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
 }
 

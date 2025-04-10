@@ -34,6 +34,13 @@ macro_rules! bin_op_pat {
         | BinOp::Div
         | BinOp::Modulo
     };
+
+    (NUMERIC_COMPARISON) => {
+        BinOp::Less
+        | BinOp::LessEqual
+        | BinOp::Greater
+        | BinOp::GreaterEqual
+    };
 }
 
 #[macro_export]

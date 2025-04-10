@@ -183,5 +183,9 @@ fn bin_op_to_instruction(op: &BinOp) -> Instruction {
         BinOp::Modulo => Instruction::Modulo,
         BinOp::Equal => Instruction::Equal,
         BinOp::NotEqual => Instruction::NotEqual,
+        BinOp::Less => Instruction::Less,
+        BinOp::LessEqual => Instruction::LessEqual,
+        BinOp::Greater => Instruction::Greater,
+        BinOp::GreaterEqual => Instruction::GreaterEqual,
     }
 }

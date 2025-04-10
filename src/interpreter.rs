@@ -82,9 +82,24 @@ impl<'a> Interpreter<'a> {
                     *a = Value::Bool(*a == b);
                     Ok(())
                 })?,
-
                 Instruction::NotEqual => self.apply_assign_op(|a, b| {
                     *a = Value::Bool(*a != b);
+                    Ok(())
+                })?,
+                Instruction::Less => self.apply_assign_op(|a, b| {
+                    *a = Value::Bool(a.less(b)?);
+                    Ok(())
+                })?,
+                Instruction::LessEqual => self.apply_assign_op(|a, b| {
+                    *a = Value::Bool(a.less_equal(b)?);
+                    Ok(())
+                })?,
+                Instruction::Greater => self.apply_assign_op(|a, b| {
+                    *a = Value::Bool(a.greater(b)?);
+                    Ok(())
+                })?,
+                Instruction::GreaterEqual => self.apply_assign_op(|a, b| {
+                    *a = Value::Bool(a.greater_equal(b)?);
                     Ok(())
                 })?,
 
@@ -95,7 +110,6 @@ impl<'a> Interpreter<'a> {
 
         Ok(())
     }
-
     
     fn apply_assign_op(&mut self, op: fn(&mut Value, Value) -> Result<(), InterpreterError>) -> Result<(), InterpreterError> {
         let a = self.pop()?;

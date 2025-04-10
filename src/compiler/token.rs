@@ -11,9 +11,13 @@ pub enum Token {
     Slash,
     Equal,
     NotEqual,
-    Percentage,
-
+    Modulo,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
     Assign,
+
     If,
     Else,
     Let,
