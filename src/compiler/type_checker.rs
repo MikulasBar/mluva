@@ -172,6 +172,14 @@ impl<'a> TypeChecker<'a> {
 
                         Ok(DataType::Bool)
                     },
+
+                    UnaryOp::Negate => {
+                        match a {
+                            DataType::Int => Ok(DataType::Int),
+                            DataType::Float => Ok(DataType::Float),
+                            _ => return Err(CompileError::WrongType{expected: DataType::Int, found: a}),
+                        }
+                    },
                 }
             },
         }

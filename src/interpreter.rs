@@ -88,6 +88,7 @@ impl<'a> Interpreter<'a> {
                 Instruction::Or => self.apply_bin_op(Value::or)?,
                 
                 Instruction::Not => self.apply_un_op(Value::not)?,
+                Instruction::Negate => self.apply_un_op(Value::negate)?,
             }
 
             self.index += 1;

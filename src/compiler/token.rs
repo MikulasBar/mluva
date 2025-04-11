@@ -37,7 +37,7 @@ pub enum Token {
     DataType(DataType),
     Ident(String),
     StringLiteral(String),
-    Int(u64),
+    Int(i32),
     Float(f64),
     Bool(bool),
 }

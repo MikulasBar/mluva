@@ -8,7 +8,7 @@ use crate::errors::InterpreterError;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Value {
     Void,
-    Int(u64),
+    Int(i32),
     Float(f64),
     Bool(bool),
     String(String),
@@ -156,13 +156,21 @@ impl Value {
             _ => return Err(InterpreterError::TypeError)
         }
     }
+
+    pub fn negate(&self) -> Result<Value, InterpreterError> {
+        match self {
+            Self::Int(a) => Ok(Value::Int(-a)),
+            Self::Float(a) => Ok(Value::Float(-a)),
+            _ => return Err(InterpreterError::TypeError)
+        }
+    }
 }
 
 mod froms {
     use super::*;
 
-    impl From<u64> for Value {
-        fn from(value: u64) -> Self {
+    impl From<i32> for Value {
+        fn from(value: i32) -> Self {
             Self::Int(value)
         }
     }

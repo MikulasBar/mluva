@@ -21,6 +21,7 @@ pub enum Instruction {
     And,
     Or,
     Not,
+    Negate,
 
     /// Jumps to a specific index in instruction list
     Jump(usize),

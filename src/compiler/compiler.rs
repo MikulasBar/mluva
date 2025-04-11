@@ -200,6 +200,7 @@ fn bin_op_to_instruction(op: &BinaryOp) -> Instruction {
 
 fn un_op_to_instruction(op: &UnaryOp) -> Instruction {
     match op {
+        UnaryOp::Negate => Instruction::Negate,
         UnaryOp::Not => Instruction::Not,
     }
 }

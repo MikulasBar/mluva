@@ -1,3 +1,5 @@
+use std::f32::consts::E;
+
 use crate::errors::CompileError;
 use super::token::Token;
 use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
@@ -257,19 +259,15 @@ impl<'a> Parser<'a> {
 
     /// Parse unary `UnaryOp` such as not
     fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileError> {
-        if let Some(token) = self.peek() {
-            match token {
-                Token::Not => {
-                    self.skip();
-                    let expr = self.parse_unary_op_expr()?;
-                    return Ok(Expr::new_unary_op(UnaryOp::Not, expr));
-                }
+        let token = self.peek().ok_or(CompileError::UnexpectedEndOfInput)?;
+        
+        let Some(op) = token_to_unary_op(token) else {
+            return self.parse_atom_expr();
+        };
 
-                _ => {}
-            }
-        }
-
-        self.parse_atom_expr()
+        self.skip();
+        let expr = self.parse_unary_op_expr()?;
+        return Ok(Expr::new_unary_op(op, expr));
     }
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
@@ -379,6 +377,14 @@ fn token_to_mul_op(token: &Token) -> Option<BinaryOp> {
         Token::Asterisk => Some(BinaryOp::Mul),
         Token::Slash => Some(BinaryOp::Div),
         Token::Modulo => Some(BinaryOp::Modulo),
+        _ => None,
+    }
+}
+
+fn token_to_unary_op(token: &Token) -> Option<UnaryOp> {
+    match token {
+        Token::Not => Some(UnaryOp::Not),
+        Token::Minus => Some(UnaryOp::Negate),
         _ => None,
     }
 }
