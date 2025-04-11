@@ -1,10 +1,11 @@
-pub mod expr;
-pub mod statement;
-pub mod bin_op;
-
+mod expr;
+mod statement;
+mod binary_op;
+mod unary_op;
 
 pub use self::{
     expr::Expr,
     statement::Stmt,
-    bin_op::BinOp,
+    binary_op::BinaryOp,
+    unary_op::UnaryOp,
 };

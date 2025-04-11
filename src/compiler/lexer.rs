@@ -86,7 +86,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                     chars.next();
                     Token::NotEqual
                 } else {
-                    return Err(CompileError::UnexpectedChar(char));
+                    Token::Not
                 }
             }
             

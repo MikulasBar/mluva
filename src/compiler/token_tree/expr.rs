@@ -1,16 +1,21 @@
 use crate::value::Value;
-use super::bin_op::BinOp;
+use super::{binary_op::BinaryOp, UnaryOp};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Literal(Value),
     Var(String),
-    BinOp(BinOp, Box<Self>, Box<Self>),
+    BinaryOp(BinaryOp, Box<Self>, Box<Self>),
+    UnaryOp(UnaryOp, Box<Self>),
     FuncCall(String, Vec<Expr>),
 }
 
 impl Expr {
-    pub fn new_bin_op(op: BinOp, lhs: Self, rhs: Self) -> Self {
-        Self::BinOp(op, Box::new(lhs), Box::new(rhs))
+    pub fn new_binary_op(op: BinaryOp, lhs: Self, rhs: Self) -> Self {
+        Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
+    }
+
+    pub fn new_unary_op(op: UnaryOp, expr: Self) -> Self {
+        Self::UnaryOp(op, Box::new(expr))
     }
 }

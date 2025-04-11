@@ -149,6 +149,13 @@ impl Value {
             _ => return Err(InterpreterError::TypeError)
         }
     }
+
+    pub fn not(&self) -> Result<Value, InterpreterError> {
+        match self {
+            Self::Bool(a) => Ok(Value::Bool(!*a)),
+            _ => return Err(InterpreterError::TypeError)
+        }
+    }
 }
 
 mod froms {

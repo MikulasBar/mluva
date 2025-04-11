@@ -23,28 +23,28 @@ macro_rules! str_pat {
 #[macro_export]
 macro_rules! bin_op_pat {
     (COMPARISON) => {
-        BinOp::Equal
-        | BinOp::NotEqual
+        BinaryOp::Equal
+        | BinaryOp::NotEqual
     };
 
     (NUMERIC) => {
-        BinOp::Add
-        | BinOp::Sub
-        | BinOp::Mul
-        | BinOp::Div
-        | BinOp::Modulo
+        BinaryOp::Add
+        | BinaryOp::Sub
+        | BinaryOp::Mul
+        | BinaryOp::Div
+        | BinaryOp::Modulo
     };
 
     (NUMERIC_COMPARISON) => {
-        BinOp::Less
-        | BinOp::LessEqual
-        | BinOp::Greater
-        | BinOp::GreaterEqual
+        BinaryOp::Less
+        | BinaryOp::LessEqual
+        | BinaryOp::Greater
+        | BinaryOp::GreaterEqual
     };
 
     (LOGICAL) => {
-        BinOp::And
-        | BinOp::Or
+        BinaryOp::And
+        | BinaryOp::Or
     };
 }
 

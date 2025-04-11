@@ -86,8 +86,10 @@ impl<'a> Interpreter<'a> {
                 Instruction::GreaterEqual => self.apply_bin_op(Value::greater_equal)?,
                 Instruction::And => self.apply_bin_op(Value::and)?,
                 Instruction::Or => self.apply_bin_op(Value::or)?,
+                
+                Instruction::Not => self.apply_un_op(Value::not)?,
             }
-            
+
             self.index += 1;
         }
 
@@ -99,6 +101,14 @@ impl<'a> Interpreter<'a> {
         let b = self.stack.last_mut().ok_or(InterpreterError::ValueStackUnderflow)?;
 
         *b = op(&*b, a)?;
+
+        Ok(())
+    }
+
+    fn apply_un_op(&mut self, op: fn(&Value) -> Result<Value, InterpreterError>) -> Result<(), InterpreterError> {
+        let a = self.stack.last_mut().ok_or(InterpreterError::ValueStackUnderflow)?;
+
+        *a = op(&*a)?;
 
         Ok(())
     }

@@ -1,6 +1,6 @@
 use crate::errors::CompileError;
 use super::token::Token;
-use super::token_tree::{Expr, BinOp, Stmt};
+use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
 use crate::expect_pat;
 use crate::value::Value;
 
@@ -187,7 +187,7 @@ impl<'a> Parser<'a> {
        self.parse_logical_expr()
     }
 
-    /// Parse logical `BinOp` such as and, or
+    /// Parse logical `BinaryOp` such as and, or
     fn parse_logical_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_comp_expr()?;
 
@@ -198,13 +198,13 @@ impl<'a> Parser<'a> {
 
             self.skip();
             let rhs = self.parse_comp_expr()?;
-            lhs = Expr::new_bin_op(op, lhs, rhs);
+            lhs = Expr::new_binary_op(op, lhs, rhs);
         }
 
         Ok(lhs)
     }
 
-    /// Parse eq and neq `BinOp`
+    /// Parse eq and neq `BinaryOp`
     fn parse_comp_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_add_expr()?;
 
@@ -215,13 +215,13 @@ impl<'a> Parser<'a> {
 
            self.skip();
             let rhs = self.parse_add_expr()?;
-            lhs = Expr::new_bin_op(op, lhs, rhs);
+            lhs = Expr::new_binary_op(op, lhs, rhs);
         }
 
         Ok(lhs)
     }
 
-    /// Parse add and subtract `BinOp`
+    /// Parse add and subtract `BinaryOp`
     fn parse_add_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_mul_expr()?;
 
@@ -232,15 +232,15 @@ impl<'a> Parser<'a> {
 
            self.skip();
             let rhs = self.parse_mul_expr()?;
-            lhs = Expr::new_bin_op(op, lhs, rhs);
+            lhs = Expr::new_binary_op(op, lhs, rhs);
         }
 
         Ok(lhs)
     }
 
-    /// Parse multiply, divide and modulo `BinOp`
+    /// Parse multiply, divide and modulo `BinaryOp`
     fn parse_mul_expr(&mut self) -> Result<Expr, CompileError> {
-        let mut lhs = self.parse_atom_expr()?;
+        let mut lhs = self.parse_unary_op_expr()?;
 
         while let Some(token) = self.peek() {
             let Some(op) = token_to_mul_op(token) else {
@@ -248,11 +248,28 @@ impl<'a> Parser<'a> {
             };
 
            self.skip();
-            let rhs = self.parse_atom_expr()?;
-            lhs = Expr::new_bin_op(op, lhs, rhs);
+            let rhs = self.parse_unary_op_expr()?;
+            lhs = Expr::new_binary_op(op, lhs, rhs);
         }
 
         Ok(lhs)
+    }
+
+    /// Parse unary `UnaryOp` such as not
+    fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileError> {
+        if let Some(token) = self.peek() {
+            match token {
+                Token::Not => {
+                    self.skip();
+                    let expr = self.parse_unary_op_expr()?;
+                    return Ok(Expr::new_unary_op(UnaryOp::Not, expr));
+                }
+
+                _ => {}
+            }
+        }
+
+        self.parse_atom_expr()
     }
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
@@ -329,41 +346,39 @@ impl<'a> Parser<'a> {
 }
 
 
-fn token_to_logical_op(token: &Token) -> Option<BinOp> {
+fn token_to_logical_op(token: &Token) -> Option<BinaryOp> {
     match token {
-        Token::And => Some(BinOp::And),
-        Token::Or => Some(BinOp::Or),
+        Token::And => Some(BinaryOp::And),
+        Token::Or => Some(BinaryOp::Or),
         _ => None,
     }
 }
 
-fn token_to_comp_op(token: &Token) -> Option<BinOp> {
+fn token_to_comp_op(token: &Token) -> Option<BinaryOp> {
     match token {
-        Token::Equal => Some(BinOp::Equal),
-        Token::NotEqual => Some(BinOp::NotEqual),
-        Token::Less => Some(BinOp::Less),
-        Token::LessEqual => Some(BinOp::LessEqual),
-        Token::Greater => Some(BinOp::Greater),
-        Token::GreaterEqual => Some(BinOp::GreaterEqual),
+        Token::Equal => Some(BinaryOp::Equal),
+        Token::NotEqual => Some(BinaryOp::NotEqual),
+        Token::Less => Some(BinaryOp::Less),
+        Token::LessEqual => Some(BinaryOp::LessEqual),
+        Token::Greater => Some(BinaryOp::Greater),
+        Token::GreaterEqual => Some(BinaryOp::GreaterEqual),
         _ => None,
     }
 }
 
-fn token_to_add_op(token: &Token) -> Option<BinOp> {
+fn token_to_add_op(token: &Token) -> Option<BinaryOp> {
     match token {
-        Token::Plus => Some(BinOp::Add),
-        Token::Minus => Some(BinOp::Sub),
+        Token::Plus => Some(BinaryOp::Add),
+        Token::Minus => Some(BinaryOp::Sub),
         _ => None,
     }
 }
 
-fn token_to_mul_op(token: &Token) -> Option<BinOp> {
+fn token_to_mul_op(token: &Token) -> Option<BinaryOp> {
     match token {
-        Token::Asterisk => Some(BinOp::Mul),
-        Token::Slash => Some(BinOp::Div),
-        Token::Modulo => Some(BinOp::Modulo),
+        Token::Asterisk => Some(BinaryOp::Mul),
+        Token::Slash => Some(BinaryOp::Div),
+        Token::Modulo => Some(BinaryOp::Modulo),
         _ => None,
     }
 }
-
-

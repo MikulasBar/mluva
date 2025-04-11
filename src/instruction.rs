@@ -20,6 +20,7 @@ pub enum Instruction {
     GreaterEqual,
     And,
     Or,
+    Not,
 
     /// Jumps to a specific index in instruction list
     Jump(usize),

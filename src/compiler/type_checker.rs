@@ -1,7 +1,7 @@
 use crate::bin_op_pat;
 use super::data_type::DataType;
 use crate::function_table::FunctionTable;
-use super::token_tree::{Expr, Stmt, BinOp};
+use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
 use super::data_type_scope::DataTypeScope;
 use crate::errors::CompileError;
 
@@ -120,7 +120,7 @@ impl<'a> TypeChecker<'a> {
                 Ok(func.return_type)
             }
 
-            Expr::BinOp(op, a, b) => {
+            Expr::BinaryOp(op, a, b) => {
                 let a = self.check_expr(a)?;
                 let b = self.check_expr(b)?;
                 match op {
@@ -155,6 +155,19 @@ impl<'a> TypeChecker<'a> {
 
                         if b != DataType::Bool {
                             return Err(CompileError::WrongType{expected: DataType::Bool, found: b});
+                        }
+
+                        Ok(DataType::Bool)
+                    },
+                }
+            },
+
+            Expr::UnaryOp(op, a) => {
+                let a = self.check_expr(a)?;
+                match op {
+                    UnaryOp::Not => {
+                        if a != DataType::Bool {
+                            return Err(CompileError::WrongType{expected: DataType::Bool, found: a});
                         }
 
                         Ok(DataType::Bool)

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::token_tree::{BinOp, Expr, Stmt};
+use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
 use crate::{
     function_table::FunctionTable, instruction::Instruction, interpreter_source::InterpreterSource,
 };
@@ -149,10 +149,16 @@ impl<'a> Compiler<'a> {
                 self.instructions.push(Instruction::Load(slot));
             }
 
-            Expr::BinOp(op, lhs, rhs) => {
+            Expr::BinaryOp(op, lhs, rhs) => {
                 self.compile_expr(lhs);
                 self.compile_expr(rhs);
                 let op_instruction = bin_op_to_instruction(op);
+                self.instructions.push(op_instruction);
+            }
+
+            Expr::UnaryOp(op, expr) => {
+                self.compile_expr(expr);
+                let op_instruction = un_op_to_instruction(op);
                 self.instructions.push(op_instruction);
             }
 
@@ -174,20 +180,26 @@ impl<'a> Compiler<'a> {
     }
 }
 
-fn bin_op_to_instruction(op: &BinOp) -> Instruction {
+fn bin_op_to_instruction(op: &BinaryOp) -> Instruction {
     match op {
-        BinOp::Add => Instruction::Add,
-        BinOp::Sub => Instruction::Sub,
-        BinOp::Mul => Instruction::Mul,
-        BinOp::Div => Instruction::Div,
-        BinOp::Modulo => Instruction::Modulo,
-        BinOp::Equal => Instruction::Equal,
-        BinOp::NotEqual => Instruction::NotEqual,
-        BinOp::Less => Instruction::Less,
-        BinOp::LessEqual => Instruction::LessEqual,
-        BinOp::Greater => Instruction::Greater,
-        BinOp::GreaterEqual => Instruction::GreaterEqual,
-        BinOp::And => Instruction::And,
-        BinOp::Or => Instruction::Or,
+        BinaryOp::Add => Instruction::Add,
+        BinaryOp::Sub => Instruction::Sub,
+        BinaryOp::Mul => Instruction::Mul,
+        BinaryOp::Div => Instruction::Div,
+        BinaryOp::Modulo => Instruction::Modulo,
+        BinaryOp::Equal => Instruction::Equal,
+        BinaryOp::NotEqual => Instruction::NotEqual,
+        BinaryOp::Less => Instruction::Less,
+        BinaryOp::LessEqual => Instruction::LessEqual,
+        BinaryOp::Greater => Instruction::Greater,
+        BinaryOp::GreaterEqual => Instruction::GreaterEqual,
+        BinaryOp::And => Instruction::And,
+        BinaryOp::Or => Instruction::Or,
+    }
+}
+
+fn un_op_to_instruction(op: &UnaryOp) -> Instruction {
+    match op {
+        UnaryOp::Not => Instruction::Not,
     }
 }

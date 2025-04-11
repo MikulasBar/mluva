@@ -19,6 +19,7 @@ pub enum Token {
     Assign,
     And,
     Or,
+    Not,
 
     If,
     Else,
