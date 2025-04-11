@@ -184,7 +184,24 @@ impl<'a> Parser<'a> {
     ////////////////// Expression parsing methods ////////////////
 
     fn parse_expr(&mut self) -> Result<Expr, CompileError> {
-       self.parse_comp_expr()
+       self.parse_logical_expr()
+    }
+
+    /// Parse logical `BinOp` such as and, or
+    fn parse_logical_expr(&mut self) -> Result<Expr, CompileError> {
+        let mut lhs = self.parse_comp_expr()?;
+
+        while let Some(token) = self.peek() {
+            let Some(op) = token_to_logical_op(token) else {
+                return Ok(lhs);
+            };
+
+            self.skip();
+            let rhs = self.parse_comp_expr()?;
+            lhs = Expr::new_bin_op(op, lhs, rhs);
+        }
+
+        Ok(lhs)
     }
 
     /// Parse eq and neq `BinOp`
@@ -312,6 +329,13 @@ impl<'a> Parser<'a> {
 }
 
 
+fn token_to_logical_op(token: &Token) -> Option<BinOp> {
+    match token {
+        Token::And => Some(BinOp::And),
+        Token::Or => Some(BinOp::Or),
+        _ => None,
+    }
+}
 
 fn token_to_comp_op(token: &Token) -> Option<BinOp> {
     match token {

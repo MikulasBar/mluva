@@ -187,5 +187,7 @@ fn bin_op_to_instruction(op: &BinOp) -> Instruction {
         BinOp::LessEqual => Instruction::LessEqual,
         BinOp::Greater => Instruction::Greater,
         BinOp::GreaterEqual => Instruction::GreaterEqual,
+        BinOp::And => Instruction::And,
+        BinOp::Or => Instruction::Or,
     }
 }

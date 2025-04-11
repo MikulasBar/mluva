@@ -73,48 +73,33 @@ impl<'a> Interpreter<'a> {
                     }
                 }
 
-                Instruction::Add => self.apply_assign_op(Value::add_assign)?,
-                Instruction::Sub => self.apply_assign_op(Value::sub_assign)?,
-                Instruction::Mul => self.apply_assign_op(Value::mul_assign)?,
-                Instruction::Div => self.apply_assign_op(Value::div_assign)?,
-                Instruction::Modulo => self.apply_assign_op(Value::modulo_assign)?,
-                Instruction::Equal => self.apply_assign_op(|a, b| {
-                    *a = Value::Bool(*a == b);
-                    Ok(())
-                })?,
-                Instruction::NotEqual => self.apply_assign_op(|a, b| {
-                    *a = Value::Bool(*a != b);
-                    Ok(())
-                })?,
-                Instruction::Less => self.apply_assign_op(|a, b| {
-                    *a = Value::Bool(a.less(b)?);
-                    Ok(())
-                })?,
-                Instruction::LessEqual => self.apply_assign_op(|a, b| {
-                    *a = Value::Bool(a.less_equal(b)?);
-                    Ok(())
-                })?,
-                Instruction::Greater => self.apply_assign_op(|a, b| {
-                    *a = Value::Bool(a.greater(b)?);
-                    Ok(())
-                })?,
-                Instruction::GreaterEqual => self.apply_assign_op(|a, b| {
-                    *a = Value::Bool(a.greater_equal(b)?);
-                    Ok(())
-                })?,
-
-                            
+                Instruction::Add => self.apply_bin_op(Value::add)?,
+                Instruction::Sub => self.apply_bin_op(Value::sub)?,
+                Instruction::Mul => self.apply_bin_op(Value::mul)?,
+                Instruction::Div => self.apply_bin_op(Value::div)?,
+                Instruction::Modulo => self.apply_bin_op(Value::modulo)?,
+                Instruction::Equal => self.apply_bin_op(Value::equal)?,
+                Instruction::NotEqual => self.apply_bin_op(Value::not_equal)?,
+                Instruction::Less => self.apply_bin_op(Value::less)?,
+                Instruction::LessEqual => self.apply_bin_op(Value::less_equal)?,
+                Instruction::Greater => self.apply_bin_op(Value::greater)?,
+                Instruction::GreaterEqual => self.apply_bin_op(Value::greater_equal)?,
+                Instruction::And => self.apply_bin_op(Value::and)?,
+                Instruction::Or => self.apply_bin_op(Value::or)?,
             }
+            
             self.index += 1;
         }
 
         Ok(())
     }
     
-    fn apply_assign_op(&mut self, op: fn(&mut Value, Value) -> Result<(), InterpreterError>) -> Result<(), InterpreterError> {
+    fn apply_bin_op(&mut self, op: fn(&Value, Value) -> Result<Value, InterpreterError>) -> Result<(), InterpreterError> {
         let a = self.pop()?;
         let b = self.stack.last_mut().ok_or(InterpreterError::ValueStackUnderflow)?;
 
-        op(b, a)
+        *b = op(&*b, a)?;
+
+        Ok(())
     }
 }

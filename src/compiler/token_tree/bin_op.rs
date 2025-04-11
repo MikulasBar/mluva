@@ -11,5 +11,7 @@ pub enum BinOp {
     LessEqual,
     Greater,
     GreaterEqual,
+    And,
+    Or,
 }
 

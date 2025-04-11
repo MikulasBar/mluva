@@ -1,5 +1,5 @@
 use crate::value::Value;
-use super::operator::BinOp;
+use super::bin_op::BinOp;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {

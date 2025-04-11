@@ -17,6 +17,8 @@ pub enum Token {
     Greater,
     GreaterEqual,
     Assign,
+    And,
+    Or,
 
     If,
     Else,

@@ -27,7 +27,7 @@ fn main() {
     }
     let interpreter_source = compile_result.unwrap();
 
-    println!("{:?}", interpreter_source);
+    // println!("{:?}", interpreter_source);
 
     let interpret_result = engine.interpret(interpreter_source);
 

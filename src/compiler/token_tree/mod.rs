@@ -1,10 +1,10 @@
 pub mod expr;
 pub mod statement;
-pub mod operator;
+pub mod bin_op;
 
 
 pub use self::{
     expr::Expr,
     statement::Stmt,
-    operator::BinOp,
+    bin_op::BinOp,
 };

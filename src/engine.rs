@@ -25,6 +25,7 @@ impl Engine {
     pub fn compile(&self, input: &str) -> Result<InterpreterSource, CompileError> {
         let tokens = tokenize(input)?;
         let stmts = Parser::new(&tokens).parse()?;
+        println!("{:?}", stmts);
         TypeChecker::new(&self.function_table).check(&stmts)?;
 
         let compile_result = Compiler::new(&self.function_table).compile(&stmts);

@@ -120,6 +120,26 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                     Token::Less
                 }
             }
+
+            '&' => {
+                chars.next();
+                if let Some('&') = chars.peek() {
+                    chars.next();
+                    Token::And
+                } else {
+                    return Err(CompileError::UnexpectedChar(char));
+                }
+            }
+
+            '|' => {
+                chars.next();
+                if let Some('|') = chars.peek() {
+                    chars.next();
+                    Token::Or
+                } else {
+                    return Err(CompileError::UnexpectedChar(char));
+                }
+            }
             
             '+' => {
                 chars.next();

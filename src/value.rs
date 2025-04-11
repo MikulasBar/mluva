@@ -36,114 +36,118 @@ impl Value {
 // Operators
 // I don't use overloaded operators cause I don't like them and it could be missleading
 impl Value {
-    pub fn equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
-        Ok(*self == rhs)
+    pub fn equal(&self, rhs: Self) -> Result<Value, InterpreterError> {
+        Ok(Value::Bool(*self == rhs))
     }
 
-    pub fn not_equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
-        Ok(*self != rhs)
+    pub fn not_equal(&self, rhs: Self) -> Result<Value, InterpreterError> {
+        Ok(Value::Bool(*self != rhs))
     }
 
-    pub fn less(&self, rhs: Self) -> Result<bool, InterpreterError> {
+    pub fn less(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => Ok(*a < b),
-            (Self::Float(a), Self::Float(b)) => Ok(*a < b),
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a < b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a < b)),
             _ => Err(InterpreterError::TypeError)
         }
     }
 
-    pub fn less_equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
+    pub fn less_equal(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => Ok(*a <= b),
-            (Self::Float(a), Self::Float(b)) => Ok(*a <= b),
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a <= b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a <= b)),
             _ => Err(InterpreterError::TypeError)
         }
     }
 
-    pub fn greater(&self, rhs: Self) -> Result<bool, InterpreterError> {
+    pub fn greater(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => Ok(*a > b),
-            (Self::Float(a), Self::Float(b)) => Ok(*a > b),
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a > b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a > b)),
             _ => Err(InterpreterError::TypeError)
         }
     }
 
-    pub fn greater_equal(&self, rhs: Self) -> Result<bool, InterpreterError> {
+    pub fn greater_equal(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => Ok(*a >= b),
-            (Self::Float(a), Self::Float(b)) => Ok(*a >= b),
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a >= b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a >= b)),
             _ => Err(InterpreterError::TypeError)
         }
     }
 
-    pub fn add_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+    pub fn add(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => *a += b,
-            (Self::Float(a), Self::Float(b)) => *a += b,
-            _ => return Err(InterpreterError::Unknown)
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Int(a + b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Float(a + b)),
+            _ => return Err(InterpreterError::TypeError)
         }
-
-        Ok(())
     }
 
-    pub fn mul_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+    pub fn mul(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => *a *= b,
-            (Self::Float(a), Self::Float(b)) => *a *= b,
-            _ => return Err(InterpreterError::Unknown)
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Int(a * b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Float(a * b)),
+            _ => return Err(InterpreterError::TypeError)
         }
-
-        Ok(())
     }
 
-    pub fn sub_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+    pub fn sub(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
-            (Self::Int(a), Self::Int(b)) => *a -= b,
-            (Self::Float(a), Self::Float(b)) => *a -= b,
-            _ => return Err(InterpreterError::Unknown)
+            (Self::Int(a), Self::Int(b)) => Ok(Value::Int(a - b)),
+            (Self::Float(a), Self::Float(b)) => Ok(Value::Float(a - b)),
+            _ => return Err(InterpreterError::TypeError)
         }
-
-        Ok(())
     }
 
-    pub fn div_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+    pub fn div(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => {
                 if b == 0 {
                     return Err(InterpreterError::DivisionByZero);
                 }
-                *a /= b
+                Ok(Value::Int(a / b))
             },
             (Self::Float(a), Self::Float(b)) => {
                 if b == 0.0 {
                     return Err(InterpreterError::DivisionByZero);
                 }
-                *a /= b
+                Ok(Value::Float(a / b))
             },
-            _ => return Err(InterpreterError::Unknown)
+            _ => return Err(InterpreterError::TypeError)
         }
-
-        Ok(())
     }
 
-    pub fn modulo_assign(&mut self, rhs: Self) -> Result<(), InterpreterError> {
+    pub fn modulo(&self, rhs: Self) -> Result<Value, InterpreterError> {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => {
                 if b == 0 {
                     return Err(InterpreterError::DivisionByZero);
                 }
-                *a %= b
+                Ok(Value::Int(a % b))
             },
             (Self::Float(a), Self::Float(b)) => {
                 if b == 0.0 {
                     return Err(InterpreterError::DivisionByZero);
                 }
-                *a %= b
+                Ok(Value::Float(a % b))
             },
             _ => return Err(InterpreterError::Unknown)
         }
+    }
 
-        Ok(())
+    pub fn and(&self, rhs: Self) -> Result<Value, InterpreterError> {
+        match (self, rhs) {
+            (Self::Bool(a), Self::Bool(b)) => Ok(Value::Bool(*a && b)),
+            _ => return Err(InterpreterError::TypeError)
+        }
+    }
+
+    pub fn or(&self, rhs: Self) -> Result<Value, InterpreterError> {
+        match (self, rhs) {
+            (Self::Bool(a), Self::Bool(b)) => Ok(Value::Bool(*a || b)),
+            _ => return Err(InterpreterError::TypeError)
+        }
     }
 }
 

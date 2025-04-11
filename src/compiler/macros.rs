@@ -41,6 +41,11 @@ macro_rules! bin_op_pat {
         | BinOp::Greater
         | BinOp::GreaterEqual
     };
+
+    (LOGICAL) => {
+        BinOp::And
+        | BinOp::Or
+    };
 }
 
 #[macro_export]

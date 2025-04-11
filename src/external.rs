@@ -10,8 +10,8 @@ pub struct ExternalFunction {
 }
 
 impl ExternalFunction {
-    pub fn check_types(&self, args: &[DataType]) -> Result<(), CompileError> {
-        (self.check_types)(args)
+    pub fn check_types(&self, types: &[DataType]) -> Result<(), CompileError> {
+        (self.check_types)(types)
     }
 
     pub fn call(&self, args: Vec<Value>) -> Result<Value, InterpreterError> {
@@ -22,11 +22,12 @@ impl ExternalFunction {
 pub const PRINT_FUNCTION: ExternalFunction = ExternalFunction {
     name: "print",
     return_type: DataType::Void,
-    check_types: |_args| Ok(()),
+    check_types: |_types| Ok(()),
     call: |args| {
         for a in args {
-            println!("{}", a);
+            print!("{} ", a);
         }
+        println!();
         Ok(Value::Void)
     },
 };
