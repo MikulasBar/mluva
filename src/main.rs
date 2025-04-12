@@ -7,6 +7,7 @@ mod instruction;
 mod compiler;
 mod function_table;
 mod interpreter_source;
+mod function_source;
 
 use std::io::Read;
 use engine::Engine;

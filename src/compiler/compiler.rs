@@ -1,24 +1,65 @@
+use core::panic;
 use std::collections::HashMap;
 
-use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
+use super::ast::{BinaryOp, Expr, FunctionDef, Item, Stmt, UnaryOp};
 use crate::{
-    function_table::FunctionTable, instruction::Instruction, interpreter_source::InterpreterSource,
+    function_source::FunctionSource, function_table::FunctionTable, instruction::Instruction, interpreter_source::InterpreterSource
 };
 
 pub struct Compiler<'a> {
-    instructions: Vec<Instruction>,
-    locals: HashMap<String, usize>,
-    next_slot: usize,
+    functions: Vec<FunctionSource>,
     function_table: &'a FunctionTable,
+    main_slot: Option<usize>,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(function_table: &'a FunctionTable) -> Self {
         Self {
-            instructions: vec![],
-            locals: HashMap::new(),
-            next_slot: 0,
             function_table,
+            main_slot: None,
+            functions: Vec::new(),
+        }
+    }
+
+    pub fn compile(mut self, items: &[Item]) -> InterpreterSource {
+        self.compile_items(items);
+        InterpreterSource::new(self.functions, self.main_slot)
+    }
+
+    fn compile_items(&mut self, items: &[Item]) {
+        for item in items {
+            match item {
+                Item::FnDef(fn_def) => {
+                    let fn_source = FunctionCompiler::new(self).compile(&fn_def);
+                    if fn_def.name == "main" {
+                        if self.main_slot.is_some() {
+                            panic!("Multiple main functions found");
+                        } else {
+                            self.main_slot = Some(self.functions.len());
+                        }
+                    }
+                    self.functions.push(fn_source);
+                }
+            }
+        }
+    }
+}
+
+
+struct FunctionCompiler<'a, 'b> {
+    compiler: &'b mut Compiler<'a>,
+    instructions: Vec<Instruction>,
+    locals: HashMap<String, usize>,
+    next_slot: usize,
+}
+
+impl<'a, 'b> FunctionCompiler<'a, 'b> {
+    fn new(compiler: &'b mut Compiler<'a>) -> Self {
+        Self {
+            compiler,
+            locals: HashMap::new(),
+            instructions: Vec::new(),
+            next_slot: 0,
         }
     }
 
@@ -43,13 +84,12 @@ impl<'a> Compiler<'a> {
         self.instructions.push(inst);
     }
 
-    // Returns compiled instructions and number of local slots used
-    pub fn compile(mut self, stmts: &[Stmt]) -> InterpreterSource {
-        self.compile_stmts(stmts);
-        InterpreterSource::new(self.instructions, self.next_slot)
+    fn compile(mut self, fn_def: &FunctionDef) -> FunctionSource {
+        self.compile_stmts(&fn_def.body);
+        FunctionSource::new(self.locals.len(), self.instructions)
     }
 
-    pub fn compile_stmts(&mut self, stmts: &[Stmt]) {
+    fn compile_stmts(&mut self, stmts: &[Stmt], ) {
         for stmt in stmts {
             self.compile_stmt(stmt);
         }
@@ -167,7 +207,7 @@ impl<'a> Compiler<'a> {
                     self.compile_expr(arg);
                 }
 
-                let Some(slot) = self.function_table.get_slot(name) else {
+                let Some(slot) = self.compiler.function_table.get_slot(name) else {
                     panic!("Function {} not found", name);
                 };
 

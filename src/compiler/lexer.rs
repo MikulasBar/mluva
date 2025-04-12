@@ -239,6 +239,7 @@ fn match_kw(ident: String) -> Token {
         "Float" => Token::DataType(DataType::Float),
         "Bool"  => Token::DataType(DataType::Bool),
         "String" => Token::DataType(DataType::String),
+        "Void"  => Token::DataType(DataType::Void),
 
         "true"  => Token::Bool(true),
         "false" => Token::Bool(false),

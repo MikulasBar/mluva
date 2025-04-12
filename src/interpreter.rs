@@ -1,4 +1,5 @@
 use crate::errors::InterpreterError;
+use crate::function_source::FunctionSource;
 use crate::function_table::FunctionTable;
 use crate::instruction::Instruction;
 use crate::interpreter_source::InterpreterSource;
@@ -14,17 +15,25 @@ pub struct Interpreter<'a> {
 
 impl<'a> Interpreter<'a> {
     pub fn new(function_table: &'a FunctionTable, source: InterpreterSource) -> Self {
+        let mut source = source;
+        let main_fn = std::mem::replace(
+            &mut source.functions[source.main_slot.unwrap()],
+            FunctionSource::new(0, vec![]),
+        );
+
         Self {
             function_table,
-            instructions: source.instructions,
+            instructions: main_fn.body,
             index: 0,
             stack: vec![],
-            slots: vec![Value::Void; source.local_slots],
+            slots: vec![Value::Void; main_fn.slot_count],
         }
     }
 
     fn pop(&mut self) -> Result<Value, InterpreterError> {
-        self.stack.pop().ok_or(InterpreterError::ValueStackUnderflow)
+        self.stack
+            .pop()
+            .ok_or(InterpreterError::ValueStackUnderflow)
     }
 
     pub fn interpret(&mut self) -> Result<(), InterpreterError> {
@@ -53,7 +62,7 @@ impl<'a> Interpreter<'a> {
                     let result = func.call(args)?;
                     self.stack.push(result);
                 }
-                
+
                 Instruction::Return => {
                     break; // TODO: Handle return logic here
                 }
@@ -86,7 +95,7 @@ impl<'a> Interpreter<'a> {
                 Instruction::GreaterEqual => self.apply_bin_op(Value::greater_equal)?,
                 Instruction::And => self.apply_bin_op(Value::and)?,
                 Instruction::Or => self.apply_bin_op(Value::or)?,
-                
+
                 Instruction::Not => self.apply_un_op(Value::not)?,
                 Instruction::Negate => self.apply_un_op(Value::negate)?,
             }
@@ -96,18 +105,30 @@ impl<'a> Interpreter<'a> {
 
         Ok(())
     }
-    
-    fn apply_bin_op(&mut self, op: fn(&Value, Value) -> Result<Value, InterpreterError>) -> Result<(), InterpreterError> {
+
+    fn apply_bin_op(
+        &mut self,
+        op: fn(&Value, Value) -> Result<Value, InterpreterError>,
+    ) -> Result<(), InterpreterError> {
         let a = self.pop()?;
-        let b = self.stack.last_mut().ok_or(InterpreterError::ValueStackUnderflow)?;
+        let b = self
+            .stack
+            .last_mut()
+            .ok_or(InterpreterError::ValueStackUnderflow)?;
 
         *b = op(&*b, a)?;
 
         Ok(())
     }
 
-    fn apply_un_op(&mut self, op: fn(&Value) -> Result<Value, InterpreterError>) -> Result<(), InterpreterError> {
-        let a = self.stack.last_mut().ok_or(InterpreterError::ValueStackUnderflow)?;
+    fn apply_un_op(
+        &mut self,
+        op: fn(&Value) -> Result<Value, InterpreterError>,
+    ) -> Result<(), InterpreterError> {
+        let a = self
+            .stack
+            .last_mut()
+            .ok_or(InterpreterError::ValueStackUnderflow)?;
 
         *a = op(&*a)?;
 

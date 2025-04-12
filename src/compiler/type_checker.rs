@@ -1,51 +1,68 @@
 use crate::bin_op_pat;
 use super::data_type::DataType;
 use crate::function_table::FunctionTable;
-use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
+use super::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use super::data_type_scope::DataTypeScope;
 use crate::errors::CompileError;
 
 
 pub struct TypeChecker<'a> {
-    scope: DataTypeScope,
     function_table: &'a FunctionTable,
 }
 
 impl<'a> TypeChecker<'a> {
     pub fn new(function_table: &'a FunctionTable) -> Self {
         Self {
-            scope: DataTypeScope::new(),
             function_table,
         }
     }
         
-    pub fn check(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
-       self.check_stmts(stmts)
+    pub fn check(&mut self, items: &[Item]) -> Result<(), CompileError> {
+       self.check_items(items)
     }
 
-    fn check_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
-       self.scope.enter();
+    fn check_items(&mut self, items: &[Item]) -> Result<(), CompileError> {
+        for item in items {
+            match item {
+                Item::FnDef(fn_def) => {
+                    let mut scope = DataTypeScope::new();
+                    scope.enter(); // parameter scope layer
+                    
+                    for (arg_name, arg_type) in fn_def.args.iter() {
+                        scope.insert_new(arg_name.clone(), arg_type.clone())?;
+                    }
 
-        for s in stmts {
-           self.check_stmt(s)?;
+                    self.check_stmts(&fn_def.body, &mut scope)?;
+                },
+            }
         }
-
-       self.scope.exit();
 
         Ok(())
     }
 
-    fn check_stmt(&mut self, stmt: &Stmt) -> Result<(), CompileError> {
+    fn check_stmts(&self, stmts: &[Stmt], scope: &mut DataTypeScope) -> Result<(), CompileError> {
+        scope.enter();
+
+        for s in stmts {
+           self.check_stmt(s, scope)?;
+        }
+
+        scope.exit();
+
+        Ok(())
+    }
+
+    fn check_stmt(&self, stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), CompileError> {
         match stmt {
             Stmt::If(cond, stmts, else_stmts) => {
-                let cond = self.check_expr(cond)?;
+                let cond = self.check_expr(cond, scope)?;
                 if !cond.is_bool() {
                     return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
-                self.check_stmts(stmts)?;
+                self.check_stmts(stmts, scope)?;
                 if let Some(else_stmts) = else_stmts {
-                   self.check_stmts(else_stmts)?;
+                   self.check_stmts(else_stmts, scope)?;
                 }
             },
 
@@ -53,7 +70,7 @@ impl<'a> TypeChecker<'a> {
                 // if the declaration has explicit type or not
                 // check the type if yes
                 // if no then do essentialy nothing
-                let expr_type = self.check_expr(expr)?;
+                let expr_type = self.check_expr(expr, scope)?;
                 let data_type = if let Some(data_type) = data_type {
                     if expr_type != *data_type {
                         return Err(CompileError::WrongType{expected: *data_type, found: expr_type});
@@ -64,15 +81,15 @@ impl<'a> TypeChecker<'a> {
                     expr_type
                 };
 
-               self.scope.insert_new(ident.clone(), data_type)?;
+               scope.insert_new(ident.clone(), data_type)?;
             },
 
             Stmt::VarAssign(ident, expr) => {
-                let Some(&data_type) = self.scope.get(&ident) else {
+                let Some(&data_type) = scope.get(&ident) else {
                     return Err(CompileError::VariableNotFound(ident.clone()));
                 };
 
-                let expr_type = self.check_expr(expr)?;
+                let expr_type = self.check_expr(expr, scope)?;
 
                 if expr_type != data_type {
                     return Err(CompileError::WrongType{expected: data_type, found: expr_type});
@@ -80,26 +97,26 @@ impl<'a> TypeChecker<'a> {
             },
 
             Stmt::While(cond, stmts) => {
-                let cond = self.check_expr(cond)?;
+                let cond = self.check_expr(cond, scope)?;
                 if !cond.is_bool() {
                     return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
-                return self.check_stmts(stmts);
+                return self.check_stmts(stmts, scope);
             },
 
             Stmt::Expr(expr) => {
-               self.check_expr(expr)?;
+               self.check_expr(expr, scope)?;
             },
         }
 
         Ok(())
     }
 
-    fn check_expr(&mut self, expr: &Expr) -> Result<DataType, CompileError> {
+    fn check_expr(&self, expr: &Expr, scope: &mut DataTypeScope) -> Result<DataType, CompileError> {
         match expr {
             Expr::Var(ident) => {
-                let Some(data_type) = self.scope.get(ident) else {
+                let Some(data_type) = scope.get(ident) else {
                     return Err(CompileError::VariableNotFound(ident.clone()));
                 };
 
@@ -112,7 +129,7 @@ impl<'a> TypeChecker<'a> {
                 };
 
                 let arg_types: Vec<DataType> = args.iter()
-                    .map(|arg| self.check_expr(arg))
+                    .map(|arg| self.check_expr(arg, scope))
                     .collect::<Result<Vec<DataType>, CompileError>>()?;
 
                 func.check_types(&arg_types)?;
@@ -121,8 +138,8 @@ impl<'a> TypeChecker<'a> {
             }
 
             Expr::BinaryOp(op, a, b) => {
-                let a = self.check_expr(a)?;
-                let b = self.check_expr(b)?;
+                let a = self.check_expr(a, scope)?;
+                let b = self.check_expr(b, scope)?;
                 match op {
                     bin_op_pat!(NUMERIC) => {
                         match (a, b) {
@@ -163,7 +180,7 @@ impl<'a> TypeChecker<'a> {
             },
 
             Expr::UnaryOp(op, a) => {
-                let a = self.check_expr(a)?;
+                let a = self.check_expr(a, scope)?;
                 match op {
                     UnaryOp::Not => {
                         if a != DataType::Bool {

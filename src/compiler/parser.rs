@@ -1,8 +1,7 @@
-use std::f32::consts::E;
-
+use crate::compiler::ast::FunctionDef;
 use crate::errors::CompileError;
 use super::token::Token;
-use super::token_tree::{BinaryOp, Expr, Stmt, UnaryOp};
+use super::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use crate::expect_pat;
 use crate::value::Value;
 
@@ -56,8 +55,56 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Stmt>, CompileError> {
-       self.parse_stmts(Token::EOF)
+
+    pub fn parse(&mut self) -> Result<Vec<Item>, CompileError> {
+       self.parse_items()
+    }
+
+    fn parse_items(&mut self) -> Result<Vec<Item>, CompileError> {
+        let mut items = vec![];
+
+        while let Some(token) = self.peek() {
+            match token {
+                // lonely EOL
+                Token::EOL => {
+                    self.skip();
+                    continue;
+                },
+
+                Token::DataType(_) => {
+                    expect_pat!(Token::DataType(return_type) in self);
+                    expect_pat!(Token::Ident(fn_name) in self);
+                    expect_pat!(Token::ParenL in self);
+
+                    let mut args = vec![];
+                    while let Some(token) = self.peek() {
+                        if token == &Token::ParenR {
+                            break;
+                        }
+
+                        expect_pat!(Token::DataType(arg_data_type) in self);
+                        expect_pat!(Token::Ident(arg_ident) in self);
+                        args.push((arg_ident, arg_data_type));
+
+                        if self.peek() == Some(&Token::Comma) {
+                           self.skip();
+                        } else {
+                            break;
+                        }
+                    }
+
+                    expect_pat!(Token::ParenR in self);
+                    expect_pat!(Token::BraceL in self);
+
+                    let stmts = self.parse_stmts(Token::BraceR)?;
+                    items.push(Item::FnDef(FunctionDef::new(fn_name, return_type, args, stmts)));
+                },
+
+                _ => return Err(CompileError::UnexpectedToken(token.clone())),
+            }
+        }
+
+        Ok(items)
     }
 
     /// Parses a list of statements until the critical token is found.
@@ -181,8 +228,6 @@ impl<'a> Parser<'a> {
     }
 
 
-
-
     ////////////////// Expression parsing methods ////////////////
 
     fn parse_expr(&mut self) -> Result<Expr, CompileError> {
@@ -260,7 +305,7 @@ impl<'a> Parser<'a> {
     /// Parse unary `UnaryOp` such as not
     fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileError> {
         let token = self.peek().ok_or(CompileError::UnexpectedEndOfInput)?;
-        
+
         let Some(op) = token_to_unary_op(token) else {
             return self.parse_atom_expr();
         };
