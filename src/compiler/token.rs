@@ -25,6 +25,7 @@ pub enum Token {
     Else,
     Let,
     While,
+    Return,
 
     ParenL,
     ParenR,

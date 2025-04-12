@@ -3,7 +3,8 @@ use std::collections::HashMap;
 
 use super::ast::{BinaryOp, Expr, FunctionDef, Item, Stmt, UnaryOp};
 use crate::{
-    function_source::FunctionSource, function_table::FunctionTable, instruction::Instruction, interpreter_source::InterpreterSource
+    function_source::FunctionSource, function_table::FunctionTable, instruction::{self, Instruction},
+    interpreter_source::InterpreterSource,
 };
 
 pub struct Compiler<'a> {
@@ -44,7 +45,6 @@ impl<'a> Compiler<'a> {
         }
     }
 }
-
 
 struct FunctionCompiler<'a, 'b> {
     compiler: &'b mut Compiler<'a>,
@@ -89,7 +89,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         FunctionSource::new(self.locals.len(), self.instructions)
     }
 
-    fn compile_stmts(&mut self, stmts: &[Stmt], ) {
+    fn compile_stmts(&mut self, stmts: &[Stmt]) {
         for stmt in stmts {
             self.compile_stmt(stmt);
         }
@@ -116,6 +116,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
             Stmt::While(cond, stmts) => {
                 self.compile_while_statement(cond, stmts);
+            },
+
+            Stmt::Return(expr) => {
+                self.compile_expr(expr);
+                self.push(Instruction::Return);
             }
         }
     }

@@ -125,6 +125,18 @@ impl<'a> Parser<'a> {
                     continue;
                 },
 
+                Token::Return => {
+                    expect_pat!(Token::Return in self);
+                    if let Some(Token::EOL) = self.peek() {
+                        self.skip();
+                        Stmt::Return(Expr::Literal(Value::Void))
+                    } else {
+                        let expr = self.parse_expr()?;
+                        expect_pat!(Token::EOL in self);
+                        Stmt::Return(expr)
+                    }
+                }
+
                 // var declaration with explicit type
                 Token::DataType(_) => {
                     expect_pat!(Token::DataType(data_type) in self);

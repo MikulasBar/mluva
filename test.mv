@@ -2,15 +2,11 @@
 
 
 Void main() {
-    let x = 0
+    print('Hi')
 
-    while x <= 100 {
-        print('x:', x)
+    return 
 
-        x = x + 1
-    }
-
-    print('Done!')
+    print('Bye')
 }
 
 Int add(Int a, Int b) {

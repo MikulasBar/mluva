@@ -12,4 +12,5 @@ pub enum Stmt {
     If(Expr, Vec<Stmt>, Option<Vec<Stmt>>),
     While(Expr, Vec<Stmt>),
     Expr(Expr),
+    Return(Expr),
 }

@@ -248,6 +248,7 @@ fn match_kw(ident: String) -> Token {
         "if"    => Token::If,
         "else"  => Token::Else,
         "while" => Token::While,
+        "return" => Token::Return,
 
         _       => Token::Ident(ident)
     }

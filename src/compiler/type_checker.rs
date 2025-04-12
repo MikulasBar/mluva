@@ -32,7 +32,7 @@ impl<'a> TypeChecker<'a> {
                         scope.insert_new(arg_name.clone(), arg_type.clone())?;
                     }
 
-                    self.check_stmts(&fn_def.body, &mut scope)?;
+                    self.check_stmts(&fn_def.body, &mut scope, fn_def.return_type)?;
                 },
             }
         }
@@ -40,11 +40,11 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmts(&self, stmts: &[Stmt], scope: &mut DataTypeScope) -> Result<(), CompileError> {
+    fn check_stmts(&self, stmts: &[Stmt], scope: &mut DataTypeScope, return_type: DataType) -> Result<(), CompileError> {
         scope.enter();
 
         for s in stmts {
-           self.check_stmt(s, scope)?;
+           self.check_stmt(s, scope, return_type)?;
         }
 
         scope.exit();
@@ -52,7 +52,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmt(&self, stmt: &Stmt, scope: &mut DataTypeScope) -> Result<(), CompileError> {
+    fn check_stmt(&self, stmt: &Stmt, scope: &mut DataTypeScope, return_type: DataType) -> Result<(), CompileError> {
         match stmt {
             Stmt::If(cond, stmts, else_stmts) => {
                 let cond = self.check_expr(cond, scope)?;
@@ -60,9 +60,9 @@ impl<'a> TypeChecker<'a> {
                     return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
-                self.check_stmts(stmts, scope)?;
+                self.check_stmts(stmts, scope, return_type)?;
                 if let Some(else_stmts) = else_stmts {
-                   self.check_stmts(else_stmts, scope)?;
+                   self.check_stmts(else_stmts, scope, return_type)?;
                 }
             },
 
@@ -102,11 +102,18 @@ impl<'a> TypeChecker<'a> {
                     return Err(CompileError::WrongType{expected: DataType::Bool, found: cond});
                 }
 
-                return self.check_stmts(stmts, scope);
+                return self.check_stmts(stmts, scope, return_type);
             },
 
             Stmt::Expr(expr) => {
                self.check_expr(expr, scope)?;
+            },
+
+            Stmt::Return(expr) => {
+                let expr_type = self.check_expr(expr, scope)?;
+                if expr_type != return_type {
+                    return Err(CompileError::WrongType{expected: return_type, found: expr_type});
+                }
             },
         }
 
