@@ -31,13 +31,13 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
 
             '\'' => tokenize_string(&mut chars),
             
-            ';' | '\n' => {
-                chars.next();
-                if let Some(&Token::EOL) | None = tokens.last() {
-                    continue;
-                }
-                Token::EOL
-            },
+            // ';' | '\n' => {
+            //     chars.next();
+            //     if let Some(&Token::EOL) | None = tokens.last() {
+            //         continue;
+            //     }
+            //     Token::EOL
+            // },
 
             // whitespaces -> skip
             str_pat!(WS) => {
@@ -249,6 +249,7 @@ fn match_kw(ident: String) -> Token {
         "else"  => Token::Else,
         "while" => Token::While,
         "return" => Token::Return,
+        "kámo" => Token::EOL,
 
         _       => Token::Ident(ident)
     }

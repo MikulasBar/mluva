@@ -10,6 +10,10 @@ pub enum CompileError {
         expected: DataType,
         found: DataType,
     },
+    WrongNumberOfArguments {
+        expected: usize,
+        found: usize,
+    },
     VariableNotFound(String),
     FunctionNotFound(String),
     VarRedeclaration(String),

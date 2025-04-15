@@ -1,20 +1,21 @@
 use core::panic;
 use std::collections::HashMap;
 
-use super::ast::{BinaryOp, Expr, FunctionDef, Item, Stmt, UnaryOp};
-use crate::{
-    function_source::FunctionSource, function_table::FunctionTable, instruction::{self, Instruction},
-    interpreter_source::InterpreterSource,
-};
+use crate::interpreter_source::InterpreterSource;
+use crate::function::{FunctionDefinitionTable, FunctionSource};
+use crate::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
+use crate::instruction::Instruction;
+
+use crate::function::InternalFunctionDefinition;
 
 pub struct Compiler<'a> {
     functions: Vec<FunctionSource>,
-    function_table: &'a FunctionTable,
+    function_table: &'a FunctionDefinitionTable,
     main_slot: Option<usize>,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(function_table: &'a FunctionTable) -> Self {
+    pub fn new(function_table: &'a FunctionDefinitionTable) -> Self {
         Self {
             function_table,
             main_slot: None,
@@ -84,7 +85,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.instructions.push(inst);
     }
 
-    fn compile(mut self, fn_def: &FunctionDef) -> FunctionSource {
+    fn compile(mut self, fn_def: &InternalFunctionDefinition) -> FunctionSource {
         self.compile_stmts(&fn_def.body);
         FunctionSource::new(self.locals.len(), self.instructions)
     }

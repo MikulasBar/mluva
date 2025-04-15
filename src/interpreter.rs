@@ -1,32 +1,38 @@
 use crate::errors::InterpreterError;
-use crate::function_source::FunctionSource;
-use crate::function_table::FunctionTable;
 use crate::instruction::Instruction;
 use crate::interpreter_source::InterpreterSource;
 use crate::value::Value;
 
-pub struct Interpreter<'a> {
-    function_table: &'a FunctionTable,
-    index: usize,
+const DEFAULT_STACK_SIZE: usize = 256;
+const DEFAULT_VALUE_STACK_SIZE: usize = 256;
+
+
+// TODO: IMPLEMENT THE INTERPRETER
+pub struct Interpreter {
+    // indicates the current instruction
+    instruction_index: usize,
+    // stack for temporary values
+    // used for intermediate calculations
+    value_stack: Vec<Value>,
+    // The call stack used for function calls and local variables
+    // all variables are stored there
+    // all functions have frames in the call stack
     stack: Vec<Value>,
-    instructions: Vec<Instruction>,
-    slots: Vec<Value>,
+    // indicates end of the stack
+    stack_index: usize,
+    // stores all indices of the frames in the call stack
+    // used to return to the correct frame after function returns 
+    frame_indices: Vec<usize>,
+    // source of the instructions
+    source: InterpreterSource,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new(function_table: &'a FunctionTable, source: InterpreterSource) -> Self {
-        let mut source = source;
-        let main_fn = std::mem::replace(
-            &mut source.functions[source.main_slot.unwrap()],
-            FunctionSource::new(0, vec![]),
-        );
-
+impl Interpreter {
+    pub fn new(source: InterpreterSource) -> Self {
         Self {
-            function_table,
-            instructions: main_fn.body,
-            index: 0,
-            stack: vec![],
-            slots: vec![Value::Void; main_fn.slot_count],
+            source,
+            instruction_index: 0,
+            
         }
     }
 

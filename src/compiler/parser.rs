@@ -1,4 +1,4 @@
-use crate::compiler::ast::FunctionDef;
+use crate::compiler::ast::InternalFunctionDefinition;
 use crate::errors::CompileError;
 use super::token::Token;
 use super::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
@@ -97,7 +97,9 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::BraceL in self);
 
                     let stmts = self.parse_stmts(Token::BraceR)?;
-                    items.push(Item::FnDef(FunctionDef::new(fn_name, return_type, args, stmts)));
+                    items.push(Item::FnDef(
+                        InternalFunctionDefinition::new(fn_name, return_type, args, stmts)
+                    ));
                 },
 
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),

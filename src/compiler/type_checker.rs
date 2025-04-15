@@ -1,6 +1,6 @@
 use crate::bin_op_pat;
 use super::data_type::DataType;
-use crate::function_table::FunctionTable;
+use crate::functin::FunctionTable;
 use super::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use super::data_type_scope::DataTypeScope;
 use crate::errors::CompileError;

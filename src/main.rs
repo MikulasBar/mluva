@@ -1,24 +1,41 @@
 mod interpreter;
 mod value;
 mod errors;
-mod engine;
-mod external;
 mod instruction;
 mod compiler;
-mod function_table;
 mod interpreter_source;
-mod function_source;
+mod function;
+mod ast;
 
 use std::io::Read;
-use engine::Engine;
-use external::PRINT_FUNCTION;
+use compiler::DataType;
+use function::{ExternalFunction, ExternalFunctionDefinition, ExternalFunctionSource};
+use value::Value;
+
+
+pub const PRINT_FUNCTION: ExternalFunction = ExternalFunction {
+    def: ExternalFunctionDefinition {
+        name: "print",
+        return_type: DataType::Void,
+        check_types: |_types| Ok(()),
+    },
+    source: ExternalFunctionSource {
+        call: |args| {
+            for a in args {
+                print!("{} ", a);
+            }
+            println!();
+            Ok(Value::Void)
+        },
+    },
+};
 
 fn main() {
     let mut input = String::new();
     let mut file = std::fs::File::open("test.mv").unwrap();
     file.read_to_string(&mut input).unwrap();
 
-    let mut engine = Engine::new();
+
     engine.add_function(PRINT_FUNCTION);
 
     let compile_result = engine.compile(&input);

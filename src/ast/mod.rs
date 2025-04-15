@@ -9,5 +9,5 @@ pub use self::{
     statement::Stmt,
     binary_op::BinaryOp,
     unary_op::UnaryOp,
-    item::{Item, FunctionDef},
+    item::Item,
 };
