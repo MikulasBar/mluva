@@ -1,4 +1,4 @@
-use crate::{compiler::DataType, errors::InterpreterError, instruction::Instruction, value::Value};
+use crate::{compiler::DataType, instruction::Instruction};
 use crate::ast::Stmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,9 +34,5 @@ pub struct InternalFunctionSource {
 impl InternalFunctionSource {
     pub fn new(slot_count: usize, body: Vec<Instruction>) -> Self {
         Self { slot_count, body }
-    }
-
-    pub fn call(&self, args: Vec<Value>) -> Result<Value, InterpreterError> {
-        todo!()
     }
 }

@@ -223,7 +223,7 @@ fn tokenize_number(chars: &mut CharIter) -> Token {
 fn tokenize_ident(chars: &mut CharIter) -> Token {
     let mut ident = String::new();
     
-    while let Some(&ch @ str_pat!(IDENT)) = chars.peek() {
+    while let Some(&ch @ (str_pat!(IDENT) | str_pat!(NUM))) = chars.peek() {
         ident.push(ch);
         chars.next();
     }

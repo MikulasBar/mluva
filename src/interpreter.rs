@@ -1,76 +1,92 @@
 use crate::errors::InterpreterError;
-use crate::function::FunctionSource;
+use crate::function::{FunctionSource, InternalFunctionSource};
 use crate::instruction::Instruction;
 use crate::interpreter_source::InterpreterSource;
 use crate::value::Value;
 
-// const DEFAULT_STACK_SIZE: usize = 256;
-// const DEFAULT_VALUE_STACK_SIZE: usize = 256;
-
-
-// TODO: IMPLEMENT THE INTERPRETER
 pub struct Interpreter {
-    // indicates the current instruction
-    index: usize,
-    // stack for temporary values
-    // used for intermediate calculations
-    value_stack: Vec<Value>,
-
-    slots: Vec<Value>,
-
-    // // The call stack used for function calls and local variables
-    // // all variables are stored there
-    // // all functions have frames in the call stack
-    // stack: Vec<Value>,
-    // // indicates end of the stack
-    // stack_index: usize,
-    // // stores all indices of the frames in the call stack
-    // // used to return to the correct frame after function returns 
-    // frame_indices: Vec<usize>,
-    // // source of the instructions
-    // source: InterpreterSource,
-
-    instructions: Vec<Instruction>,
+    main_slot: usize,
     functions: Vec<FunctionSource>,
+    stack: Vec<Value>,
 }
 
 impl Interpreter {
     pub fn new(source: InterpreterSource) -> Self {
-        let InterpreterSource { functions, main_slot } = source;
+        let InterpreterSource {
+            functions,
+            main_slot,
+        } = source;
         // println!("FUNCTION SOURCES: {:?}\n", functions);
         // println!("MAIN: {:?}\n", main_slot);
-        
-        let main_source = functions[main_slot].clone();
-
-        let FunctionSource::Internal(f) = main_source else {
-            panic!("Main function must be internal")
-        };
 
         Self {
-            instructions: f.body,
             functions: functions,
+            main_slot,
+            stack: vec![],
+        }
+    }
+
+    pub fn interpret(&mut self) -> Result<(), InterpreterError> {
+        let main_source = &self.functions[self.main_slot];
+        interpret_function(&self.functions, &mut self.stack, main_source, 0)?;
+
+        Ok(())
+    }
+
+}
+
+fn interpret_function(
+    functions: &[FunctionSource],
+    stack: &mut Vec<Value>,
+    source: &FunctionSource,
+    arg_count: usize,
+) -> Result<Value, InterpreterError> {
+    match source {
+        FunctionSource::External(f) => {
+            let args = get_args_from_stack(stack, arg_count)?;
+            f.call(args)
+        },
+        FunctionSource::Internal(f) => {
+            InternalFunctionInterpreter::new(&functions, stack, f)
+                .interpret()
+        }
+    }
+}
+struct InternalFunctionInterpreter<'a> {
+    functions: &'a [FunctionSource],
+    stack: &'a mut Vec<Value>,
+    index: usize,
+    slots: Vec<Value>,
+    source: &'a InternalFunctionSource,
+}
+
+impl<'a> InternalFunctionInterpreter<'a> {
+    pub fn new(
+        functions: &'a [FunctionSource],
+        stack: &'a mut Vec<Value>,
+        source: &'a InternalFunctionSource,
+    ) -> Self {
+        Self {
+            functions,
+            stack,
+            source,
             index: 0,
-            value_stack: vec![],
-            slots: vec![Value::Void; f.slot_count],
+            slots: vec![Value::Void; source.slot_count],
         }
     }
 
     fn pop(&mut self) -> Result<Value, InterpreterError> {
-        self.value_stack
+        self.stack
             .pop()
             .ok_or(InterpreterError::ValueStackUnderflow)
     }
 
-    pub fn interpret(&mut self) -> Result<(), InterpreterError> {
-        self.interpret_instructions()
-    }
-
-    pub fn interpret_instructions(&mut self) -> Result<(), InterpreterError> {
-        while self.index < self.instructions.len() {
-            let instruction = &self.instructions[self.index];
+    pub fn interpret(&mut self) -> Result<Value, InterpreterError> {
+        while self.index < self.source.body.len() {
+            let instruction = &self.source.body[self.index];
             match *instruction {
                 Instruction::Push(ref value) => {
-                    self.value_stack.push(value.clone());
+                    self.stack.push(value.clone());
                 }
 
                 Instruction::Pop => {
@@ -82,21 +98,18 @@ impl Interpreter {
                 }
 
                 Instruction::Load(slot) => {
-                    self.value_stack.push(self.slots[slot].clone());
+                    self.stack.push(self.slots[slot].clone());
                 }
 
                 Instruction::Call { slot, arg_count } => {
-                    let args = self.value_stack.split_off(self.value_stack.len() - arg_count);
-                    let fn_source = &self.functions[slot];
-                    let FunctionSource::External(func) = fn_source else {
-                        panic!("Only external functions can be called for now")
-                    };
-                    let result = func.call(args)?;
-                    self.value_stack.push(result);
+                    let source = &self.functions[slot];
+                    let result =
+                        interpret_function(self.functions, &mut self.stack, source, arg_count)?;
+                    self.stack.push(result);
                 }
 
                 Instruction::Return => {
-                    break; // TODO: Handle return logic here
+                    return Ok(self.pop()?);
                 }
 
                 Instruction::Jump(target) => {
@@ -135,7 +148,8 @@ impl Interpreter {
             self.index += 1;
         }
 
-        Ok(())
+        // If we reach here without returning, it means the function did not return a value
+        Err(InterpreterError::FunctionDidNotReturn)
     }
 
     fn apply_bin_op(
@@ -144,7 +158,7 @@ impl Interpreter {
     ) -> Result<(), InterpreterError> {
         let a = self.pop()?;
         let b = self
-            .value_stack
+            .stack
             .last_mut()
             .ok_or(InterpreterError::ValueStackUnderflow)?;
 
@@ -158,7 +172,7 @@ impl Interpreter {
         op: fn(&Value) -> Result<Value, InterpreterError>,
     ) -> Result<(), InterpreterError> {
         let a = self
-            .value_stack
+            .stack
             .last_mut()
             .ok_or(InterpreterError::ValueStackUnderflow)?;
 
@@ -166,4 +180,19 @@ impl Interpreter {
 
         Ok(())
     }
+}
+
+fn get_args_from_stack(
+    stack: &mut Vec<Value>,
+    arg_count: usize,
+) -> Result<Vec<Value>, InterpreterError> {
+    if stack.len() < arg_count {
+        return Err(InterpreterError::ValueStackUnderflow);
+    }
+
+    // Split the stack to get the arguments
+    let args = stack.split_off(stack.len() - arg_count);
+    // Reverse the arguments to maintain the order
+    let args = args.into_iter().rev().collect::<Vec<_>>();
+    Ok(args)
 }

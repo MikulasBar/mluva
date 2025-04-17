@@ -1,16 +1,22 @@
-external Void print(String);
 
+
+external Void print(Float);
 
 Void main() {
-    print('Hello, world!')
-
-    return
+    let a = 1.0
+    let b = 2.0
+    let c = float_add3(a + b, a, b)
+    print(c)
 
     # print('Bye')
 }
 
 Int add(Int a, Int b) {
     return a + b
+}
+
+Float float_add3(Float a, Float b, Float c) {
+    return a + b + c
 }
 
 # Int x = -1.0

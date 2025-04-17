@@ -8,6 +8,9 @@ use crate::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use crate::instruction::Instruction;
 
 use crate::function::InternalFunctionDefinition;
+use crate::value::Value;
+
+use super::DataType;
 
 pub struct Compiler {
     fn_map: HashMap<String, usize>,
@@ -144,7 +147,7 @@ impl<'b> FunctionCompiler<'b> {
         })
     }
 
-    fn update_at(&mut self, index: usize, inst: Instruction) {
+    fn update_instruction_at(&mut self, index: usize, inst: Instruction) {
         let len = self.instructions.len();
         if index >= len {
             panic!("Index out of bounds :{}, length: {}", index, len);
@@ -157,8 +160,20 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions.push(inst);
     }
 
-    fn compile(mut self, fn_def: &InternalFunctionDefinition) -> Result<InternalFunctionSource, CompileError> {
-        self.compile_stmts(&fn_def.body)?;
+    fn compile(mut self, def: &InternalFunctionDefinition) -> Result<InternalFunctionSource, CompileError> {
+        for (name, _) in &def.params {
+            let slot = self.get_slot(&name);
+            self.instructions.push(Instruction::Store(slot));
+        }
+
+        self.compile_stmts(&def.body)?;
+        
+        // implicit return at the end of Void functions
+        if let DataType::Void = def.return_type {
+            self.instructions.push(Instruction::Push(Value::Void));
+            self.instructions.push(Instruction::Return);
+        }
+
         Ok(InternalFunctionSource::new(self.locals.len(), self.instructions))
     }
 
@@ -222,18 +237,18 @@ impl<'b> FunctionCompiler<'b> {
             let post_if_index = self.instructions.len();
             // jump from the if condition to the else block
             // we should jump over the whole if-else block, only if block
-            self.update_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
+            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
 
             // Compile the statements in the "else" block
             self.compile_stmts(else_stmts)?;
 
             // Update the jump instruction to skip over the "else" block
             let post_else_index = self.instructions.len();
-            self.update_at(if_jump_index, Instruction::Jump(post_else_index));
+            self.update_instruction_at(if_jump_index, Instruction::Jump(post_else_index));
         } else {
             // If there is no "else" block, we can just jump over the "if" block
             let post_if_index = self.instructions.len();
-            self.update_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
+            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
         }
 
         Ok(())
@@ -259,7 +274,7 @@ impl<'b> FunctionCompiler<'b> {
         let end_index = self.instructions.len();
 
         // Update the jump instruction for the "while" block to skip over the body and the end jump
-        self.update_at(cond_jump_index, Instruction::JumpIfFalse(end_index));
+        self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(end_index));
 
         Ok(())
     }
