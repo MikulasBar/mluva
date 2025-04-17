@@ -1,6 +1,7 @@
 
 
-external Void print(Float);
+external Void print(..);
+external Void assert(Bool);
 
 Void main() {
     let a = 1.0
@@ -8,7 +9,11 @@ Void main() {
     let c = float_add3(a + b, a, b)
     print(c)
 
-    # print('Bye')
+    assert(c == 6.0);
+
+    print('Hello, world!')
+
+    print(1, 2, false, 'asfaf', 45.65)
 }
 
 Int add(Int a, Int b) {

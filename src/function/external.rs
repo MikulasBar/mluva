@@ -8,11 +8,11 @@ use crate::{
 pub struct ExternalFunctionDefinition {
     pub name: String,
     pub return_type: DataType,
-    pub params: Vec<DataType>,
+    pub params: Option<Vec<DataType>>,
 }
 
 impl ExternalFunctionDefinition {
-    pub fn new(name: impl Into<String>, return_type: DataType, params: Vec<DataType>) -> Self {
+    pub fn new(name: impl Into<String>, return_type: DataType, params: Option<Vec<DataType>>) -> Self {
         Self {
             name: name.into(),
             return_type,

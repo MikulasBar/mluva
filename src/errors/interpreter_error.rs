@@ -9,4 +9,5 @@ pub enum InterpreterError {
     /// but I want to have a fallback for any type error
     TypeError,
     FunctionDidNotReturn,
+    Other(String),
 }

@@ -25,10 +25,11 @@ impl<'a> FunctionDefinitionRef<'a> {
         }
     }
 
-    pub fn arg_count(&self) -> usize {
+    // if the params are None, it means that the function is variadic
+    pub fn arg_count(&self) -> Option<usize> {
         match *self {
-            Self::External(external) => external.params.len(),
-            Self::Internal(internal) => internal.params.len(),
+            Self::External(external) => Some(external.params.as_deref()?.len()),
+            Self::Internal(internal) => Some(internal.params.len()),
         }
     }
 
@@ -37,7 +38,13 @@ impl<'a> FunctionDefinitionRef<'a> {
 
         match self {
             Self::External(f) => {
-                for (&expected, &found) in f.params.iter().zip(types.into_iter()) {
+                if f.params.is_none() {
+                    return Ok(());
+                }
+                
+                let params = f.params.as_deref().unwrap().iter();
+
+                for (&expected, &found) in params.zip(types.into_iter()) {
                     check_single_arg(expected, found)?;
                 }
             }
@@ -53,7 +60,12 @@ impl<'a> FunctionDefinitionRef<'a> {
 }
 
 
-fn check_arg_count(expected: usize, found: usize) -> Result<(), CompileError> {
+fn check_arg_count(expected: Option<usize>, found: usize) -> Result<(), CompileError> {
+    // If the function is variadic, we don't care about the number of arguments
+    let Some(expected) = expected else {
+        return Ok(());
+    };
+
     if expected != found {
         return Err(CompileError::WrongNumberOfArguments {
             expected,

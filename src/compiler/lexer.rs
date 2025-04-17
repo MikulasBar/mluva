@@ -79,6 +79,17 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                 Token::Comma
             }
 
+            '.' => {
+                chars.next();
+                
+                if let Some('.') = chars.peek() {
+                    chars.next();
+                    Token::DotDot
+                } else {
+                    return Err(CompileError::UnexpectedChar(char));
+                }
+            }
+
             '!' => {
                 chars.next();
                 if let Some('=') = chars.peek() {

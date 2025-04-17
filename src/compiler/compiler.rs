@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::errors::CompileError;
 use crate::interpreter_source::InterpreterSource;
-use crate::function::{ExternalFunctionDefinition, FunctionSource, InternalFunctionSource};
+use crate::function::{ExternalFunctionDefinition, ExternalFunctionSource, FunctionSource, InternalFunctionSource};
 use crate::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use crate::instruction::Instruction;
 
@@ -27,7 +27,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile(mut self, items: &[Item], externals: HashMap<String, FunctionSource>) -> Result<InterpreterSource, CompileError> {
+    pub fn compile(mut self, items: &[Item], externals: HashMap<String, ExternalFunctionSource>) -> Result<InterpreterSource, CompileError> {
         self.allocate_function_slots(items)?;
         self.compile_items(items)?;
         self.add_externals(externals)?;
@@ -51,7 +51,7 @@ impl Compiler {
         Ok(InterpreterSource::new(functions, self.main_slot.unwrap()))
     }
 
-    fn add_externals(&mut self, externals: HashMap<String, FunctionSource>) -> Result<(), CompileError> {
+    fn add_externals(&mut self, externals: HashMap<String, ExternalFunctionSource>) -> Result<(), CompileError> {
         for (name, source) in externals {
             let Some(slot) = self.fn_map.get(&name) else {
                 continue;
@@ -65,7 +65,7 @@ impl Compiler {
                 self.main_slot = Some(self.functions.len());
             }
 
-            self.functions[*slot] = Some(source);
+            self.functions[*slot] = Some(FunctionSource::External(source));
         }
 
         Ok(())

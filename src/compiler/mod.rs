@@ -16,12 +16,12 @@ pub use parser::Parser;
 pub use type_checker::TypeChecker;
 
 use crate::{
-    errors::CompileError, function::FunctionSource, interpreter_source::InterpreterSource
+    errors::CompileError, function::ExternalFunctionSource, interpreter_source::InterpreterSource
 };
 
 pub fn compile_from_str(
     input: &str,
-    externals: HashMap<String, FunctionSource>,
+    externals: HashMap<String, ExternalFunctionSource>,
 ) -> Result<InterpreterSource, CompileError> {
     let tokens = tokenize(input)?;
     // println!("TOKENS: {:?}", tokens);

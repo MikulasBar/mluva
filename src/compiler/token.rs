@@ -35,6 +35,7 @@ pub enum Token {
     BraceL,
     BraceR,
     Comma,
+    DotDot,
 
     DataType(DataType),
     Ident(String),
