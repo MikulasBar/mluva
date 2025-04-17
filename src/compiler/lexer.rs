@@ -6,7 +6,6 @@ use crate::str_pat;
 type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
-    // println!("Tokenizing input: {:?}", input);
     let mut tokens = vec![];
     let mut chars = input.chars().peekable();
     
@@ -31,13 +30,13 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
 
             '\'' => tokenize_string(&mut chars),
             
-            // ';' | '\n' => {
-            //     chars.next();
-            //     if let Some(&Token::EOL) | None = tokens.last() {
-            //         continue;
-            //     }
-            //     Token::EOL
-            // },
+            ';' | '\n' => {
+                chars.next();
+                if let Some(&Token::EOL) | None = tokens.last() {
+                    continue;
+                }
+                Token::EOL
+            },
 
             // whitespaces -> skip
             str_pat!(WS) => {
@@ -249,7 +248,7 @@ fn match_kw(ident: String) -> Token {
         "else"  => Token::Else,
         "while" => Token::While,
         "return" => Token::Return,
-        "kámo" => Token::EOL,
+        "external" => Token::External,
 
         _       => Token::Ident(ident)
     }

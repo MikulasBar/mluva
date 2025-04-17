@@ -16,5 +16,6 @@ pub enum CompileError {
     },
     VariableNotFound(String),
     FunctionNotFound(String),
+    FunctionAlreadyDefined(String),
     VarRedeclaration(String),
 }

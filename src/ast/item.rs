@@ -1,7 +1,8 @@
-use crate::function::InternalFunctionDefinition;
+use crate::function::{ExternalFunctionDefinition, InternalFunctionDefinition};
 
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Item {
-    FnDef(InternalFunctionDefinition),
+    FunctionDef(InternalFunctionDefinition),
+    ExternalFunctionDef(ExternalFunctionDefinition),
 }

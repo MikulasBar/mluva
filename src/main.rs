@@ -7,26 +7,20 @@ mod interpreter_source;
 mod function;
 mod ast;
 
-use std::io::Read;
-use compiler::DataType;
-use function::{ExternalFunction, ExternalFunctionDefinition, ExternalFunctionSource};
+use std::{collections::HashMap, io::Read};
+use compiler::compile_from_str;
+use function::ExternalFunctionSource;
+use interpreter::Interpreter;
 use value::Value;
 
 
-pub const PRINT_FUNCTION: ExternalFunction = ExternalFunction {
-    def: ExternalFunctionDefinition {
-        name: "print",
-        return_type: DataType::Void,
-        check_types: |_types| Ok(()),
-    },
-    source: ExternalFunctionSource {
-        call: |args| {
-            for a in args {
-                print!("{} ", a);
-            }
-            println!();
-            Ok(Value::Void)
-        },
+pub const PRINT_EFSOURCE: ExternalFunctionSource = ExternalFunctionSource {
+    call: |args| {
+        for a in args {
+            print!("{} ", a);
+        }
+        println!();
+        Ok(Value::Void)
     },
 };
 
@@ -35,22 +29,22 @@ fn main() {
     let mut file = std::fs::File::open("test.mv").unwrap();
     file.read_to_string(&mut input).unwrap();
 
+    let mut externals = HashMap::new();
+    externals.insert("print".to_string(), PRINT_EFSOURCE.into());
 
-    engine.add_function(PRINT_FUNCTION);
+    let compile_result = compile_from_str(&input, externals);
 
-    let compile_result = engine.compile(&input);
     if let Err(e) = compile_result {
-        eprintln!("Compile error: {:?}", e);
+        eprintln!("Compilation error: {:?}", e);
         return;
     }
-    let interpreter_source = compile_result.unwrap();
 
-    // println!("{:?}", interpreter_source);
+    let source = compile_result.unwrap();
 
-    let interpret_result = engine.interpret(interpreter_source);
+    let interpret_result = Interpreter::new(source).interpret();
 
     if let Err(e) = interpret_result {
-        eprintln!("Interpret error: {:?}", e);
+        eprintln!("Interpretation error: {:?}", e);
         return;
     }
 }

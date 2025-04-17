@@ -19,3 +19,20 @@ impl FunctionSource {
         }
     }
 }
+
+mod froms {
+    use crate::function::{ExternalFunctionSource, InternalFunctionSource};
+    use super::FunctionSource;
+
+    impl From<ExternalFunctionSource> for FunctionSource {
+        fn from(source: ExternalFunctionSource) -> Self {
+            FunctionSource::External(source)
+        }
+    }
+
+    impl From<InternalFunctionSource> for FunctionSource {
+        fn from(source: InternalFunctionSource) -> Self {
+            FunctionSource::Internal(source)
+        }
+    }
+}

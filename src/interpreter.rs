@@ -1,53 +1,76 @@
 use crate::errors::InterpreterError;
+use crate::function::FunctionSource;
 use crate::instruction::Instruction;
 use crate::interpreter_source::InterpreterSource;
 use crate::value::Value;
 
-const DEFAULT_STACK_SIZE: usize = 256;
-const DEFAULT_VALUE_STACK_SIZE: usize = 256;
+// const DEFAULT_STACK_SIZE: usize = 256;
+// const DEFAULT_VALUE_STACK_SIZE: usize = 256;
 
 
 // TODO: IMPLEMENT THE INTERPRETER
 pub struct Interpreter {
     // indicates the current instruction
-    instruction_index: usize,
+    index: usize,
     // stack for temporary values
     // used for intermediate calculations
     value_stack: Vec<Value>,
-    // The call stack used for function calls and local variables
-    // all variables are stored there
-    // all functions have frames in the call stack
-    stack: Vec<Value>,
-    // indicates end of the stack
-    stack_index: usize,
-    // stores all indices of the frames in the call stack
-    // used to return to the correct frame after function returns 
-    frame_indices: Vec<usize>,
-    // source of the instructions
-    source: InterpreterSource,
+
+    slots: Vec<Value>,
+
+    // // The call stack used for function calls and local variables
+    // // all variables are stored there
+    // // all functions have frames in the call stack
+    // stack: Vec<Value>,
+    // // indicates end of the stack
+    // stack_index: usize,
+    // // stores all indices of the frames in the call stack
+    // // used to return to the correct frame after function returns 
+    // frame_indices: Vec<usize>,
+    // // source of the instructions
+    // source: InterpreterSource,
+
+    instructions: Vec<Instruction>,
+    functions: Vec<FunctionSource>,
 }
 
 impl Interpreter {
     pub fn new(source: InterpreterSource) -> Self {
+        let InterpreterSource { functions, main_slot } = source;
+        // println!("FUNCTION SOURCES: {:?}\n", functions);
+        println!("MAIN: {:?}\n", main_slot);
+        
+        let main_source = functions[main_slot].clone();
+
+        let FunctionSource::Internal(f) = main_source else {
+            panic!("Main function must be internal")
+        };
+
         Self {
-            source,
-            instruction_index: 0,
-            
+            instructions: f.body,
+            functions: functions,
+            index: 0,
+            value_stack: vec![],
+            slots: vec![Value::Void; f.slot_count],
         }
     }
 
     fn pop(&mut self) -> Result<Value, InterpreterError> {
-        self.stack
+        self.value_stack
             .pop()
             .ok_or(InterpreterError::ValueStackUnderflow)
     }
 
     pub fn interpret(&mut self) -> Result<(), InterpreterError> {
+        self.interpret_instructions()
+    }
+
+    pub fn interpret_instructions(&mut self) -> Result<(), InterpreterError> {
         while self.index < self.instructions.len() {
             let instruction = &self.instructions[self.index];
             match *instruction {
                 Instruction::Push(ref value) => {
-                    self.stack.push(value.clone());
+                    self.value_stack.push(value.clone());
                 }
 
                 Instruction::Pop => {
@@ -59,14 +82,17 @@ impl Interpreter {
                 }
 
                 Instruction::Load(slot) => {
-                    self.stack.push(self.slots[slot].clone());
+                    self.value_stack.push(self.slots[slot].clone());
                 }
 
                 Instruction::Call { slot, arg_count } => {
-                    let args = self.stack.split_off(self.stack.len() - arg_count);
-                    let func = self.function_table.get_fn_by_index(slot).unwrap();
+                    let args = self.value_stack.split_off(self.value_stack.len() - arg_count);
+                    let fn_source = &self.functions[slot];
+                    let FunctionSource::External(func) = fn_source else {
+                        panic!("Only external functions can be called for now")
+                    };
                     let result = func.call(args)?;
-                    self.stack.push(result);
+                    self.value_stack.push(result);
                 }
 
                 Instruction::Return => {
@@ -118,7 +144,7 @@ impl Interpreter {
     ) -> Result<(), InterpreterError> {
         let a = self.pop()?;
         let b = self
-            .stack
+            .value_stack
             .last_mut()
             .ok_or(InterpreterError::ValueStackUnderflow)?;
 
@@ -132,7 +158,7 @@ impl Interpreter {
         op: fn(&Value) -> Result<Value, InterpreterError>,
     ) -> Result<(), InterpreterError> {
         let a = self
-            .stack
+            .value_stack
             .last_mut()
             .ok_or(InterpreterError::ValueStackUnderflow)?;
 

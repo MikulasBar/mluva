@@ -1,23 +1,23 @@
-use crate::{compiler::DataType, errors::{InterpreterError, CompileError}, value::Value};
+use crate::{
+    compiler::DataType,
+    errors::InterpreterError,
+    value::Value,
+};
 
-
-#[derive(Debug, Clone)]
-pub struct ExternalFunction {
-    pub def: ExternalFunctionDefinition,
-    pub source: ExternalFunctionSource,
-}
-
-
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ExternalFunctionDefinition {
-    pub name: &'static str,
+    pub name: String,
     pub return_type: DataType,
-    pub check_types: fn(&[DataType]) -> Result<(), CompileError>,
+    pub params: Vec<DataType>,
 }
 
 impl ExternalFunctionDefinition {
-    pub fn check_types(&self, types: &[DataType]) -> Result<(), CompileError> {
-        (self.check_types)(types)
+    pub fn new(name: impl Into<String>, return_type: DataType, params: Vec<DataType>) -> Self {
+        Self {
+            name: name.into(),
+            return_type,
+            params,
+        }
     }
 }
 

@@ -1,39 +1,70 @@
+use std::collections::HashMap;
+
+use crate::ast::{Expr, Item, Stmt, UnaryOp, BinaryOp};
 use crate::bin_op_pat;
+use crate::function::FunctionDefinitionRef;
 use super::data_type::DataType;
-use crate::functin::FunctionTable;
-use super::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use super::data_type_scope::DataTypeScope;
 use crate::errors::CompileError;
 
 
 pub struct TypeChecker<'a> {
-    function_table: &'a FunctionTable,
+    function_types: HashMap<String, FunctionDefinitionRef<'a>>,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(function_table: &'a FunctionTable) -> Self {
+    pub fn new() -> Self {
         Self {
-            function_table,
+            function_types: HashMap::new(),
         }
     }
         
-    pub fn check(&mut self, items: &[Item]) -> Result<(), CompileError> {
-       self.check_items(items)
+    pub fn check(&mut self, items: &'a [Item]) -> Result<(), CompileError> {
+        self.load_function_types(items)?;
+        self.check_items(items)
+    }
+
+    fn load_function_types(&mut self, items: &'a [Item]) -> Result<(), CompileError> {
+        for item in items {
+            match item {
+                Item::FunctionDef(def) => {
+                    let name = def.name.clone();
+                    if self.function_types.contains_key(&name) {
+                        return Err(CompileError::FunctionAlreadyDefined(name));
+                    }
+
+                    self.function_types.insert(name, FunctionDefinitionRef::Internal(def));
+                },
+                
+                Item::ExternalFunctionDef(def) => {
+                    let name = def.name.clone();
+                    if self.function_types.contains_key(&name) {
+                        return Err(CompileError::FunctionAlreadyDefined(name));
+                    }
+
+                    self.function_types.insert(name, FunctionDefinitionRef::External(def));
+                }
+            }
+        }
+
+        Ok(())
     }
 
     fn check_items(&mut self, items: &[Item]) -> Result<(), CompileError> {
         for item in items {
             match item {
-                Item::FnDef(fn_def) => {
+                Item::FunctionDef(fn_def) => {
                     let mut scope = DataTypeScope::new();
-                    scope.enter(); // parameter scope layer
+                    scope.enter(); // argument scope layer
                     
-                    for (arg_name, arg_type) in fn_def.args.iter() {
+                    for (arg_name, arg_type) in fn_def.params.iter() {
                         scope.insert_new(arg_name.clone(), arg_type.clone())?;
                     }
 
                     self.check_stmts(&fn_def.body, &mut scope, fn_def.return_type)?;
                 },
+
+                Item::ExternalFunctionDef(_) => {},
             }
         }
 
@@ -131,7 +162,7 @@ impl<'a> TypeChecker<'a> {
             },
             Expr::Literal(lit) => Ok(lit.get_type()),
             Expr::FuncCall(name, args) => {
-                let Some(func) = self.function_table.get_fn(name.as_str()) else {
+                let Some(func) = self.function_types.get(name) else {
                     return Err(CompileError::FunctionNotFound(name.clone()));
                 };
 
@@ -139,9 +170,9 @@ impl<'a> TypeChecker<'a> {
                     .map(|arg| self.check_expr(arg, scope))
                     .collect::<Result<Vec<DataType>, CompileError>>()?;
 
-                func.check_types(&arg_types)?;
+                func.check_arg_types(&arg_types)?;
 
-                Ok(func.return_type)
+                Ok(func.return_type())
             }
 
             Expr::BinaryOp(op, a, b) => {

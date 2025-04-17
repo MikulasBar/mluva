@@ -1,7 +1,8 @@
-use crate::compiler::ast::InternalFunctionDefinition;
+use crate::ast::*;
 use crate::errors::CompileError;
+use crate::function::{ExternalFunctionDefinition, InternalFunctionDefinition};
 use super::token::Token;
-use super::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
+use super::DataType;
 use crate::expect_pat;
 use crate::value::Value;
 
@@ -76,37 +77,79 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::Ident(fn_name) in self);
                     expect_pat!(Token::ParenL in self);
 
-                    let mut args = vec![];
-                    while let Some(token) = self.peek() {
-                        if token == &Token::ParenR {
-                            break;
-                        }
-
-                        expect_pat!(Token::DataType(arg_data_type) in self);
-                        expect_pat!(Token::Ident(arg_ident) in self);
-                        args.push((arg_ident, arg_data_type));
-
-                        if self.peek() == Some(&Token::Comma) {
-                           self.skip();
-                        } else {
-                            break;
-                        }
-                    }
+                    let params = self.parse_named_parameters()?;
 
                     expect_pat!(Token::ParenR in self);
                     expect_pat!(Token::BraceL in self);
 
                     let stmts = self.parse_stmts(Token::BraceR)?;
-                    items.push(Item::FnDef(
-                        InternalFunctionDefinition::new(fn_name, return_type, args, stmts)
+                    items.push(Item::FunctionDef(
+                        InternalFunctionDefinition::new(fn_name, return_type, params, stmts)
                     ));
                 },
+
+                Token::External => {
+                    expect_pat!(Token::External in self);
+                    expect_pat!(Token::DataType(return_type) in self);
+                    expect_pat!(Token::Ident(fn_name) in self);
+                    expect_pat!(Token::ParenL in self);
+
+                    let params = self.parse_unnamed_parameters()?;
+
+                    expect_pat!(Token::ParenR in self);
+                    expect_pat!(Token::EOL in self);
+
+                    items.push(Item::ExternalFunctionDef(
+                        ExternalFunctionDefinition::new(fn_name, return_type, params)
+                    ));
+                }
 
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),
             }
         }
 
         Ok(items)
+    }
+
+    fn parse_unnamed_parameters(&mut self) -> Result<Vec<DataType>, CompileError> {
+        let mut params = vec![];
+        while let Some(token) = self.peek() {
+            if token == &Token::ParenR {
+                break;
+            }
+
+            expect_pat!(Token::DataType(data_type) in self);
+            params.push(data_type);
+
+            if self.peek() == Some(&Token::Comma) {
+               self.skip();
+            } else {
+                break;
+            }
+        }
+
+        Ok(params)
+    }
+
+    fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileError> {
+        let mut params = vec![];
+        while let Some(token) = self.peek() {
+            if token == &Token::ParenR {
+                break;
+            }
+
+            expect_pat!(Token::DataType(data_type) in self);
+            expect_pat!(Token::Ident(ident) in self);
+            params.push((ident, data_type));
+
+            if self.peek() == Some(&Token::Comma) {
+               self.skip();
+            } else {
+                break;
+            }
+        }
+
+        Ok(params)
     }
 
     /// Parses a list of statements until the critical token is found.

@@ -1,61 +1,132 @@
 use core::panic;
 use std::collections::HashMap;
 
+use crate::errors::CompileError;
 use crate::interpreter_source::InterpreterSource;
-use crate::function::{FunctionDefinitionTable, FunctionSource};
+use crate::function::{ExternalFunctionDefinition, FunctionSource, InternalFunctionSource};
 use crate::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use crate::instruction::Instruction;
 
 use crate::function::InternalFunctionDefinition;
 
-pub struct Compiler<'a> {
-    functions: Vec<FunctionSource>,
-    function_table: &'a FunctionDefinitionTable,
+pub struct Compiler {
+    fn_map: HashMap<String, usize>,
+    functions: Vec<Option<FunctionSource>>,
     main_slot: Option<usize>,
 }
 
-impl<'a> Compiler<'a> {
-    pub fn new(function_table: &'a FunctionDefinitionTable) -> Self {
+impl Compiler {
+    pub fn new() -> Self {
         Self {
-            function_table,
-            main_slot: None,
             functions: Vec::new(),
+            fn_map: HashMap::new(),
+            main_slot: None,
         }
     }
 
-    pub fn compile(mut self, items: &[Item]) -> InterpreterSource {
-        self.compile_items(items);
-        InterpreterSource::new(self.functions, self.main_slot)
-    }
+    pub fn compile(mut self, items: &[Item], externals: HashMap<String, FunctionSource>) -> Result<InterpreterSource, CompileError> {
+        self.allocate_function_slots(items)?;
+        self.compile_items(items)?;
+        self.add_externals(externals)?;
 
-    fn compile_items(&mut self, items: &[Item]) {
-        for item in items {
-            match item {
-                Item::FnDef(fn_def) => {
-                    let fn_source = FunctionCompiler::new(self).compile(&fn_def);
-                    if fn_def.name == "main" {
-                        if self.main_slot.is_some() {
-                            panic!("Multiple main functions found");
-                        } else {
-                            self.main_slot = Some(self.functions.len());
-                        }
-                    }
-                    self.functions.push(fn_source);
-                }
+        let mut functions = vec![];
+
+        // check if all functions are defined
+        for (name, slot) in self.fn_map {
+            if let Some(f) = self.functions[slot].take() {
+                functions.push(f);
+            } else {
+                return Err(CompileError::FunctionNotFound(name));
             }
         }
+
+        if self.main_slot.is_none() {
+            return Err(CompileError::FunctionNotFound("main".to_string()));
+        }
+
+        Ok(InterpreterSource::new(functions, self.main_slot.unwrap()))
+    }
+
+    fn add_externals(&mut self, externals: HashMap<String, FunctionSource>) -> Result<(), CompileError> {
+        for (name, source) in externals {
+            let Some(slot) = self.fn_map.get(&name) else {
+                continue;
+            };
+
+            if self.functions[*slot].is_some() {
+                return Err(CompileError::FunctionAlreadyDefined(name.clone()));
+            }
+
+            if name == "main" {
+                self.main_slot = Some(self.functions.len());
+            }
+
+            self.functions[*slot] = Some(source);
+        }
+
+        Ok(())
+    }
+
+    fn allocate_function_slots(&mut self, items: &[Item]) -> Result<(), CompileError> {
+        let mut count = 0;
+
+        for item in items {
+            match item {
+                Item::FunctionDef(InternalFunctionDefinition { name, .. }) | Item::ExternalFunctionDef(ExternalFunctionDefinition{ name, .. }) => {
+                    if self.fn_map.contains_key(name) {
+                        return Err(CompileError::FunctionAlreadyDefined(name.clone()));
+                    }
+
+                    if name == "main" {
+                        self.main_slot = Some(count);                        
+                    }
+
+                    self.fn_map.insert(name.clone(), count);
+                    count += 1;
+                },
+            }
+        }
+
+        self.functions.resize(count, None);
+
+        Ok(())
+    }
+
+    fn compile_items(&mut self, items: &[Item]) -> Result<(), CompileError> {
+        for item in items {
+            match item {
+                Item::FunctionDef(fn_def) => {
+                    let source = FunctionCompiler::new(self).compile(&fn_def)?;
+                    let Some(slot) = self.fn_map.get(&fn_def.name) else {
+                        // TODO: separate error for function not found and function not defined
+                        return Err(CompileError::FunctionNotFound(fn_def.name.clone()));
+                    };
+
+                    if self.functions[*slot].is_some() {
+                        return Err(CompileError::FunctionAlreadyDefined(fn_def.name.clone()));
+                    }
+
+                    self.functions[*slot] = Some(FunctionSource::Internal(source));
+                },
+
+                // External functions are provided by the user and are not compiled here.
+                Item::ExternalFunctionDef(_) => {},
+            }
+        }
+
+        Ok(())
     }
 }
 
-struct FunctionCompiler<'a, 'b> {
-    compiler: &'b mut Compiler<'a>,
+struct FunctionCompiler<'b> {
+    compiler: &'b mut Compiler,
     instructions: Vec<Instruction>,
     locals: HashMap<String, usize>,
     next_slot: usize,
 }
 
-impl<'a, 'b> FunctionCompiler<'a, 'b> {
-    fn new(compiler: &'b mut Compiler<'a>) -> Self {
+impl<'b> FunctionCompiler<'b> {
+    fn new(compiler: &'b mut Compiler) -> Self {
         Self {
             compiler,
             locals: HashMap::new(),
@@ -85,57 +156,61 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
         self.instructions.push(inst);
     }
 
-    fn compile(mut self, fn_def: &InternalFunctionDefinition) -> FunctionSource {
-        self.compile_stmts(&fn_def.body);
-        FunctionSource::new(self.locals.len(), self.instructions)
+    fn compile(mut self, fn_def: &InternalFunctionDefinition) -> Result<InternalFunctionSource, CompileError> {
+        self.compile_stmts(&fn_def.body)?;
+        Ok(InternalFunctionSource::new(self.locals.len(), self.instructions))
     }
 
-    fn compile_stmts(&mut self, stmts: &[Stmt]) {
+    fn compile_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
         for stmt in stmts {
-            self.compile_stmt(stmt);
+            self.compile_stmt(stmt)?;
         }
+
+        Ok(())
     }
 
-    fn compile_stmt(&mut self, stmt: &Stmt) {
+    fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), CompileError> {
         match stmt {
             // there is no difference between declaration and assignment at this point
             Stmt::VarDeclare(_, name, expr) | Stmt::VarAssign(name, expr) => {
-                self.compile_expr(expr);
+                self.compile_expr(expr)?;
                 let slot = self.get_slot(name);
                 self.push(Instruction::Store(slot));
             }
 
             Stmt::Expr(expr) => {
-                self.compile_expr(expr);
+                self.compile_expr(expr)?;
                 // We need to pop the expression from stack since we don't use it anywhere.
                 self.push(Instruction::Pop);
             }
 
             Stmt::If(cond, stmts, else_stmts) => {
-                self.compile_if_statement(cond, stmts, else_stmts.as_deref());
+                self.compile_if_statement(cond, stmts, else_stmts.as_deref())?;
             }
 
             Stmt::While(cond, stmts) => {
-                self.compile_while_statement(cond, stmts);
+                self.compile_while_statement(cond, stmts)?;
             },
 
             Stmt::Return(expr) => {
-                self.compile_expr(expr);
+                self.compile_expr(expr)?;
                 self.push(Instruction::Return);
             }
         }
+
+        Ok(())
     }
 
-    fn compile_if_statement(&mut self, cond: &Expr, stmts: &[Stmt], else_stmts: Option<&[Stmt]>) {
+    fn compile_if_statement(&mut self, cond: &Expr, stmts: &[Stmt], else_stmts: Option<&[Stmt]>) -> Result<(), CompileError> {
         // Compile the condition expression
-        self.compile_expr(cond);
+        self.compile_expr(cond)?;
 
         // Store the index of the jump instruction for the "if" block
         let cond_jump_index = self.instructions.len();
         self.instructions.push(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the statements in the "if" block
-        self.compile_stmts(stmts);
+        self.compile_stmts(stmts)?;
 
         if let Some(else_stmts) = else_stmts {
             // Store the index of the jump instruction for the "else" block
@@ -149,7 +224,7 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             self.update_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
 
             // Compile the statements in the "else" block
-            self.compile_stmts(else_stmts);
+            self.compile_stmts(else_stmts)?;
 
             // Update the jump instruction to skip over the "else" block
             let post_else_index = self.instructions.len();
@@ -159,20 +234,22 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             let post_if_index = self.instructions.len();
             self.update_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
         }
+
+        Ok(())
     }
 
-    fn compile_while_statement(&mut self, cond: &Expr, stmts: &[Stmt]) {
+    fn compile_while_statement(&mut self, cond: &Expr, stmts: &[Stmt]) -> Result<(), CompileError> {
         // Store the index of the start of the "while" block
         // this includes the condition evaluation and check
         // because every iteration we need to check the condition
         let start_index = self.instructions.len();
-        self.compile_expr(cond);
+        self.compile_expr(cond)?;
         // Store the index of the jump instruction so we can update it later
         let cond_jump_index = self.instructions.len();
         self.instructions.push(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the instructions in the "while" block
-        self.compile_stmts(stmts);
+        self.compile_stmts(stmts)?;
 
         // Jump back to the condition check
         self.push(Instruction::Jump(start_index));
@@ -182,9 +259,11 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
 
         // Update the jump instruction for the "while" block to skip over the body and the end jump
         self.update_at(cond_jump_index, Instruction::JumpIfFalse(end_index));
+
+        Ok(())
     }
 
-    fn compile_expr(&mut self, expr: &Expr) {
+    fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
         match expr {
             Expr::Literal(v) => {
                 self.instructions.push(Instruction::Push(v.clone()));
@@ -196,24 +275,24 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
             }
 
             Expr::BinaryOp(op, lhs, rhs) => {
-                self.compile_expr(lhs);
-                self.compile_expr(rhs);
+                self.compile_expr(lhs)?;
+                self.compile_expr(rhs)?;
                 let op_instruction = bin_op_to_instruction(op);
                 self.instructions.push(op_instruction);
             }
 
             Expr::UnaryOp(op, expr) => {
-                self.compile_expr(expr);
+                self.compile_expr(expr)?;
                 let op_instruction = un_op_to_instruction(op);
                 self.instructions.push(op_instruction);
             }
 
             Expr::FuncCall(name, args) => {
                 for arg in args {
-                    self.compile_expr(arg);
+                    self.compile_expr(arg)?;
                 }
 
-                let Some(slot) = self.compiler.function_table.get_slot(name) else {
+                let Some(&slot) = self.compiler.fn_map.get(name) else {
                     panic!("Function {} not found", name);
                 };
 
@@ -223,6 +302,8 @@ impl<'a, 'b> FunctionCompiler<'a, 'b> {
                 });
             }
         }
+
+        Ok(())
     }
 }
 

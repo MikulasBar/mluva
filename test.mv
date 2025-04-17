@@ -1,10 +1,10 @@
 
-
+external Void print(String)
 
 Void main() {
     print('Hi')
 
-    return 
+    return
 
     print('Bye')
 }
