@@ -29,14 +29,15 @@ impl Compiler {
         self.compile_items(items)?;
         self.add_externals(externals)?;
 
-        let mut functions = vec![];
+        let mut functions = Vec::with_capacity(self.functions.len());
+
 
         // check if all functions are defined
-        for (name, slot) in self.fn_map {
-            if let Some(f) = self.functions[slot].take() {
+        for (slot, f_opt) in self.functions.into_iter().enumerate() {
+            if let Some(f) = f_opt {
                 functions.push(f);
             } else {
-                return Err(CompileError::FunctionNotFound(name));
+                return Err(CompileError::FunctionNotFound(format!("slot({})", slot)));
             }
         }
 

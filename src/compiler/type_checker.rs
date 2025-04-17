@@ -170,6 +170,7 @@ impl<'a> TypeChecker<'a> {
                     .map(|arg| self.check_expr(arg, scope))
                     .collect::<Result<Vec<DataType>, CompileError>>()?;
 
+                // println!("ARG TYPES: {:?}", arg_types);
                 func.check_arg_types(&arg_types)?;
 
                 Ok(func.return_type())

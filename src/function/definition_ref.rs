@@ -37,12 +37,12 @@ impl<'a> FunctionDefinitionRef<'a> {
 
         match self {
             Self::External(f) => {
-                for (&found, &expected) in f.params.iter().zip(types.into_iter()) {
+                for (&expected, &found) in f.params.iter().zip(types.into_iter()) {
                     check_single_arg(expected, found)?;
                 }
             }
             Self::Internal(f) => {
-                for (&(_, found), &expected) in f.params.iter().zip(types.into_iter()) {
+                for (&(_, expected), &found) in f.params.iter().zip(types.into_iter()) {
                     check_single_arg(expected, found)?;
                 }
             }

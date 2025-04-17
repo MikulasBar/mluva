@@ -24,9 +24,9 @@ pub fn compile_from_str(
     externals: HashMap<String, FunctionSource>,
 ) -> Result<InterpreterSource, CompileError> {
     let tokens = tokenize(input)?;
-    println!("TOKENS: {:?}", tokens);
+    // println!("TOKENS: {:?}", tokens);
     let items = Parser::new(&tokens).parse()?;
-    println!("ITEMS: {:?}", items);
+    // println!("ITEMS: {:?}", items);
     TypeChecker::new().check(&items)?;
     Compiler::new().compile(&items, externals)
 }

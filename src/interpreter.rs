@@ -38,7 +38,7 @@ impl Interpreter {
     pub fn new(source: InterpreterSource) -> Self {
         let InterpreterSource { functions, main_slot } = source;
         // println!("FUNCTION SOURCES: {:?}\n", functions);
-        println!("MAIN: {:?}\n", main_slot);
+        // println!("MAIN: {:?}\n", main_slot);
         
         let main_source = functions[main_slot].clone();
 

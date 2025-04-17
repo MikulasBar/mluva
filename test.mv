@@ -1,16 +1,16 @@
+external Void print(String);
 
-external Void print(String)
 
 Void main() {
-    print('Hi')
+    print('Hello, world!')
 
     return
 
-    print('Bye')
+    # print('Bye')
 }
 
 Int add(Int a, Int b) {
-    a + b
+    return a + b
 }
 
 # Int x = -1.0
