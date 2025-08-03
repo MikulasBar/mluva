@@ -39,11 +39,16 @@ const ASSERT_EFSOURCE: ExternalFunctionSource = ExternalFunctionSource {
 };
 
 fn main() {
-    let v = Value::Float(54654.564654);
+    let v = Value::String("Hello, world!".to_string());
     let bytes = v.to_bytecode();
 
     let mut f = std::fs::File::create("test.mvb").unwrap();
-    // file.write(&bytes).unwrap();
+    // f.write(&bytes).unwrap();
+
+    // let mut c = 0;
+    // let x = Value::from_bytecode(&bytes, &mut c).unwrap();
+    // println!("Deserialized value: {:?}", x);
+    // println!("Cursor position after deserialization: {} / {}", c, bytes.len());
 
 
 

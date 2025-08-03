@@ -94,6 +94,7 @@ impl BytecodeSerializable for Value {
                 }
                 let s = String::from_utf8(bytes[*cursor..*cursor + len].to_vec())
                     .map_err(|e| e.to_string())?;
+                *cursor += len;
                 Ok(Value::String(s))
             }
             _ => Err(format!("Unknown type identifier: {}", type_id)),
