@@ -94,17 +94,17 @@ impl<'a> InternalFunctionInterpreter<'a> {
                 }
 
                 Instruction::Store(slot) => {
-                    self.slots[slot] = self.pop()?;
+                    self.slots[slot as usize] = self.pop()?;
                 }
 
                 Instruction::Load(slot) => {
-                    self.stack.push(self.slots[slot].clone());
+                    self.stack.push(self.slots[slot as usize].clone());
                 }
 
                 Instruction::Call { slot, arg_count } => {
-                    let source = &self.functions[slot];
+                    let source = &self.functions[slot as usize];
                     let result =
-                        interpret_function(self.functions, &mut self.stack, source, arg_count)?;
+                        interpret_function(self.functions, &mut self.stack, source, arg_count as usize)?;
                     self.stack.push(result);
                 }
 
@@ -113,8 +113,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
                 }
 
                 Instruction::Jump(target) => {
-                    // Jump to target
-                    self.index = target;
+                    self.index = target as usize;
                     continue; // Skip the index increment below
                 }
 
@@ -122,7 +121,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
                     let cond = self.pop()?;
 
                     if cond.is_false()? {
-                        self.index = target;
+                        self.index = target as usize;
                         continue; // Skip the index increment below
                     }
                 }

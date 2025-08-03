@@ -163,7 +163,7 @@ impl<'b> FunctionCompiler<'b> {
     fn compile(mut self, def: &InternalFunctionDefinition) -> Result<InternalFunctionSource, CompileError> {
         for (name, _) in &def.params {
             let slot = self.get_slot(&name);
-            self.instructions.push(Instruction::Store(slot));
+            self.instructions.push(Instruction::Store(slot as u32));
         }
 
         self.compile_stmts(&def.body)?;
@@ -191,7 +191,7 @@ impl<'b> FunctionCompiler<'b> {
             Stmt::VarDeclare(_, name, expr) | Stmt::VarAssign(name, expr) => {
                 self.compile_expr(expr)?;
                 let slot = self.get_slot(name);
-                self.push(Instruction::Store(slot));
+                self.push(Instruction::Store(slot as u32));
             }
 
             Stmt::Expr(expr) => {
@@ -237,18 +237,18 @@ impl<'b> FunctionCompiler<'b> {
             let post_if_index = self.instructions.len();
             // jump from the if condition to the else block
             // we should jump over the whole if-else block, only if block
-            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
+            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index as u32));
 
             // Compile the statements in the "else" block
             self.compile_stmts(else_stmts)?;
 
             // Update the jump instruction to skip over the "else" block
             let post_else_index = self.instructions.len();
-            self.update_instruction_at(if_jump_index, Instruction::Jump(post_else_index));
+            self.update_instruction_at(if_jump_index, Instruction::Jump(post_else_index as u32));
         } else {
             // If there is no "else" block, we can just jump over the "if" block
             let post_if_index = self.instructions.len();
-            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index));
+            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index as u32));
         }
 
         Ok(())
@@ -268,13 +268,13 @@ impl<'b> FunctionCompiler<'b> {
         self.compile_stmts(stmts)?;
 
         // Jump back to the condition check
-        self.push(Instruction::Jump(start_index));
+        self.push(Instruction::Jump(start_index as u32));
 
         // Index of the end of the "while" block
         let end_index = self.instructions.len();
 
         // Update the jump instruction for the "while" block to skip over the body and the end jump
-        self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(end_index));
+        self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(end_index as u32));
 
         Ok(())
     }
@@ -287,7 +287,7 @@ impl<'b> FunctionCompiler<'b> {
 
             Expr::Var(name) => {
                 let slot = self.get_slot(name);
-                self.instructions.push(Instruction::Load(slot));
+                self.instructions.push(Instruction::Load(slot as u32));
             }
 
             Expr::BinaryOp(op, lhs, rhs) => {
@@ -313,8 +313,8 @@ impl<'b> FunctionCompiler<'b> {
                 };
 
                 self.instructions.push(Instruction::Call {
-                    slot,
-                    arg_count: args.len(),
+                    slot: slot as u32,
+                    arg_count: args.len() as u32,
                 });
             }
         }
