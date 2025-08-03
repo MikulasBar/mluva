@@ -2,14 +2,14 @@ use std::collections::HashMap;
 
 use crate::ast::{Expr, Item, Stmt, UnaryOp, BinaryOp};
 use crate::bin_op_pat;
-use crate::function::FunctionDefinitionRef;
+use crate::function::InternalFunctionDefinition;
 use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
 use crate::errors::CompileError;
 
 
 pub struct TypeChecker<'a> {
-    function_types: HashMap<String, FunctionDefinitionRef<'a>>,
+    function_types: HashMap<String, &'a InternalFunctionDefinition>,
 }
 
 impl<'a> TypeChecker<'a> {
@@ -33,17 +33,8 @@ impl<'a> TypeChecker<'a> {
                         return Err(CompileError::FunctionAlreadyDefined(name));
                     }
 
-                    self.function_types.insert(name, FunctionDefinitionRef::Internal(def));
+                    self.function_types.insert(name, &def);
                 },
-                
-                Item::ExternalFunctionDef(def) => {
-                    let name = def.name.clone();
-                    if self.function_types.contains_key(&name) {
-                        return Err(CompileError::FunctionAlreadyDefined(name));
-                    }
-
-                    self.function_types.insert(name, FunctionDefinitionRef::External(def));
-                }
             }
         }
 
@@ -63,8 +54,6 @@ impl<'a> TypeChecker<'a> {
 
                     self.check_stmts(&fn_def.body, &mut scope, fn_def.return_type)?;
                 },
-
-                Item::ExternalFunctionDef(_) => {},
             }
         }
 
@@ -173,7 +162,7 @@ impl<'a> TypeChecker<'a> {
                 // println!("ARG TYPES: {:?}", arg_types);
                 func.check_arg_types(&arg_types)?;
 
-                Ok(func.return_type())
+                Ok(func.return_type)
             }
 
             Expr::BinaryOp(op, a, b) => {

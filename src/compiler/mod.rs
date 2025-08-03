@@ -15,18 +15,11 @@ pub use lexer::tokenize;
 pub use parser::Parser;
 pub use type_checker::TypeChecker;
 
-use crate::{
-    errors::CompileError, function::ExternalFunctionSource, interpreter_source::InterpreterSource
-};
+use crate::{errors::CompileError, executable_module::ExecutableModule};
 
-pub fn compile_from_str(
-    input: &str,
-    externals: HashMap<String, ExternalFunctionSource>,
-) -> Result<InterpreterSource, CompileError> {
+pub fn compile_from_str(input: &str) -> Result<ExecutableModule, CompileError> {
     let tokens = tokenize(input)?;
-    // println!("TOKENS: {:?}", tokens);
     let items = Parser::new(&tokens).parse()?;
-    // println!("ITEMS: {:?}", items);
     TypeChecker::new().check(&items)?;
-    Compiler::new().compile(&items, externals)
+    Compiler::new().compile(&items)
 }

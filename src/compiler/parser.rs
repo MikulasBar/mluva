@@ -1,6 +1,6 @@
 use crate::ast::*;
 use crate::errors::CompileError;
-use crate::function::{ExternalFunctionDefinition, InternalFunctionDefinition};
+use crate::function::{InternalFunctionDefinition};
 use super::token::Token;
 use super::DataType;
 use crate::expect_pat;
@@ -99,9 +99,11 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::ParenR in self);
                     expect_pat!(Token::EOL in self);
 
-                    items.push(Item::ExternalFunctionDef(
-                        ExternalFunctionDefinition::new(fn_name, return_type, params)
-                    ));
+                    unimplemented!("External functions are not yet supported");
+
+                    // items.push(Item::ExternalFunctionDef(
+                    //     ExternalFunctionDefinition::new(fn_name, return_type, params)
+                    // ));
                 }
 
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),

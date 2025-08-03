@@ -2,8 +2,8 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::errors::CompileError;
-use crate::interpreter_source::InterpreterSource;
-use crate::function::{ExternalFunctionDefinition, ExternalFunctionSource, FunctionSource, InternalFunctionSource};
+use crate::executable_module::ExecutableModule;
+use crate::function::{InternalFunctionSource};
 use crate::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
 use crate::instruction::Instruction;
 
@@ -14,7 +14,7 @@ use super::DataType;
 
 pub struct Compiler {
     fn_map: HashMap<String, usize>,
-    functions: Vec<Option<FunctionSource>>,
+    functions: Vec<Option<InternalFunctionSource>>,
     main_slot: Option<usize>,
 }
 
@@ -27,10 +27,9 @@ impl Compiler {
         }
     }
 
-    pub fn compile(mut self, items: &[Item], externals: HashMap<String, ExternalFunctionSource>) -> Result<InterpreterSource, CompileError> {
+    pub fn compile(mut self, items: &[Item]) -> Result<ExecutableModule, CompileError> {
         self.allocate_function_slots(items)?;
         self.compile_items(items)?;
-        self.add_externals(externals)?;
 
         let mut functions = Vec::with_capacity(self.functions.len());
 
@@ -48,27 +47,7 @@ impl Compiler {
             return Err(CompileError::FunctionNotFound("main".to_string()));
         }
 
-        Ok(InterpreterSource::new(functions, self.main_slot.unwrap()))
-    }
-
-    fn add_externals(&mut self, externals: HashMap<String, ExternalFunctionSource>) -> Result<(), CompileError> {
-        for (name, source) in externals {
-            let Some(slot) = self.fn_map.get(&name) else {
-                continue;
-            };
-
-            if self.functions[*slot].is_some() {
-                return Err(CompileError::FunctionAlreadyDefined(name.clone()));
-            }
-
-            if name == "main" {
-                self.main_slot = Some(self.functions.len());
-            }
-
-            self.functions[*slot] = Some(FunctionSource::External(source));
-        }
-
-        Ok(())
+        Ok(ExecutableModule::new(functions, self.main_slot.unwrap()))
     }
 
     fn allocate_function_slots(&mut self, items: &[Item]) -> Result<(), CompileError> {
@@ -76,7 +55,7 @@ impl Compiler {
 
         for item in items {
             match item {
-                Item::FunctionDef(InternalFunctionDefinition { name, .. }) | Item::ExternalFunctionDef(ExternalFunctionDefinition{ name, .. }) => {
+                Item::FunctionDef(InternalFunctionDefinition { name, .. }) => {
                     if self.fn_map.contains_key(name) {
                         return Err(CompileError::FunctionAlreadyDefined(name.clone()));
                     }
@@ -110,11 +89,8 @@ impl Compiler {
                         return Err(CompileError::FunctionAlreadyDefined(fn_def.name.clone()));
                     }
 
-                    self.functions[*slot] = Some(FunctionSource::Internal(source));
+                    self.functions[*slot] = Some(source);
                 },
-
-                // External functions are provided by the user and are not compiled here.
-                Item::ExternalFunctionDef(_) => {},
             }
         }
 

@@ -1,3 +1,4 @@
+use crate::errors::CompileError;
 use crate::{compiler::DataType, instruction::Instruction};
 use crate::ast::Stmt;
 
@@ -22,6 +23,20 @@ impl InternalFunctionDefinition {
             params,
             body,
         }
+    }
+
+    pub fn check_arg_types(&self, arg_types: &[DataType]) -> Result<(), CompileError> {
+        if self.params.len() != arg_types.len() {
+            return Err(CompileError::WrongNumberOfArguments { expected: self.params.len(), found: arg_types.len() });
+        }
+
+        for (i, (_, param_type)) in self.params.iter().enumerate() {
+            if &arg_types[i] != param_type {
+                return Err(CompileError::WrongType { expected: *param_type, found: arg_types[i] });
+            }
+        }
+
+        Ok(())
     }
 }
 

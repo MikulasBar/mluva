@@ -1,23 +1,21 @@
 use crate::errors::InterpreterError;
-use crate::function::{FunctionSource, InternalFunctionSource};
+use crate::function::{InternalFunctionSource};
 use crate::instruction::Instruction;
-use crate::interpreter_source::InterpreterSource;
+use crate::executable_module::ExecutableModule;
 use crate::value::Value;
 
 pub struct Interpreter {
     main_slot: usize,
-    functions: Vec<FunctionSource>,
+    functions: Vec<InternalFunctionSource>,
     stack: Vec<Value>,
 }
 
 impl Interpreter {
-    pub fn new(source: InterpreterSource) -> Self {
-        let InterpreterSource {
+    pub fn new(source: ExecutableModule) -> Self {
+        let ExecutableModule {
             functions,
             main_slot,
         } = source;
-        // println!("FUNCTION SOURCES: {:?}\n", functions);
-        // println!("MAIN: {:?}\n", main_slot);
 
         Self {
             functions: functions,
@@ -36,24 +34,15 @@ impl Interpreter {
 }
 
 fn interpret_function(
-    functions: &[FunctionSource],
+    functions: &[InternalFunctionSource],
     stack: &mut Vec<Value>,
-    source: &FunctionSource,
+    source: &InternalFunctionSource,
     arg_count: usize,
 ) -> Result<Value, InterpreterError> {
-    match source {
-        FunctionSource::External(f) => {
-            let args = get_args_from_stack(stack, arg_count)?;
-            f.call(args)
-        },
-        FunctionSource::Internal(f) => {
-            InternalFunctionInterpreter::new(&functions, stack, f)
-                .interpret()
-        }
-    }
+    InternalFunctionInterpreter::new(&functions, stack, source).interpret()
 }
 struct InternalFunctionInterpreter<'a> {
-    functions: &'a [FunctionSource],
+    functions: &'a [InternalFunctionSource],
     stack: &'a mut Vec<Value>,
     index: usize,
     slots: Vec<Value>,
@@ -62,7 +51,7 @@ struct InternalFunctionInterpreter<'a> {
 
 impl<'a> InternalFunctionInterpreter<'a> {
     pub fn new(
-        functions: &'a [FunctionSource],
+        functions: &'a [InternalFunctionSource],
         stack: &'a mut Vec<Value>,
         source: &'a InternalFunctionSource,
     ) -> Self {
