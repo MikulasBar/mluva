@@ -12,6 +12,7 @@ mod function;
 mod data_type;
 
 const MAGIC: &[u8] = &[0x00, 0x08, b'm', b'v', 0x00, b'b', 0x08];
+const MAGIC_LEN: usize = MAGIC.len();
 
 pub struct Bytecode<'a> {
     version: u8,

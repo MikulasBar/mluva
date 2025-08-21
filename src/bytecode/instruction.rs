@@ -49,8 +49,8 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Jump(_) => InstructionId::JUMP,
         Instruction::JumpIfFalse(_) => InstructionId::JUMPIFFALSE,
         Instruction::Call{..} => InstructionId::CALL,
-        Instruction::Load(_) => InstructionId::LOAD,
-        Instruction::Store(_) => InstructionId::STORE,
+        Instruction::Load{..} => InstructionId::LOAD,
+        Instruction::Store{..} => InstructionId::STORE,
         Instruction::Pop => InstructionId::POP,
         Instruction::Push(_) => InstructionId::PUSH,
     }
@@ -67,14 +67,13 @@ impl BytecodeSerializable for Instruction {
             Instruction::JumpIfFalse(target) => {
                 buffer.extend_from_slice(&target.to_le_bytes());
             },
-            Instruction::Call { slot, arg_count } => {
-                buffer.extend_from_slice(&slot.to_le_bytes());
-                buffer.extend_from_slice(&arg_count.to_le_bytes());
+            Instruction::Call { call_slot } => {
+                buffer.extend_from_slice(&call_slot.to_le_bytes());
             },
-            Instruction::Load(slot) => {
+            Instruction::Load { slot } => {
                 buffer.extend_from_slice(&slot.to_le_bytes());
             },
-            Instruction::Store(slot) => {
+            Instruction::Store { slot } => {
                 buffer.extend_from_slice(&slot.to_le_bytes());
             },
             Instruction::Push(value) => {
@@ -128,13 +127,12 @@ impl BytecodeSerializable for Instruction {
                 Ok(Instruction::JumpIfFalse(target))
             },
             InstructionId::CALL => {
-                if *cursor + 8 > bytes.len() {
+                if *cursor + 4 > bytes.len() {
                     return Err("Insufficient bytes for Call".to_string());
                 }
-                let slot = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
-                let arg_count = u32::from_le_bytes(bytes[*cursor + 4..*cursor + 8].try_into().unwrap());
-                *cursor += 8;
-                Ok(Instruction::Call { slot, arg_count })
+                let call_slot = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
+                *cursor += 4;
+                Ok(Instruction::Call { call_slot })
             },
             InstructionId::LOAD => {
                 if *cursor + 4 > bytes.len() {
@@ -142,7 +140,7 @@ impl BytecodeSerializable for Instruction {
                 }
                 let slot = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
                 *cursor += 4;
-                Ok(Instruction::Load(slot))
+                Ok(Instruction::Load { slot })
             },
             InstructionId::STORE => {
                 if *cursor + 4 > bytes.len() {
@@ -150,7 +148,7 @@ impl BytecodeSerializable for Instruction {
                 }
                 let slot = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
                 *cursor += 4;
-                Ok(Instruction::Store(slot))
+                Ok(Instruction::Store { slot })
             },
             InstructionId::PUSH => {
                 let value = Value::from_bytecode(bytes, cursor)?;

@@ -26,9 +26,9 @@ impl Interpreter {
 
     pub fn interpret(&mut self) -> Result<(), InterpreterError> {
         let main_source = &self.functions[self.main_slot as usize];
-        let val = interpret_function(&self.functions, &mut self.stack, main_source, 0)?;
+        let val = interpret_function(&self.functions, &mut self.stack, main_source)?;
         println!("RETURN: {:?}", val);
-        
+
         Ok(())
     }
 
@@ -38,7 +38,6 @@ fn interpret_function(
     functions: &[InternalFunctionSource],
     stack: &mut Vec<Value>,
     source: &InternalFunctionSource,
-    arg_count: usize,
 ) -> Result<Value, InterpreterError> {
     InternalFunctionInterpreter::new(&functions, stack, source).interpret()
 }
@@ -84,18 +83,18 @@ impl<'a> InternalFunctionInterpreter<'a> {
                     self.pop()?;
                 }
 
-                Instruction::Store(slot) => {
+                Instruction::Store { slot } => {
                     self.slots[slot as usize] = self.pop()?;
                 }
 
-                Instruction::Load(slot) => {
+                Instruction::Load { slot } => {
                     self.stack.push(self.slots[slot as usize].clone());
                 }
 
-                Instruction::Call { slot, arg_count } => {
-                    let source = &self.functions[slot as usize];
+                Instruction::Call { call_slot } => {
+                    let source = &self.functions[call_slot as usize];
                     let result =
-                        interpret_function(self.functions, &mut self.stack, source, arg_count as usize)?;
+                        interpret_function(self.functions, &mut self.stack, source)?;
                     self.stack.push(result);
                 }
 

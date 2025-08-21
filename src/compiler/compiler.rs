@@ -113,8 +113,8 @@ impl<'b> FunctionCompiler<'b> {
 
     fn compile(mut self, def: &InternalFunctionDefinition) -> Result<InternalFunctionSource, CompileError> {
         for (name, _) in &def.params {
-            let slot = self.get_slot(&name);
-            self.instructions.push(Instruction::Store(slot as u32));
+            let slot = self.get_slot(&name) as u32;
+            self.instructions.push(Instruction::Store { slot });
         }
 
         self.compile_stmts(&def.body)?;
@@ -141,8 +141,8 @@ impl<'b> FunctionCompiler<'b> {
             // there is no difference between declaration and assignment at this point
             Stmt::VarDeclare(_, name, expr) | Stmt::VarAssign(name, expr) => {
                 self.compile_expr(expr)?;
-                let slot = self.get_slot(name);
-                self.push(Instruction::Store(slot as u32));
+                let slot = self.get_slot(name) as u32;
+                self.push(Instruction::Store { slot });
             }
 
             Stmt::Expr(expr) => {
@@ -237,8 +237,8 @@ impl<'b> FunctionCompiler<'b> {
             }
 
             Expr::Var(name) => {
-                let slot = self.get_slot(name);
-                self.instructions.push(Instruction::Load(slot as u32));
+                let slot = self.get_slot(name) as u32;
+                self.instructions.push(Instruction::Load { slot });
             }
 
             Expr::BinaryOp(op, lhs, rhs) => {
@@ -259,13 +259,12 @@ impl<'b> FunctionCompiler<'b> {
                     self.compile_expr(arg)?;
                 }
 
-                let Some(&slot) = self.compiler.fn_map.get(name) else {
+                let Some(&call_slot) = self.compiler.fn_map.get(name) else {
                     panic!("Function {} not found", name);
                 };
 
                 self.instructions.push(Instruction::Call {
-                    slot: slot as u32,
-                    arg_count: args.len() as u32,
+                    call_slot: call_slot as u32,
                 });
             }
         }
