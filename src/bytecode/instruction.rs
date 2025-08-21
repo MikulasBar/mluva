@@ -57,54 +57,30 @@ fn get_id(instruction: &Instruction) -> u8 {
 }
 
 impl BytecodeSerializable for Instruction {
-    fn to_bytecode(&self) -> Vec<u8> {
-        let mut bytes = vec![];
-
-        bytes.push(get_id(self));
+    fn write_bytecode(&self, buffer: &mut Vec<u8>) {
+        buffer.push(get_id(self));
 
         match self {
-            Instruction::Return
-            | Instruction::Add
-            | Instruction::Sub
-            | Instruction::Mul
-            | Instruction::Div
-            | Instruction::Modulo
-            | Instruction::Equal
-            | Instruction::NotEqual
-            | Instruction::Less
-            | Instruction::LessEqual
-            | Instruction::Greater
-            | Instruction::GreaterEqual
-            | Instruction::And
-            | Instruction::Or
-            | Instruction::Not
-            | Instruction::Negate
-            | Instruction::Pop => bytes,
             Instruction::Jump(target) => {
-                bytes.extend_from_slice(&target.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&target.to_le_bytes());
             },
             Instruction::JumpIfFalse(target) => {
-                bytes.extend_from_slice(&target.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&target.to_le_bytes());
             },
             Instruction::Call { slot, arg_count } => {
-                bytes.extend_from_slice(&slot.to_le_bytes());
-                bytes.extend_from_slice(&arg_count.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&slot.to_le_bytes());
+                buffer.extend_from_slice(&arg_count.to_le_bytes());
             },
             Instruction::Load(slot) => {
-                bytes.extend_from_slice(&slot.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&slot.to_le_bytes());
             },
             Instruction::Store(slot) => {
-                bytes.extend_from_slice(&slot.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&slot.to_le_bytes());
             },
             Instruction::Push(value) => {
-                bytes.extend(value.to_bytecode());
-                bytes
+                value.write_bytecode(buffer);
             },
+            _ => {},
         }
     }
 

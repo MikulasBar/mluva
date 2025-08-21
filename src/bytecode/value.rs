@@ -21,30 +21,22 @@ fn get_id(value: &Value) -> u8 {
 }
 
 impl BytecodeSerializable for Value {
-    fn to_bytecode(&self) -> Vec<u8> {
-        let mut bytes = vec![];
-
-        bytes.push(get_id(self));
+    fn write_bytecode(&self, buffer: &mut Vec<u8>) {
+        buffer.push(get_id(self));
 
         match self {
-            Value::Void => bytes,
-            Value::Bool(b) => {
-                bytes.push(if *b { 1 } else { 0 });
-                bytes
-            }
+            Value::Void => (),
+            Value::Bool(b) => buffer.push(*b as u8),
             Value::Int(x) => {
-                bytes.extend_from_slice(&x.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&x.to_le_bytes());
             }
             Value::Float(x) => {
-                bytes.extend_from_slice(&x.to_le_bytes());
-                bytes
+                buffer.extend_from_slice(&x.to_le_bytes());
             }
             Value::String(s) => {
                 let len = s.len() as u32; // TODO: handle length exceeding u32::MAX
-                bytes.extend_from_slice(&len.to_le_bytes());
-                bytes.extend_from_slice(s.as_bytes());
-                bytes
+                buffer.extend_from_slice(&len.to_le_bytes());
+                buffer.extend_from_slice(s.as_bytes());
             }
         }
     }
