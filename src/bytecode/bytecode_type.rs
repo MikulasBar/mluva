@@ -14,10 +14,19 @@ pub enum BytecodeType {
     Library,
 }
 
+impl BytecodeType {
+    pub fn byte_count(&self) -> u32 {
+        match self {
+            BytecodeType::Executable { .. } => 5,
+            BytecodeType::Library => 1,
+        }
+    }
+}
+
 impl BytecodeSerializable for BytecodeType {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
         if bytes.len() < *cursor + 1 {
-            return Err("Not enough bytes for BytecodeType".to_string());
+            return Err("Not enough bytes for bytecode type".to_string());
         }
         let type_id = bytes[*cursor];
         *cursor += 1;
@@ -25,14 +34,14 @@ impl BytecodeSerializable for BytecodeType {
         match type_id {
             BytecodeTypeId::EXECUTABLE => {
                 if bytes.len() < *cursor + 4 {
-                    return Err("Not enough bytes for Executable main_slot".to_string());
+                    return Err("Not enough bytes for main call slot".to_string());
                 }
                 let main_slot = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
                 *cursor += 4;
                 Ok(BytecodeType::Executable { main_slot })
             }
             BytecodeTypeId::LIBRARY => Ok(BytecodeType::Library),
-            _ => Err(format!("Unknown BytecodeType ID: {}", type_id)),
+            _ => Err(format!("Unknown bytecode type ID: {}", type_id)),
         }
     }
 

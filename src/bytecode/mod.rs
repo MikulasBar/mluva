@@ -1,18 +1,13 @@
 use std::collections::HashMap;
 
-use crate::{executable_module::ExecutableModule, function::{InternalFunctionDefinition, InternalFunctionSource}};
+use crate::{bytecode::header::BytecodeHeader, executable_module::ExecutableModule, function::{InternalFunctionDefinition, InternalFunctionSource}};
 use serializable::BytecodeSerializable;
 use bytecode_type::BytecodeType;
 
-mod value;
-mod instruction;
+mod header;
 mod serializable;
 mod bytecode_type;
-mod function;
-mod data_type;
 
-const MAGIC: &[u8] = &[0x00, 0x08, b'm', b'v', 0x00, b'b', 0x08];
-const MAGIC_LEN: usize = MAGIC.len();
 
 pub struct Bytecode<'a> {
     version: u8,
@@ -44,6 +39,10 @@ impl<'a> Bytecode<'a> {
         self.write_bytecode(&mut buffer);
         buffer
     }
+
+    pub fn deserialize_into_exec_module(bytes: &[u8]) -> Result<ExecutableModule, String> {
+        todo!()
+    }
 }
 
 impl BytecodeSerializable for Bytecode<'_> {
@@ -52,12 +51,6 @@ impl BytecodeSerializable for Bytecode<'_> {
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(MAGIC);
-        buffer.push(self.version);
-        self.bc_type.write_bytecode(buffer);
-        let function_count = self.function_map.len() as u32;
-        buffer.extend_from_slice(&function_count.to_le_bytes());
-
         let mut block_buffer = vec![];
 
         for (name, slot) in &self.function_map {
@@ -70,11 +63,14 @@ impl BytecodeSerializable for Bytecode<'_> {
             def.write_bytecode(&mut block_buffer);
         }
 
-        // Offset for text section so that we can access it without loading definitions
-        // the + 4 accounts for the length of this number that isn't added yet
-        let text_offset = buffer.len() as u32 + block_buffer.len() as u32 + 4;
-        buffer.extend_from_slice(&text_offset.to_le_bytes());
+        let header = BytecodeHeader::new(
+            self.version,
+            self.bc_type,
+            self.function_map.len() as u32,
+            block_buffer.len() as u32,
+        );
 
+        header.write_bytecode(buffer);
         buffer.extend_from_slice(&block_buffer);
 
         for source in &self.sources {
