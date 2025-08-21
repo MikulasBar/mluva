@@ -1,40 +1,21 @@
-mod interpreter;
-mod value;
-mod errors;
-mod instruction;
-mod compiler;
-mod executable_module;
-mod function;
 mod ast;
 mod bytecode;
+mod compiler;
+mod errors;
+mod executable_module;
+mod function;
+mod instruction;
+mod interpreter;
+mod value;
 
-use std::{collections::HashMap, io::{Read, Write}};
-use compiler::compile_from_str;
-use errors::InterpreterError;
 use interpreter::Interpreter;
-use value::Value;
+use std::{
+    io::{Read, Write},
+};
 
-use crate::compiler::compile_from_str_to_bc;
+use crate::{compiler::compile_from_str_to_bc, executable_module::ExecutableModule};
 
 fn main() {
-    // let v = Value::String("Hello, world!".to_string());
-    // let bytes = v.to_bytecode();
-
-    // let mut f = std::fs::File::create("test.mvb").unwrap();
-    // f.write(&bytes).unwrap();
-
-    // let mut c = 0;
-    // let x = Value::from_bytecode(&bytes, &mut c).unwrap();
-    // println!("Deserialized value: {:?}", x);
-    // println!("Cursor position after deserialization: {} / {}", c, bytes.len());
-
-
-
-    
-
-
-
-
     let mut input = String::new();
     let mut file = std::fs::File::open("test.mv").unwrap();
     file.read_to_string(&mut input).unwrap();
@@ -46,19 +27,18 @@ fn main() {
         return;
     }
 
-    let (module, bytecode) = compile_result.unwrap();
-
-    let interpret_result = Interpreter::new(module).interpret();
+    let (_, bytecode) = compile_result.unwrap();
 
     let mut bytecode_file = std::fs::File::create("test.mvb").unwrap();
 
     bytecode_file.write_all(&bytecode).unwrap();
+
+    let module = ExecutableModule::from_bytecode(&bytecode).unwrap();
+
+    let interpret_result = Interpreter::new(module).interpret();
 
     if let Err(e) = interpret_result {
         eprintln!("Interpretation error: {:?}", e);
         return;
     }
 }
-
-
-

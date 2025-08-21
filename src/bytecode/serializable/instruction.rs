@@ -84,8 +84,8 @@ impl BytecodeSerializable for Instruction {
     }
 
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        if bytes.is_empty() {
-            return Err("Bytecode is empty".to_string());
+        if cursor >= &mut bytes.len() {
+            return Err("Cursor out of bounds".to_string());
         }
 
         let id = bytes[*cursor];

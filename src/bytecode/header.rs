@@ -1,12 +1,14 @@
 use crate::bytecode::{bytecode_type::BytecodeType, serializable::BytecodeSerializable};
 
 const MAGIC: &[u8] = &[0x00, 0x08, b'm', b'v', 0x00, b'b', 0x08];
+const CURRENT_VERSION: u8 = 1;
 
+#[derive(Debug, Clone, Copy)]
 pub struct BytecodeHeader {
-    version: u8,
-    bc_type: BytecodeType,
-    function_count: u32,
-    text_block_offset: u32,
+    pub version: u8,
+    pub bc_type: BytecodeType,
+    pub function_count: u32,
+    pub text_block_offset: u32,
 }
 
 impl BytecodeHeader {
@@ -18,7 +20,8 @@ impl BytecodeHeader {
         function_count: u32,
         block_buffer_size: u32,
     ) -> Self {
-        let text_block_offset = MAGIC.len() as u32 + 1 + bc_type.byte_count() + block_buffer_size;
+        let header_size = MAGIC.len() as u32 + 1 + bc_type.byte_count() + 4 + 4;
+        let text_block_offset = header_size + block_buffer_size;
         BytecodeHeader {
             version,
             bc_type,
@@ -45,6 +48,11 @@ impl BytecodeSerializable for BytecodeHeader {
         }
 
         let version = bytes[*cursor];
+
+        if version != CURRENT_VERSION {
+            return Err(format!("Unsupported bytecode version: {}", version));
+        }
+
         *cursor += 1;
 
         let bc_type = BytecodeType::from_bytecode(bytes, cursor)?;

@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 
-use crate::{bytecode::header::BytecodeHeader, executable_module::ExecutableModule, function::{InternalFunctionDefinition, InternalFunctionSource}};
-use serializable::BytecodeSerializable;
-use bytecode_type::BytecodeType;
+use crate::{
+    executable_module::ExecutableModule,
+    function::{InternalFunctionDefinition, InternalFunctionSource},
+};
+pub use bytecode_type::BytecodeType;
+pub use header::BytecodeHeader;
+pub use serializable::BytecodeSerializable;
 
+mod bytecode_type;
 mod header;
 mod serializable;
-mod bytecode_type;
-
 
 pub struct Bytecode<'a> {
     version: u8,
@@ -27,7 +30,9 @@ impl<'a> Bytecode<'a> {
         let sources = module.functions.iter().map(|f| f.clone()).collect();
         Bytecode {
             version,
-            bc_type: BytecodeType::Executable { main_slot: module.main_slot  as u32 },
+            bc_type: BytecodeType::Executable {
+                main_slot: module.main_slot as u32,
+            },
             function_map,
             definitions,
             sources,
@@ -38,10 +43,6 @@ impl<'a> Bytecode<'a> {
         let mut buffer = vec![];
         self.write_bytecode(&mut buffer);
         buffer
-    }
-
-    pub fn deserialize_into_exec_module(bytes: &[u8]) -> Result<ExecutableModule, String> {
-        todo!()
     }
 }
 
@@ -71,6 +72,8 @@ impl BytecodeSerializable for Bytecode<'_> {
         );
 
         header.write_bytecode(buffer);
+        // println!("SER: {:#?}", header);
+        // println!("SER: Block buffer length: {}", block_buffer.len());
         buffer.extend_from_slice(&block_buffer);
 
         for source in &self.sources {
@@ -78,4 +81,3 @@ impl BytecodeSerializable for Bytecode<'_> {
         }
     }
 }
-

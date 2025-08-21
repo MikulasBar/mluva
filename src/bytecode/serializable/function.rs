@@ -1,4 +1,4 @@
-use crate::{bytecode::serializable::BytecodeSerializable, function::{InternalFunctionDefinition, InternalFunctionSource}};
+use crate::{bytecode::serializable::BytecodeSerializable, function::{InternalFunctionDefinition, InternalFunctionSource}, instruction::Instruction};
 
 
 
@@ -24,7 +24,28 @@ impl BytecodeSerializable for InternalFunctionDefinition {
 
 impl BytecodeSerializable for InternalFunctionSource {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        todo!()
+        if bytes.len() < *cursor + 4 {
+            return Err("Not enough bytes for slot count".to_string());
+        }
+        let slot_count = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap()) as usize;
+        *cursor += 4;
+
+        if bytes.len() < *cursor + 4 {
+            return Err("Not enough bytes for instruction count".to_string());
+        }
+        let instr_count = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap()) as usize;
+        *cursor += 4;
+
+        let mut body = Vec::with_capacity(instr_count);
+        for _ in 0..instr_count {
+            let instruction = Instruction::from_bytecode(bytes, cursor)?;
+            body.push(instruction);
+        }
+
+        Ok(InternalFunctionSource {
+            slot_count,
+            body,
+        })
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {

@@ -3,14 +3,14 @@ use crate::{bytecode::serializable::BytecodeSerializable, compiler::DataType};
 pub struct DataTypeId;
 
 impl DataTypeId {
-    pub const VOID: u32 = 0;
-    pub const BOOL: u32 = 1;
-    pub const INT: u32 = 2;
-    pub const FLOAT: u32 = 3;
-    pub const STRING: u32 = 4;
+    pub const VOID: u8 = 0;
+    pub const BOOL: u8 = 1;
+    pub const INT: u8 = 2;
+    pub const FLOAT: u8 = 3;
+    pub const STRING: u8 = 4;
 }
 
-fn get_id(data_type: &DataType) -> u32 {
+fn get_id(data_type: &DataType) -> u8 {
     match data_type {
         DataType::Void => DataTypeId::VOID,
         DataType::Bool => DataTypeId::BOOL,

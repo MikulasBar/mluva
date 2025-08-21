@@ -1,7 +1,7 @@
 use crate::{bytecode::BytecodeSerializable, value::Value};
 use super::data_type::DataTypeId;
 
-fn get_id(value: &Value) -> u32 {
+fn get_id(value: &Value) -> u8 {
     match value {
         Value::Void => DataTypeId::VOID,
         Value::Bool(_) => DataTypeId::BOOL,
@@ -13,7 +13,7 @@ fn get_id(value: &Value) -> u32 {
 
 impl BytecodeSerializable for Value {
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(&get_id(self).to_le_bytes());
+        buffer.push(get_id(self));
 
         match self {
             Value::Void => (),
@@ -37,7 +37,7 @@ impl BytecodeSerializable for Value {
             return Err("Not enough bytes for Value type ID".to_string());
         }
 
-        let type_id = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
+        let type_id = bytes[*cursor];
         *cursor += 1;
 
         match type_id {
