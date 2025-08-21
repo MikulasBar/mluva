@@ -1,5 +1,6 @@
 use core::panic;
 use std::collections::HashMap;
+use std::vec;
 
 use crate::errors::CompileError;
 use crate::executable_module::ExecutableModule;
@@ -13,26 +14,22 @@ use crate::value::Value;
 use super::DataType;
 
 pub struct Compiler {
-    fn_map: HashMap<String, usize>,
+    fn_map: HashMap<String, u32>,
     functions: Vec<Option<InternalFunctionSource>>,
-    main_slot: Option<usize>,
 }
 
 impl Compiler {
-    pub fn new() -> Self {
+    pub fn new(fn_map: HashMap<String, u32>) -> Self {
         Self {
-            functions: Vec::new(),
-            fn_map: HashMap::new(),
-            main_slot: None,
+            functions: vec![None; fn_map.len()],
+            fn_map: fn_map,
         }
     }
 
-    pub fn compile(mut self, items: &[Item]) -> Result<ExecutableModule, CompileError> {
-        self.allocate_function_slots(items)?;
+    pub fn compile(mut self, items: &[Item]) -> Result<(ExecutableModule, HashMap<String, u32>), CompileError> {
         self.compile_items(items)?;
 
         let mut functions = Vec::with_capacity(self.functions.len());
-
 
         // check if all functions are defined
         for (slot, f_opt) in self.functions.into_iter().enumerate() {
@@ -43,53 +40,31 @@ impl Compiler {
             }
         }
 
-        if self.main_slot.is_none() {
+        let main_slot = self.fn_map.get("main");
+
+        if main_slot.is_none() {
             return Err(CompileError::FunctionNotFound("main".to_string()));
         }
+        let module = ExecutableModule::new(functions, *main_slot.unwrap());
 
-        Ok(ExecutableModule::new(functions, self.main_slot.unwrap()))
-    }
-
-    fn allocate_function_slots(&mut self, items: &[Item]) -> Result<(), CompileError> {
-        let mut count = 0;
-
-        for item in items {
-            match item {
-                Item::FunctionDef(InternalFunctionDefinition { name, .. }) => {
-                    if self.fn_map.contains_key(name) {
-                        return Err(CompileError::FunctionAlreadyDefined(name.clone()));
-                    }
-
-                    if name == "main" {
-                        self.main_slot = Some(count);                        
-                    }
-
-                    self.fn_map.insert(name.clone(), count);
-                    count += 1;
-                },
-            }
-        }
-
-        self.functions.resize(count, None);
-
-        Ok(())
+        Ok((module, self.fn_map))
     }
 
     fn compile_items(&mut self, items: &[Item]) -> Result<(), CompileError> {
         for item in items {
             match item {
                 Item::FunctionDef(fn_def) => {
-                    let source = FunctionCompiler::new(self).compile(&fn_def)?;
-                    let Some(slot) = self.fn_map.get(&fn_def.name) else {
+                    let Some(slot) = self.fn_map.get(&fn_def.name).cloned() else {
                         // TODO: separate error for function not found and function not defined
                         return Err(CompileError::FunctionNotFound(fn_def.name.clone()));
                     };
-
-                    if self.functions[*slot].is_some() {
+                    
+                    if self.functions[slot as usize].is_some() {
                         return Err(CompileError::FunctionAlreadyDefined(fn_def.name.clone()));
                     }
+                    let source = FunctionCompiler::new(self).compile(&fn_def)?;
 
-                    self.functions[*slot] = Some(source);
+                    self.functions[slot as usize] = Some(source);
                 },
             }
         }

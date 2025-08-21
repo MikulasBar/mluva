@@ -5,7 +5,7 @@ use crate::executable_module::ExecutableModule;
 use crate::value::Value;
 
 pub struct Interpreter {
-    main_slot: usize,
+    main_slot: u32,
     functions: Vec<InternalFunctionSource>,
     stack: Vec<Value>,
 }
@@ -25,9 +25,10 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self) -> Result<(), InterpreterError> {
-        let main_source = &self.functions[self.main_slot];
-        interpret_function(&self.functions, &mut self.stack, main_source, 0)?;
-
+        let main_source = &self.functions[self.main_slot as usize];
+        let val = interpret_function(&self.functions, &mut self.stack, main_source, 0)?;
+        println!("RETURN: {:?}", val);
+        
         Ok(())
     }
 
@@ -41,6 +42,7 @@ fn interpret_function(
 ) -> Result<Value, InterpreterError> {
     InternalFunctionInterpreter::new(&functions, stack, source).interpret()
 }
+
 struct InternalFunctionInterpreter<'a> {
     functions: &'a [InternalFunctionSource],
     stack: &'a mut Vec<Value>,
@@ -136,7 +138,6 @@ impl<'a> InternalFunctionInterpreter<'a> {
             self.index += 1;
         }
 
-        // If we reach here without returning, it means the function did not return a value
         Err(InterpreterError::FunctionDidNotReturn)
     }
 

@@ -1,28 +1,19 @@
 use crate::{bytecode::BytecodeSerializable, value::Value};
+use super::data_type::DataTypeId;
 
-struct TypeId;
-
-impl TypeId {
-    const VOID: u8 = 0;
-    const BOOL: u8 = 1;
-    const INT: u8 = 2;
-    const FLOAT: u8 = 3;
-    const STRING: u8 = 4;
-}
-
-fn get_id(value: &Value) -> u8 {
+fn get_id(value: &Value) -> u32 {
     match value {
-        Value::Void => TypeId::VOID,
-        Value::Bool(_) => TypeId::BOOL,
-        Value::Int(_) => TypeId::INT,
-        Value::Float(_) => TypeId::FLOAT,
-        Value::String(_) => TypeId::STRING,
+        Value::Void => DataTypeId::VOID,
+        Value::Bool(_) => DataTypeId::BOOL,
+        Value::Int(_) => DataTypeId::INT,
+        Value::Float(_) => DataTypeId::FLOAT,
+        Value::String(_) => DataTypeId::STRING,
     }
 }
 
 impl BytecodeSerializable for Value {
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
-        buffer.push(get_id(self));
+        buffer.extend_from_slice(&get_id(self).to_le_bytes());
 
         match self {
             Value::Void => (),
@@ -42,23 +33,23 @@ impl BytecodeSerializable for Value {
     }
 
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        if bytes.is_empty() {
-            return Err("Bytecode is empty".to_string());
+        if *cursor + 4 > bytes.len() {
+            return Err("Not enough bytes for Value type ID".to_string());
         }
 
-        let type_id = bytes[*cursor];
+        let type_id = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
         *cursor += 1;
 
         match type_id {
-            TypeId::VOID => Ok(Value::Void),
-            TypeId::BOOL => {
+            DataTypeId::VOID => Ok(Value::Void),
+            DataTypeId::BOOL => {
                 if *cursor >= bytes.len() {
                     return Err("Insufficient bytes for Bool".to_string());
                 }
                 let b = bytes[*cursor] != 0;
                 Ok(Value::Bool(b))
             }
-            TypeId::INT => {
+            DataTypeId::INT => {
                 if *cursor + 4 > bytes.len() {
                     return Err("Insufficient bytes for Int".to_string());
                 }
@@ -66,7 +57,7 @@ impl BytecodeSerializable for Value {
                 *cursor += 4;
                 Ok(Value::Int(x))
             }
-            TypeId::FLOAT => {
+            DataTypeId::FLOAT => {
                 if *cursor + 8 > bytes.len() {
                     return Err("Insufficient bytes for Float".to_string());
                 }
@@ -74,7 +65,7 @@ impl BytecodeSerializable for Value {
                 *cursor += 8;
                 Ok(Value::Float(x))
             }
-            TypeId::STRING => {
+            DataTypeId::STRING => {
                 if *cursor + 4 > bytes.len() {
                     return Err("Insufficient bytes for String length".to_string());
                 }

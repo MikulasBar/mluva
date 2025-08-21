@@ -3,11 +3,13 @@
 # external Void print(..);
 # external Void assert(Bool);
 
-Void main() {
+Float main() {
     let a = 1.0
     let b = 2.0
     let c = float_add3(a + b, a, b)
-    print(c)
+
+    return c
+    # print(c)
 
     # assert(c == 6.0);
 
