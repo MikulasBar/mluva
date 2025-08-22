@@ -1,65 +1,44 @@
+mod ast;
+mod bytecode;
+mod compiler;
+mod errors;
+mod executable_module;
+mod function;
+mod instruction;
 mod interpreter;
 mod value;
-mod errors;
-mod instruction;
-mod compiler;
-mod interpreter_source;
-mod function;
-mod ast;
 
-use std::{collections::HashMap, io::Read};
-use compiler::compile_from_str;
-use errors::InterpreterError;
-use function::ExternalFunctionSource;
 use interpreter::Interpreter;
-use value::Value;
-
-
-const PRINT_EFSOURCE: ExternalFunctionSource = ExternalFunctionSource {
-    call: |args| {
-        for a in args {
-            print!("{} ", a);
-        }
-        println!();
-        Ok(Value::Void)
-    },
+use std::{
+    io::{Read, Write},
 };
 
-const ASSERT_EFSOURCE: ExternalFunctionSource = ExternalFunctionSource {
-    call: |args| {
-        if args[0].is_false()? {
-            return Err(InterpreterError::Other("Assertion failed".to_string()));
-        }
-
-        Ok(Value::Void)
-    }
-};
+use crate::{compiler::compile_from_str_to_bc, executable_module::ExecutableModule};
 
 fn main() {
     let mut input = String::new();
     let mut file = std::fs::File::open("test.mv").unwrap();
     file.read_to_string(&mut input).unwrap();
 
-    let mut externals = HashMap::new();
-    externals.insert("print".to_string(), PRINT_EFSOURCE);
-    externals.insert("assert".to_string(), ASSERT_EFSOURCE);
-
-    let compile_result = compile_from_str(&input, externals);
+    let compile_result = compile_from_str_to_bc(&input);
 
     if let Err(e) = compile_result {
         eprintln!("Compilation error: {:?}", e);
         return;
     }
 
-    let source = compile_result.unwrap();
+    let (_, bytecode) = compile_result.unwrap();
 
-    let interpret_result = Interpreter::new(source).interpret();
+    let mut bytecode_file = std::fs::File::create("test.mvb").unwrap();
+
+    bytecode_file.write_all(&bytecode).unwrap();
+
+    let module = ExecutableModule::from_bytecode(&bytecode).unwrap();
+
+    let interpret_result = Interpreter::new(module).interpret();
 
     if let Err(e) = interpret_result {
         eprintln!("Interpretation error: {:?}", e);
         return;
     }
 }
-
-
-

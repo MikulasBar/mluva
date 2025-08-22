@@ -3,8 +3,8 @@ use crate::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
-    Store(usize),
-    Load(usize),
+    Store { slot: u32 },
+    Load { slot: u32 },
     Push(Value),
     Pop,
     Add,
@@ -24,11 +24,8 @@ pub enum Instruction {
     Negate,
 
     /// Jumps to a specific index in instruction list
-    Jump(usize),
-    JumpIfFalse(usize),
-    Call {
-        slot: usize,
-        arg_count: usize,
-    },
+    Jump(u32),
+    JumpIfFalse(u32),
+    Call { call_slot: u32 },
     Return,
 }

@@ -1,23 +1,21 @@
 use crate::errors::InterpreterError;
-use crate::function::{FunctionSource, InternalFunctionSource};
+use crate::function::{InternalFunctionSource};
 use crate::instruction::Instruction;
-use crate::interpreter_source::InterpreterSource;
+use crate::executable_module::ExecutableModule;
 use crate::value::Value;
 
 pub struct Interpreter {
-    main_slot: usize,
-    functions: Vec<FunctionSource>,
+    main_slot: u32,
+    functions: Vec<InternalFunctionSource>,
     stack: Vec<Value>,
 }
 
 impl Interpreter {
-    pub fn new(source: InterpreterSource) -> Self {
-        let InterpreterSource {
+    pub fn new(source: ExecutableModule) -> Self {
+        let ExecutableModule {
             functions,
             main_slot,
         } = source;
-        // println!("FUNCTION SOURCES: {:?}\n", functions);
-        // println!("MAIN: {:?}\n", main_slot);
 
         Self {
             functions: functions,
@@ -27,8 +25,9 @@ impl Interpreter {
     }
 
     pub fn interpret(&mut self) -> Result<(), InterpreterError> {
-        let main_source = &self.functions[self.main_slot];
-        interpret_function(&self.functions, &mut self.stack, main_source, 0)?;
+        let main_source = &self.functions[self.main_slot as usize];
+        let val = interpret_function(&self.functions, &mut self.stack, main_source)?;
+        println!("RETURN: {:?}", val);
 
         Ok(())
     }
@@ -36,24 +35,15 @@ impl Interpreter {
 }
 
 fn interpret_function(
-    functions: &[FunctionSource],
+    functions: &[InternalFunctionSource],
     stack: &mut Vec<Value>,
-    source: &FunctionSource,
-    arg_count: usize,
+    source: &InternalFunctionSource,
 ) -> Result<Value, InterpreterError> {
-    match source {
-        FunctionSource::External(f) => {
-            let args = get_args_from_stack(stack, arg_count)?;
-            f.call(args)
-        },
-        FunctionSource::Internal(f) => {
-            InternalFunctionInterpreter::new(&functions, stack, f)
-                .interpret()
-        }
-    }
+    InternalFunctionInterpreter::new(&functions, stack, source).interpret()
 }
+
 struct InternalFunctionInterpreter<'a> {
-    functions: &'a [FunctionSource],
+    functions: &'a [InternalFunctionSource],
     stack: &'a mut Vec<Value>,
     index: usize,
     slots: Vec<Value>,
@@ -62,7 +52,7 @@ struct InternalFunctionInterpreter<'a> {
 
 impl<'a> InternalFunctionInterpreter<'a> {
     pub fn new(
-        functions: &'a [FunctionSource],
+        functions: &'a [InternalFunctionSource],
         stack: &'a mut Vec<Value>,
         source: &'a InternalFunctionSource,
     ) -> Self {
@@ -93,18 +83,18 @@ impl<'a> InternalFunctionInterpreter<'a> {
                     self.pop()?;
                 }
 
-                Instruction::Store(slot) => {
-                    self.slots[slot] = self.pop()?;
+                Instruction::Store { slot } => {
+                    self.slots[slot as usize] = self.pop()?;
                 }
 
-                Instruction::Load(slot) => {
-                    self.stack.push(self.slots[slot].clone());
+                Instruction::Load { slot } => {
+                    self.stack.push(self.slots[slot as usize].clone());
                 }
 
-                Instruction::Call { slot, arg_count } => {
-                    let source = &self.functions[slot];
+                Instruction::Call { call_slot } => {
+                    let source = &self.functions[call_slot as usize];
                     let result =
-                        interpret_function(self.functions, &mut self.stack, source, arg_count)?;
+                        interpret_function(self.functions, &mut self.stack, source)?;
                     self.stack.push(result);
                 }
 
@@ -113,8 +103,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
                 }
 
                 Instruction::Jump(target) => {
-                    // Jump to target
-                    self.index = target;
+                    self.index = target as usize;
                     continue; // Skip the index increment below
                 }
 
@@ -122,7 +111,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
                     let cond = self.pop()?;
 
                     if cond.is_false()? {
-                        self.index = target;
+                        self.index = target as usize;
                         continue; // Skip the index increment below
                     }
                 }
@@ -148,7 +137,6 @@ impl<'a> InternalFunctionInterpreter<'a> {
             self.index += 1;
         }
 
-        // If we reach here without returning, it means the function did not return a value
         Err(InterpreterError::FunctionDidNotReturn)
     }
 
