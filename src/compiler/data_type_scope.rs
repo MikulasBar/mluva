@@ -42,17 +42,6 @@ impl DataTypeScope {
         Ok(())
     }
 
-    // pub fn change(&mut self, key: &K, value: V) {
-    //     for scope in self.scopes.iter_mut().rev() {
-    //         if scope.contains_key(key) {
-    //             scope.insert(key.clone(), value);
-    //             return;
-    //         }
-    //     }
-
-    //     panic!()
-    // }
-
     pub fn get(&self, key: &str) -> Option<&DataType> {
         for scope in self.scopes.iter().rev() {
             if let Some(value) = scope.get(key) {

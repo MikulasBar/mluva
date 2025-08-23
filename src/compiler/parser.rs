@@ -434,23 +434,7 @@ impl<'a> Parser<'a> {
         match self.peek() {
             Some(Token::ParenL) => {
                 expect_pat!(Token::ParenL in self);
-                // let mut args = Vec::new();
-
-                // while let Some(token) = self.peek() {
-                //     if token == &Token::ParenR {
-                //         break;
-                //     }
-
-                //     args.push(self.parse_expr()?);
-
-                //     if self.peek() == Some(&Token::Comma) {
-                //         self.skip();
-                //     } else {
-                //         break;
-                //     }
-                // }
                 let args = self.parse_args()?;
-
                 expect_pat!(Token::ParenR in self);
                 Ok(Expr::FuncCall(ident, args))
             },

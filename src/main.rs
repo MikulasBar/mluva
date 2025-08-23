@@ -7,6 +7,7 @@ mod function;
 mod instruction;
 mod interpreter;
 mod value;
+mod module;
 
 use interpreter::Interpreter;
 use std::{
