@@ -1,11 +1,10 @@
-use crate::ast::*;
-use crate::errors::CompileError;
-use crate::function::{InternalFunctionDefinition};
 use super::token::Token;
 use super::DataType;
+use crate::ast::*;
+use crate::errors::CompileError;
 use crate::expect_pat;
+use crate::function::InternalFunctionDefinition;
 use crate::value::Value;
-
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
@@ -14,10 +13,7 @@ pub struct Parser<'a> {
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a [Token]) -> Self {
-        Self {
-            tokens,
-            index: 0,
-        }
+        Self { tokens, index: 0 }
     }
 
     /// Returns the next token and advances the index by one.
@@ -25,7 +21,7 @@ impl<'a> Parser<'a> {
     fn next(&mut self) -> Option<Token> {
         if self.index < self.tokens.len() {
             let token = self.tokens[self.index].clone();
-           self.index += 1;
+            self.index += 1;
             Some(token)
         } else {
             None
@@ -36,7 +32,7 @@ impl<'a> Parser<'a> {
     /// This is useful for skipping over tokens that are not needed.
     fn skip(&mut self) {
         if self.index < self.tokens.len() {
-           self.index += 1;
+            self.index += 1;
         }
     }
 
@@ -56,9 +52,8 @@ impl<'a> Parser<'a> {
         }
     }
 
-
     pub fn parse(&mut self) -> Result<Vec<Item>, CompileError> {
-       self.parse_items()
+        self.parse_items()
     }
 
     fn parse_items(&mut self) -> Result<Vec<Item>, CompileError> {
@@ -70,7 +65,7 @@ impl<'a> Parser<'a> {
                 Token::EOL => {
                     self.skip();
                     continue;
-                },
+                }
 
                 Token::DataType(_) => {
                     expect_pat!(Token::DataType(return_type) in self);
@@ -83,10 +78,23 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::BraceL in self);
 
                     let stmts = self.parse_stmts(Token::BraceR)?;
-                    items.push(Item::FunctionDef(
-                        InternalFunctionDefinition::new(fn_name, return_type, params, stmts)
-                    ));
-                },
+                    items.push(Item::FunctionDef(InternalFunctionDefinition::new(
+                        fn_name,
+                        return_type,
+                        params,
+                        stmts,
+                    )));
+                }
+
+                Token::Import => {
+                    expect_pat!(Token::Import in self);
+                    expect_pat!(Token::Ident(module_name) in self);
+                    expect_pat!(Token::EOL in self);
+
+                    println!("Importing module: {}", module_name);
+
+                    items.push(Item::Import(module_name));
+                }
 
                 Token::External => {
                     expect_pat!(Token::External in self);
@@ -133,7 +141,7 @@ impl<'a> Parser<'a> {
             params.push(data_type);
 
             if self.peek() == Some(&Token::Comma) {
-               self.skip();
+                self.skip();
             } else {
                 break;
             }
@@ -154,7 +162,7 @@ impl<'a> Parser<'a> {
             params.push((ident, data_type));
 
             if self.peek() == Some(&Token::Comma) {
-               self.skip();
+                self.skip();
             } else {
                 break;
             }
@@ -170,16 +178,16 @@ impl<'a> Parser<'a> {
 
         while let Some(token) = self.peek() {
             if *token == critical_token {
-               self.skip();
+                self.skip();
                 break;
             }
 
             let stmt = match token {
                 // lonely EOL
                 Token::EOL => {
-                   self.skip();
+                    self.skip();
                     continue;
-                },
+                }
 
                 Token::Return => {
                     expect_pat!(Token::Return in self);
@@ -204,7 +212,7 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::EOL in self);
 
                     Stmt::VarDeclare(Some(data_type), ident, expr)
-                },
+                }
 
                 Token::Let => {
                     expect_pat!(Token::Let in self);
@@ -219,9 +227,7 @@ impl<'a> Parser<'a> {
                 }
 
                 // var assign / function call in expr stmt
-                Token::Ident(_) => {
-                   self.parse_ident_statement()?
-                },
+                Token::Ident(_) => self.parse_ident_statement()?,
 
                 Token::If => self.parse_if_statement()?,
 
@@ -234,11 +240,9 @@ impl<'a> Parser<'a> {
 
                     let stmts = self.parse_stmts(Token::BraceR)?;
                     Stmt::While(cond, stmts)
-                },
+                }
 
-                _ => {
-                    Stmt::Expr(self.parse_expr()?)
-                },
+                _ => Stmt::Expr(self.parse_expr()?),
             };
 
             stmts.push(stmt);
@@ -280,7 +284,7 @@ impl<'a> Parser<'a> {
 
         let else_branch = if let Some(Token::Else) = self.peek() {
             expect_pat!(Token::Else in self);
-        
+
             if let Some(Token::If) = self.peek() {
                 Some(vec![self.parse_if_statement()?])
             } else {
@@ -295,11 +299,10 @@ impl<'a> Parser<'a> {
         Ok(Stmt::If(cond, stmts, else_branch))
     }
 
-
     ////////////////// Expression parsing methods ////////////////
 
     fn parse_expr(&mut self) -> Result<Expr, CompileError> {
-       self.parse_logical_expr()
+        self.parse_logical_expr()
     }
 
     /// Parse logical `BinaryOp` such as and, or
@@ -328,7 +331,7 @@ impl<'a> Parser<'a> {
                 return Ok(lhs);
             };
 
-           self.skip();
+            self.skip();
             let rhs = self.parse_add_expr()?;
             lhs = Expr::new_binary_op(op, lhs, rhs);
         }
@@ -345,7 +348,7 @@ impl<'a> Parser<'a> {
                 return Ok(lhs);
             };
 
-           self.skip();
+            self.skip();
             let rhs = self.parse_mul_expr()?;
             lhs = Expr::new_binary_op(op, lhs, rhs);
         }
@@ -362,7 +365,7 @@ impl<'a> Parser<'a> {
                 return Ok(lhs);
             };
 
-           self.skip();
+            self.skip();
             let rhs = self.parse_unary_op_expr()?;
             lhs = Expr::new_binary_op(op, lhs, rhs);
         }
@@ -410,9 +413,7 @@ impl<'a> Parser<'a> {
                 Ok(Expr::Literal(Value::String(string)))
             }
 
-            Token::Ident(_) => {
-               self.parse_ident_expr()
-            }
+            Token::Ident(_) => self.parse_ident_expr(),
 
             Token::ParenL => {
                 expect_pat!(Token::ParenL in self);
@@ -430,32 +431,69 @@ impl<'a> Parser<'a> {
     fn parse_ident_expr(&mut self) -> Result<Expr, CompileError> {
         expect_pat!(Token::Ident(ident) in self);
 
-        if let Some(Token::ParenL) = self.peek() {
-            expect_pat!(Token::ParenL in self);
-            let mut args = Vec::new();
+        match self.peek() {
+            Some(Token::ParenL) => {
+                expect_pat!(Token::ParenL in self);
+                // let mut args = Vec::new();
 
-            while let Some(token) = self.peek() {
-                if token == &Token::ParenR {
-                    break;
-                }
+                // while let Some(token) = self.peek() {
+                //     if token == &Token::ParenR {
+                //         break;
+                //     }
 
-                args.push(self.parse_expr()?);
+                //     args.push(self.parse_expr()?);
 
-                if self.peek() == Some(&Token::Comma) {
-                   self.skip();
-                } else {
-                    break;
-                }
+                //     if self.peek() == Some(&Token::Comma) {
+                //         self.skip();
+                //     } else {
+                //         break;
+                //     }
+                // }
+                let args = self.parse_args()?;
+
+                expect_pat!(Token::ParenR in self);
+                Ok(Expr::FuncCall(ident, args))
+            },
+
+            Some(Token::Colon) => {
+                expect_pat!(Token::Colon in self);
+                expect_pat!(Token::Ident(func_name) in self);
+
+                expect_pat!(Token::ParenL in self);
+                let args = self.parse_args()?;
+                expect_pat!(Token::ParenR in self);
+
+                Ok(Expr::ForeignFuncCall {
+                    module_name: ident,
+                    func_name,
+                    args,
+                })
             }
 
-            expect_pat!(Token::ParenR in self);
-            Ok(Expr::FuncCall(ident, args))
-        } else {
-            Ok(Expr::Var(ident))
+            _ => Ok(Expr::Var(ident)),
         }
     }
-}
 
+    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileError> {
+        let mut args = vec![];
+
+        while let Some(token) = self.peek() {
+            if token == &Token::ParenR {
+                break;
+            }
+
+            args.push(self.parse_expr()?);
+
+            if self.peek() == Some(&Token::Comma) {
+                self.skip();
+            } else {
+                break;
+            }
+        }
+
+        Ok(args)
+    }
+}
 
 fn token_to_logical_op(token: &Token) -> Option<BinaryOp> {
     match token {
@@ -499,5 +537,102 @@ fn token_to_unary_op(token: &Token) -> Option<UnaryOp> {
         Token::Not => Some(UnaryOp::Not),
         Token::Minus => Some(UnaryOp::Negate),
         _ => None,
+    }
+}
+
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    mod parse_ident_expr {
+        use super::*;
+
+        #[test]
+        fn var() {
+            let tokens = vec![
+                Token::Ident("my_var".to_string()),
+            ];
+
+            let mut parser = Parser::new(&tokens);
+            let expr = parser.parse_ident_expr().unwrap();
+            assert_eq!(
+                expr,
+                Expr::Var("my_var".to_string())
+            );
+        }
+
+        #[test]
+        fn func_call() {
+            let tokens = vec![
+                Token::Ident("my_func".to_string()),
+                Token::ParenL,
+                Token::Int(42),
+                Token::ParenR,
+            ];
+
+            let mut parser = Parser::new(&tokens);
+            let expr = parser.parse_ident_expr().unwrap();
+            assert_eq!(
+                expr,
+                Expr::FuncCall(
+                    "my_func".to_string(),
+                    vec![
+                        Expr::Literal(Value::Int(42)),
+                    ]
+                )
+            );
+        }
+
+        #[test]
+        fn foreign_func_call() {
+            let tokens = vec![
+                Token::Ident("Math".to_string()),
+                Token::Colon,
+                Token::Ident("sqrt".to_string()),
+                Token::ParenL,
+                Token::Float(16.0),
+                Token::ParenR,
+            ];
+
+            let mut parser = Parser::new(&tokens);
+            let expr = parser.parse_ident_expr().unwrap();
+            assert_eq!(
+                expr,
+                Expr::ForeignFuncCall {
+                    module_name: "Math".to_string(),
+                    func_name: "sqrt".to_string(),
+                    args: vec![
+                        Expr::Literal(Value::Float(16.0)),
+                    ],
+                }
+            );
+        }
+
+
+    }
+
+    #[test]
+    fn parse_args() {
+        let tokens = vec![
+            Token::Int(1),
+            Token::Comma,
+            Token::Int(2),
+            Token::Comma,
+            Token::Int(3),
+            Token::ParenR,
+        ];
+
+        let mut parser = Parser::new(&tokens);
+        let args = parser.parse_args().unwrap();
+        assert_eq!(
+            args,
+            vec![
+                Expr::Literal(Value::Int(1)),
+                Expr::Literal(Value::Int(2)),
+                Expr::Literal(Value::Int(3))
+            ]
+        );
     }
 }

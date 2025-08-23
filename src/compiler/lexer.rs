@@ -100,6 +100,11 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                 }
             }
             
+            ':' => {
+                chars.next();
+                Token::Colon
+            }
+
             // assign / eq
             '=' => {
                 chars.next();
@@ -259,7 +264,8 @@ fn match_kw(ident: String) -> Token {
         "else"  => Token::Else,
         "while" => Token::While,
         "return" => Token::Return,
-        "external" => Token::External,
+        // "external" => Token::External,
+        "import" => Token::Import,
 
         _       => Token::Ident(ident)
     }

@@ -8,6 +8,11 @@ pub enum Expr {
     BinaryOp(BinaryOp, Box<Self>, Box<Self>),
     UnaryOp(UnaryOp, Box<Self>),
     FuncCall(String, Vec<Expr>),
+    ForeignFuncCall {
+        module_name: String,
+        func_name: String,
+        args: Vec<Expr>,
+    }
 }
 
 impl Expr {

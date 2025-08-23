@@ -66,6 +66,8 @@ impl Compiler {
 
                     self.functions[slot as usize] = Some(source);
                 },
+
+                _ => (), // TODO: handle this 
             }
         }
 
@@ -266,7 +268,9 @@ impl<'b> FunctionCompiler<'b> {
                 self.instructions.push(Instruction::Call {
                     call_slot: call_slot as u32,
                 });
-            }
+            },
+
+            Expr::ForeignFuncCall { .. } => todo!(), // TODO
         }
 
         Ok(())

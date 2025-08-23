@@ -46,7 +46,9 @@ impl<'a> TypeChecker<'a> {
                     let slot = self.fn_map.len() as u32;
                     self.definitions.push(def);
                     self.fn_map.insert(name, slot);
-                }
+                },
+
+                _ => (),
             }
         }
 
@@ -65,7 +67,9 @@ impl<'a> TypeChecker<'a> {
                     }
 
                     self.check_stmts(&fn_def.body, &mut scope, fn_def.return_type)?;
-                }
+                },
+
+                Item::Import(_) => (), // TODO: handle this
             }
         }
 
@@ -202,7 +206,9 @@ impl<'a> TypeChecker<'a> {
                 func.check_arg_types(&arg_types)?;
 
                 Ok(func.return_type)
-            }
+            },
+
+            Expr::ForeignFuncCall { .. } => todo!(), // TODO: handle this
 
             Expr::BinaryOp(op, a, b) => {
                 let a = self.check_expr(a, scope)?;

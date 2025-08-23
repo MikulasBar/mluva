@@ -1,5 +1,5 @@
 
-
+import some_module
 # external Void print(..);
 # external Void assert(Bool);
 
