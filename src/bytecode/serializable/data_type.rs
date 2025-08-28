@@ -20,13 +20,20 @@ fn get_id(data_type: &DataType) -> u8 {
     }
 }
 
-
 impl BytecodeSerializable for DataType {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        todo!()
+        let id = u8::from_bytecode(bytes, cursor)?;
+        match id {
+            DataTypeId::VOID => Ok(DataType::Void),
+            DataTypeId::BOOL => Ok(DataType::Bool),
+            DataTypeId::INT => Ok(DataType::Int),
+            DataTypeId::FLOAT => Ok(DataType::Float),
+            DataTypeId::STRING => Ok(DataType::String),
+            _ => Err(format!("Unknown DataType id: {}", id)),
+        }
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
-        buffer.extend_from_slice(&get_id(self).to_le_bytes());
+        get_id(self).write_bytecode(buffer);
     }
 }
