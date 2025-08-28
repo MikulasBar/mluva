@@ -26,7 +26,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile(mut self, items: &[Item]) -> Result<(ExecutableModule, HashMap<String, u32>), CompileError> {
+    pub fn compile(mut self, items: &[Item]) -> Result<(Vec<InternalFunctionSource>, HashMap<String, u32>), CompileError> {
         self.compile_items(items)?;
 
         let mut functions = Vec::with_capacity(self.functions.len());
@@ -40,14 +40,7 @@ impl Compiler {
             }
         }
 
-        let main_slot = self.fn_map.get("main");
-
-        if main_slot.is_none() {
-            return Err(CompileError::FunctionNotFound("main".to_string()));
-        }
-        let module = ExecutableModule::new(functions, *main_slot.unwrap());
-
-        Ok((module, self.fn_map))
+        Ok((functions, self.fn_map))
     }
 
     fn compile_items(&mut self, items: &[Item]) -> Result<(), CompileError> {

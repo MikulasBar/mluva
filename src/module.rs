@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable}, function::{InternalFunctionDefinition, InternalFunctionSource}};
+use crate::{bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable}, compiler::{tokenize, Compiler, Parser, TypeChecker}, errors::CompileError, function::{InternalFunctionDefinition, InternalFunctionSource}};
 
 pub struct Module {
     main_slot: Option<u32>,
@@ -21,6 +21,21 @@ impl Module {
 
     pub fn is_executable(&self) -> bool {
         self.main_slot.is_some()
+    }
+
+    pub fn from_string(input: &str) -> Result<Self, CompileError> {
+        let tokens = tokenize(input)?;
+        let items = Parser::new(&tokens).parse()?;
+        let (fn_map, definitions) = TypeChecker::new().check_and_return_definitions(&items)?;
+        let (sources, fn_map) = Compiler::new(fn_map).compile(&items)?;
+        let main_slot = fn_map.get("main").copied();
+
+        Ok(Self {
+            main_slot,
+            fn_map,
+            definitions, // TODO: change typechecker so it will return owned value
+            sources,
+        })
     }
 }
 
