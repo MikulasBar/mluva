@@ -3,17 +3,22 @@ use super::DataType;
 use crate::ast::*;
 use crate::errors::CompileError;
 use crate::expect_pat;
-use crate::function::InternalFunctionDefinition;
+use crate::function::InternalFunctionSigniture;
 use crate::value::Value;
 
 pub struct Parser<'a> {
     tokens: &'a [Token],
     index: usize,
+    ast: Ast,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(tokens: &'a [Token]) -> Self {
-        Self { tokens, index: 0 }
+        Self {
+            tokens,
+            index: 0,
+            ast: Ast::empty(),
+        }
     }
 
     /// Returns the next token and advances the index by one.
@@ -52,13 +57,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(&mut self) -> Result<Vec<Item>, CompileError> {
-        self.parse_items()
+    pub fn parse(mut self) -> Result<Ast, CompileError> {
+        self.parse_top_level()?;
+        Ok(self.ast)
     }
 
-    fn parse_items(&mut self) -> Result<Vec<Item>, CompileError> {
-        let mut items = vec![];
-
+    fn parse_top_level(&mut self) -> Result<(), CompileError> {
         while let Some(token) = self.peek() {
             match token {
                 // lonely EOL
@@ -69,7 +73,7 @@ impl<'a> Parser<'a> {
 
                 Token::DataType(_) => {
                     expect_pat!(Token::DataType(return_type) in self);
-                    expect_pat!(Token::Ident(fn_name) in self);
+                    expect_pat!(Token::Ident(name) in self);
                     expect_pat!(Token::ParenL in self);
 
                     let params = self.parse_named_parameters()?;
@@ -77,23 +81,24 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::ParenR in self);
                     expect_pat!(Token::BraceL in self);
 
-                    let stmts = self.parse_stmts(Token::BraceR)?;
-                    items.push(Item::FunctionDef(InternalFunctionDefinition::new(
-                        fn_name,
+                    let body = self.parse_stmts(Token::BraceR)?;
+                    let signiture = InternalFunctionSigniture::new(
                         return_type,
                         params,
-                        stmts,
-                    )));
+                    );
+                    self.ast.add_function(name, signiture, body);
                 }
 
                 Token::Import => {
+                    // Only supports single segment module names for now
                     expect_pat!(Token::Import in self);
                     expect_pat!(Token::Ident(module_name) in self);
                     expect_pat!(Token::EOL in self);
 
                     println!("Importing module: {}", module_name);
+                    let import_path = Path::single(module_name);
 
-                    items.push(Item::Import(module_name));
+                    self.ast.add_import(import_path);
                 }
 
                 Token::External => {
@@ -118,7 +123,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Ok(items)
+        Ok(())
     }
 
     fn parse_params_of_external_fn(&mut self) -> Result<Option<Vec<DataType>>, CompileError> {
@@ -436,8 +441,8 @@ impl<'a> Parser<'a> {
                 expect_pat!(Token::ParenL in self);
                 let args = self.parse_args()?;
                 expect_pat!(Token::ParenR in self);
-                Ok(Expr::FuncCall(ident, args))
-            },
+                Ok(Expr::FunctionCall(ident, args))
+            }
 
             Some(Token::Colon) => {
                 expect_pat!(Token::Colon in self);
@@ -447,7 +452,7 @@ impl<'a> Parser<'a> {
                 let args = self.parse_args()?;
                 expect_pat!(Token::ParenR in self);
 
-                Ok(Expr::ForeignFuncCall {
+                Ok(Expr::ForeignFunctionCall {
                     module_name: ident,
                     func_name,
                     args,
@@ -524,8 +529,6 @@ fn token_to_unary_op(token: &Token) -> Option<UnaryOp> {
     }
 }
 
-
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -535,16 +538,11 @@ mod test {
 
         #[test]
         fn var() {
-            let tokens = vec![
-                Token::Ident("my_var".to_string()),
-            ];
+            let tokens = vec![Token::Ident("my_var".to_string())];
 
             let mut parser = Parser::new(&tokens);
             let expr = parser.parse_ident_expr().unwrap();
-            assert_eq!(
-                expr,
-                Expr::Var("my_var".to_string())
-            );
+            assert_eq!(expr, Expr::Var("my_var".to_string()));
         }
 
         #[test]
@@ -560,12 +558,7 @@ mod test {
             let expr = parser.parse_ident_expr().unwrap();
             assert_eq!(
                 expr,
-                Expr::FuncCall(
-                    "my_func".to_string(),
-                    vec![
-                        Expr::Literal(Value::Int(42)),
-                    ]
-                )
+                Expr::FunctionCall("my_func".to_string(), vec![Expr::Literal(Value::Int(42)),])
             );
         }
 
@@ -584,17 +577,13 @@ mod test {
             let expr = parser.parse_ident_expr().unwrap();
             assert_eq!(
                 expr,
-                Expr::ForeignFuncCall {
+                Expr::ForeignFunctionCall {
                     module_name: "Math".to_string(),
                     func_name: "sqrt".to_string(),
-                    args: vec![
-                        Expr::Literal(Value::Float(16.0)),
-                    ],
+                    args: vec![Expr::Literal(Value::Float(16.0)),],
                 }
             );
         }
-
-
     }
 
     #[test]

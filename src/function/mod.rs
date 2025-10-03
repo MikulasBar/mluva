@@ -1,4 +1,3 @@
 mod internal;
 
-
-pub use internal::{InternalFunctionDefinition, InternalFunctionSource};
+pub use internal::*;

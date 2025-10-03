@@ -7,8 +7,8 @@ pub enum Expr {
     Var(String),
     BinaryOp(BinaryOp, Box<Self>, Box<Self>),
     UnaryOp(UnaryOp, Box<Self>),
-    FuncCall(String, Vec<Expr>),
-    ForeignFuncCall {
+    FunctionCall(String, Vec<Expr>),
+    ForeignFunctionCall {
         module_name: String,
         func_name: String,
         args: Vec<Expr>,

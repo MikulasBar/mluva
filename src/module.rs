@@ -1,21 +1,40 @@
 use std::collections::HashMap;
 
-use crate::{bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable}, compiler::{tokenize, Compiler, Parser, TypeChecker}, errors::CompileError, function::{InternalFunctionDefinition, InternalFunctionSource}};
+use crate::{
+    bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
+    compiler::{tokenize, Compiler, Parser, TypeChecker},
+    errors::{CompileError, InterpreterError},
+    function::{InternalFunctionSigniture, InternalFunctionSource},
+};
 
 pub struct Module {
     main_slot: Option<u32>,
-    fn_map: HashMap<String, u32>,
-    definitions: Vec<InternalFunctionDefinition>,
-    sources: Vec<InternalFunctionSource>,
+    function_map: HashMap<String, u32>,
+    function_signitures: Vec<InternalFunctionSigniture>,
+    function_sources: Vec<InternalFunctionSource>,
 }
 
 impl Module {
+    pub fn new(
+        main_slot: Option<u32>,
+        function_map: HashMap<String, u32>,
+        function_signitures: Vec<InternalFunctionSigniture>,
+        function_sources: Vec<InternalFunctionSource>,
+    ) -> Self {
+        Self {
+            main_slot,
+            function_map,
+            function_signitures,
+            function_sources,
+        }
+    }
+
     pub fn empty() -> Self {
         Self {
             main_slot: None,
-            fn_map: HashMap::new(),
-            definitions: vec![],
-            sources: vec![],
+            function_map: HashMap::new(),
+            function_signitures: vec![],
+            function_sources: vec![],
         }
     }
 
@@ -25,20 +44,28 @@ impl Module {
 
     pub fn from_string(input: &str) -> Result<Self, CompileError> {
         let tokens = tokenize(input)?;
-        let items = Parser::new(&tokens).parse()?;
-        let (fn_map, definitions) = TypeChecker::new().check_and_return_definitions(&items)?;
-        let (sources, fn_map) = Compiler::new(fn_map).compile(&items)?;
-        let main_slot = fn_map.get("main").copied();
+        let ast = Parser::new(&tokens).parse()?;
+        TypeChecker::new(&ast, &[]).check()?;
+        let module = Compiler::new(ast).compile()?;
 
-        Ok(Self {
-            main_slot,
-            fn_map,
-            definitions, // TODO: change typechecker so it will return owned value
-            sources,
-        })
+        Ok(module)
+    }
+
+    pub fn execute(&self) -> Result<(), InterpreterError> {
+        todo!();
+        
+        // if !self.is_executable() {
+        //     return Err(InterpreterError::Other(
+        //         "Module is not executable (missing main function)".to_string(),
+        //     ));
+        // }
+
+        // let executable_module = crate::executable_module::ExecutableModule::from_module(self)?;
+
+        // let mut interpreter = crate::interpreter::Interpreter::new(executable_module);
+        // interpreter.interpret()
     }
 }
-
 
 impl BytecodeSerializable for Module {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
@@ -46,19 +73,17 @@ impl BytecodeSerializable for Module {
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
-        let header = BytecodeHeader::new(self.main_slot, self.fn_map.len() as u32);
+        let header = BytecodeHeader::new(self.main_slot, self.function_map.len() as u32);
         header.write_bytecode(buffer);
-        
-        write_fn_map_bytecode(&self.fn_map, buffer);
 
-        for def in &self.definitions {
+        write_fn_map_bytecode(&self.function_map, buffer);
+
+        for def in &self.function_signitures {
             def.write_bytecode(buffer);
         }
 
-        for src in &self.sources {
+        for src in &self.function_sources {
             src.write_bytecode(buffer);
         }
     }
 }
-
-

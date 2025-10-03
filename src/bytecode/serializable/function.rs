@@ -1,8 +1,8 @@
 use crate::{
-    bytecode::serializable::BytecodeSerializable, compiler::DataType, function::{InternalFunctionDefinition, InternalFunctionSource}, instruction::Instruction
+    bytecode::serializable::BytecodeSerializable, function::{InternalFunctionSigniture, InternalFunctionSource}, instruction::Instruction
 };
 
-impl BytecodeSerializable for InternalFunctionDefinition {
+impl BytecodeSerializable for InternalFunctionSigniture {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
         todo!("Implementation needs refactoring of function definition struct")
         // let return_type = DataType::from_bytecode(bytes, cursor)?;
