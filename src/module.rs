@@ -4,7 +4,7 @@ use crate::{
     bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
     errors::{CompileError, RuntimeError},
-    function::{InternalFunctionSigniture, InternalFunctionSource}, interpreter::Interpreter, value::Value,
+    function::{InternalFunctionSigniture, InternalFunctionSource}, runtime::Runtime, value::Value,
 };
 
 pub struct Module {
@@ -51,6 +51,10 @@ impl Module {
         &self.function_sources
     }
 
+    pub fn get_function_source_by_slot(&self, slot: u32) -> Option<&InternalFunctionSource> {
+        self.function_sources.get(slot as usize)
+    }
+
     pub fn get_function_signiture(&self, name: &str) -> Option<&InternalFunctionSigniture> {
         let slot = self.function_map.get(name)?;
         self.function_signitures.get(*slot as usize)
@@ -83,8 +87,8 @@ impl Module {
         buffer
     }
 
-    pub fn execute(&self) -> Result<Value, RuntimeError> {
-        Interpreter::new(self).execute()
+    pub fn execute_without_dependencies(&self) -> Result<Value, RuntimeError> {
+        Runtime::new(self, &HashMap::new()).execute()
     }
 }
 

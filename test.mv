@@ -1,29 +1,15 @@
-
-import some_module
-# external Void print(..);
-# external Void assert(Bool);
+import math
 
 Float main() {
     let a = 1.0
     let b = 2.0
-    let c = float_add3(a + b, a, b)
+    let c = add_float3(a + b, a, b)
 
     return c
-    # print(c)
-
-    # assert(c == 6.0);
-
-    # print('Hello, world!')
-
-    # print(1, 2, false, 'asfaf', 45.65)
 }
 
-Int add(Int a, Int b) {
-    return a + b
-}
-
-Float float_add3(Float a, Float b, Float c) {
-    return a + b + c
+Float add_float3(Float a, Float b, Float c) {
+    return math:add_float(a, b) + c
 }
 
 # Int x = -1.0

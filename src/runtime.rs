@@ -1,36 +1,46 @@
+use std::collections::HashMap;
+
 use crate::errors::RuntimeError;
-use crate::function::{InternalFunctionSource};
+use crate::function::InternalFunctionSource;
 use crate::instruction::Instruction;
 use crate::module::Module;
 use crate::value::Value;
 
-pub struct Interpreter<'a> {
+pub struct Runtime<'a> {
     module: &'a Module,
+    dependencies: &'a HashMap<String, Module>,
     stack: Vec<Value>,
 }
 
-impl<'a> Interpreter<'a> {
-    pub fn new(module: &'a Module) -> Self {
+impl<'a> Runtime<'a> {
+    pub fn new(module: &'a Module, dependencies: &'a HashMap<String, Module>) -> Self {
         Self {
             module,
+            dependencies,
             stack: vec![],
         }
     }
 
     pub fn execute(mut self) -> Result<Value, RuntimeError> {
-        let main_function = self.module.get_main_source().ok_or(
-            RuntimeError::Other("Module is not executable (missing main function)".to_string()),
-        )?;
+        let main_function = self.module.get_main_source().ok_or(RuntimeError::Other(
+            "Module is not executable (missing main function)".to_string(),
+        ))?;
 
         let functions = self.module.get_sources();
-        let val = InternalFunctionInterpreter::new(functions, &mut self.stack, main_function).interpret()?;
-        
+        let val = InternalFunctionRuntime::new(
+            self.dependencies,
+            functions,
+            &mut self.stack,
+            main_function,
+        )
+        .interpret()?;
+
         Ok(val)
     }
-
 }
 
-struct InternalFunctionInterpreter<'a> {
+struct InternalFunctionRuntime<'a> {
+    dependencies: &'a HashMap<String, Module>,
     functions: &'a [InternalFunctionSource],
     stack: &'a mut Vec<Value>,
     index: usize,
@@ -38,13 +48,15 @@ struct InternalFunctionInterpreter<'a> {
     source: &'a InternalFunctionSource,
 }
 
-impl<'a> InternalFunctionInterpreter<'a> {
+impl<'a> InternalFunctionRuntime<'a> {
     pub fn new(
+        dependencies: &'a HashMap<String, Module>,
         functions: &'a [InternalFunctionSource],
         stack: &'a mut Vec<Value>,
         source: &'a InternalFunctionSource,
     ) -> Self {
         Self {
+            dependencies,
             functions,
             stack,
             source,
@@ -54,9 +66,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
     }
 
     fn pop(&mut self) -> Result<Value, RuntimeError> {
-        self.stack
-            .pop()
-            .ok_or(RuntimeError::ValueStackUnderflow)
+        self.stack.pop().ok_or(RuntimeError::ValueStackUnderflow)
     }
 
     pub fn interpret(mut self) -> Result<Value, RuntimeError> {
@@ -81,13 +91,43 @@ impl<'a> InternalFunctionInterpreter<'a> {
 
                 Instruction::Call { call_slot } => {
                     let source = &self.functions[call_slot as usize];
-                    let result =
-                        InternalFunctionInterpreter::new(self.functions, &mut self.stack, source).interpret()?;
+                    let result = InternalFunctionRuntime::new(
+                        self.dependencies,
+                        self.functions,
+                        &mut self.stack,
+                        source,
+                    )
+                    .interpret()?;
                     self.stack.push(result);
                 }
 
-                Instruction::ForeignCall { ref module_name, call_slot } => {
-                    unimplemented!("Foreign function calls are not implemented yet: {}::{}", module_name, call_slot);
+                Instruction::ForeignCall {
+                    ref module_name,
+                    call_slot,
+                } => {
+                    let module = self
+                        .dependencies
+                        .get(module_name)
+                        .ok_or(RuntimeError::Other(format!(
+                            "Missing dependency: {}",
+                            module_name
+                        )))?;
+
+                    let source = module.get_function_source_by_slot(call_slot).ok_or(
+                        RuntimeError::Other(format!(
+                            "Function slot {} not found in module {}",
+                            call_slot, module_name
+                        )),
+                    )?;
+
+                    let result = InternalFunctionRuntime::new(
+                        self.dependencies,
+                        self.functions,
+                        &mut self.stack,
+                        source,
+                    )
+                    .interpret()?;
+                    self.stack.push(result);
                 }
 
                 Instruction::Return => {
