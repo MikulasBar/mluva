@@ -1,89 +1,81 @@
 use core::panic;
 use std::collections::HashMap;
-use std::vec;
 
+use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
 use crate::errors::CompileError;
-use crate::executable_module::ExecutableModule;
-use crate::function::{InternalFunctionSource};
-use crate::ast::{BinaryOp, Expr, Item, Stmt, UnaryOp};
+use crate::function::{InternalFunctionSigniture, InternalFunctionSource};
 use crate::instruction::Instruction;
 
-use crate::function::InternalFunctionDefinition;
+use crate::module::Module;
 use crate::value::Value;
 
 use super::DataType;
 
-pub struct Compiler {
-    fn_map: HashMap<String, u32>,
-    functions: Vec<Option<InternalFunctionSource>>,
+pub struct Compiler<'a> {
+    sources: Vec<InternalFunctionSource>,
+    ast: Ast,
+    dependencies: &'a HashMap<String, Module>,
 }
 
-impl Compiler {
-    pub fn new(fn_map: HashMap<String, u32>) -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new(ast: Ast, dependencies: &'a HashMap<String, Module>) -> Self {
+        let function_count = ast.function_count() as usize;
+
         Self {
-            functions: vec![None; fn_map.len()],
-            fn_map: fn_map,
+            sources: Vec::with_capacity(function_count),
+            ast,
+            dependencies,
         }
     }
 
-    pub fn compile(mut self, items: &[Item]) -> Result<(ExecutableModule, HashMap<String, u32>), CompileError> {
-        self.compile_items(items)?;
-
-        let mut functions = Vec::with_capacity(self.functions.len());
-
-        // check if all functions are defined
-        for (slot, f_opt) in self.functions.into_iter().enumerate() {
-            if let Some(f) = f_opt {
-                functions.push(f);
-            } else {
-                return Err(CompileError::FunctionNotFound(format!("slot({})", slot)));
-            }
+    pub fn compile(mut self) -> Result<Module, CompileError> {
+        for slot in 0..self.ast.function_count() {
+            self.compile_function(slot)?;
         }
 
-        let main_slot = self.fn_map.get("main");
+        let (function_map, function_signitures, ..) = self.ast.deconstruct();
+        let main_slot = function_map.get("main").copied();
+        let module = Module::new(main_slot, function_map, function_signitures, self.sources);
 
-        if main_slot.is_none() {
-            return Err(CompileError::FunctionNotFound("main".to_string()));
-        }
-        let module = ExecutableModule::new(functions, *main_slot.unwrap());
-
-        Ok((module, self.fn_map))
+        Ok(module)
     }
 
-    fn compile_items(&mut self, items: &[Item]) -> Result<(), CompileError> {
-        for item in items {
-            match item {
-                Item::FunctionDef(fn_def) => {
-                    let Some(slot) = self.fn_map.get(&fn_def.name).cloned() else {
-                        // TODO: separate error for function not found and function not defined
-                        return Err(CompileError::FunctionNotFound(fn_def.name.clone()));
-                    };
-                    
-                    if self.functions[slot as usize].is_some() {
-                        return Err(CompileError::FunctionAlreadyDefined(fn_def.name.clone()));
-                    }
-                    let source = FunctionCompiler::new(self).compile(&fn_def)?;
+    fn compile_function(&mut self, slot: u32) -> Result<(), CompileError> {
+        let function_map = self.ast.get_function_map();
+        let signiture = self.ast.get_function_signiture_by_slot(slot).unwrap();
+        let body = self.ast.get_function_body_by_slot(slot).unwrap();
 
-                    self.functions[slot as usize] = Some(source);
-                },
-            }
-        }
+        let source = FunctionCompiler::new(self.dependencies, function_map, body, signiture).compile()?;
+
+        self.sources.push(source);
 
         Ok(())
     }
 }
 
 struct FunctionCompiler<'b> {
-    compiler: &'b mut Compiler,
+    dependencies: &'b HashMap<String, Module>,
+    function_map: &'b HashMap<String, u32>,
+    body: &'b [Stmt],
+    signiture: &'b InternalFunctionSigniture,
+
     instructions: Vec<Instruction>,
     locals: HashMap<String, usize>,
     next_slot: usize,
 }
 
 impl<'b> FunctionCompiler<'b> {
-    fn new(compiler: &'b mut Compiler) -> Self {
+    fn new(
+        dependencies: &'b HashMap<String, Module>,
+        function_map: &'b HashMap<String, u32>,
+        body: &'b [Stmt],
+        signiture: &'b InternalFunctionSigniture,
+    ) -> Self {
         Self {
-            compiler,
+            dependencies,
+            function_map,
+            body,
+            signiture,
             locals: HashMap::new(),
             instructions: Vec::new(),
             next_slot: 0,
@@ -107,25 +99,31 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions[index] = inst;
     }
 
-    fn push(&mut self, inst: Instruction) {
-        self.instructions.push(inst);
+    fn push(&mut self, instr: Instruction) {
+        self.instructions.push(instr);
     }
 
-    fn compile(mut self, def: &InternalFunctionDefinition) -> Result<InternalFunctionSource, CompileError> {
-        for (name, _) in &def.params {
-            let slot = self.get_slot(&name) as u32;
-            self.instructions.push(Instruction::Store { slot });
-        }
+    fn compile(mut self) -> Result<InternalFunctionSource, CompileError> {
+        self.setup_parameters();
+        self.compile_stmts(&self.body)?;
 
-        self.compile_stmts(&def.body)?;
-        
         // implicit return at the end of Void functions
-        if let DataType::Void = def.return_type {
+        if let DataType::Void = self.signiture.return_type {
             self.instructions.push(Instruction::Push(Value::Void));
             self.instructions.push(Instruction::Return);
         }
 
-        Ok(InternalFunctionSource::new(self.locals.len(), self.instructions))
+        Ok(InternalFunctionSource::new(
+            self.locals.len(),
+            self.instructions,
+        ))
+    }
+
+    fn setup_parameters(&mut self) {
+        for (name, _) in &self.signiture.params {
+            let slot = self.get_slot(&name) as u32;
+            self.instructions.push(Instruction::Store { slot });
+        }
     }
 
     fn compile_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
@@ -157,7 +155,7 @@ impl<'b> FunctionCompiler<'b> {
 
             Stmt::While(cond, stmts) => {
                 self.compile_while_statement(cond, stmts)?;
-            },
+            }
 
             Stmt::Return(expr) => {
                 self.compile_expr(expr)?;
@@ -168,7 +166,12 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_if_statement(&mut self, cond: &Expr, stmts: &[Stmt], else_stmts: Option<&[Stmt]>) -> Result<(), CompileError> {
+    fn compile_if_statement(
+        &mut self,
+        cond: &Expr,
+        stmts: &[Stmt],
+        else_stmts: Option<&[Stmt]>,
+    ) -> Result<(), CompileError> {
         // Compile the condition expression
         self.compile_expr(cond)?;
 
@@ -188,7 +191,10 @@ impl<'b> FunctionCompiler<'b> {
             let post_if_index = self.instructions.len();
             // jump from the if condition to the else block
             // we should jump over the whole if-else block, only if block
-            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index as u32));
+            self.update_instruction_at(
+                cond_jump_index,
+                Instruction::JumpIfFalse(post_if_index as u32),
+            );
 
             // Compile the statements in the "else" block
             self.compile_stmts(else_stmts)?;
@@ -199,7 +205,10 @@ impl<'b> FunctionCompiler<'b> {
         } else {
             // If there is no "else" block, we can just jump over the "if" block
             let post_if_index = self.instructions.len();
-            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index as u32));
+            self.update_instruction_at(
+                cond_jump_index,
+                Instruction::JumpIfFalse(post_if_index as u32),
+            );
         }
 
         Ok(())
@@ -254,17 +263,41 @@ impl<'b> FunctionCompiler<'b> {
                 self.instructions.push(op_instruction);
             }
 
-            Expr::FuncCall(name, args) => {
+            Expr::FunctionCall(name, args) => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
 
-                let Some(&call_slot) = self.compiler.fn_map.get(name) else {
+                let Some(call_slot) = self.function_map.get(name).copied() else {
                     panic!("Function {} not found", name);
                 };
 
-                self.instructions.push(Instruction::Call {
-                    call_slot: call_slot as u32,
+                self.instructions.push(Instruction::Call { call_slot });
+            }
+
+            Expr::ForeignFunctionCall {
+                module_name,
+                func_name,
+                args,
+            } => {
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+
+                let Some(call_slot) = self
+                    .dependencies
+                    .get(module_name)
+                    .and_then(|module| module.get_slot(func_name))
+                else {
+                    return Err(CompileError::UnknownForeignFunction {
+                        module: module_name.clone(),
+                        name: func_name.clone(),
+                    });
+                };
+
+                self.instructions.push(Instruction::ForeignCall {
+                    module_name: module_name.clone(),
+                    call_slot,
                 });
             }
         }

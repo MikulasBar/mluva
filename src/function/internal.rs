@@ -1,38 +1,36 @@
 use crate::errors::CompileError;
 use crate::{compiler::DataType, instruction::Instruction};
-use crate::ast::Stmt;
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct InternalFunctionDefinition {
-    pub name: String,
+
+/// Signiture of an in-language function without name
+#[derive(Debug, Clone)]
+pub struct InternalFunctionSigniture {
     pub return_type: DataType,
     pub params: Vec<(String, DataType)>,
-    pub body: Vec<Stmt>,
 }
 
-impl InternalFunctionDefinition {
-    pub fn new(
-        name: String,
-        return_type: DataType,
-        params: Vec<(String, DataType)>,
-        body: Vec<Stmt>,
-    ) -> Self {
-        InternalFunctionDefinition {
-            name,
+impl InternalFunctionSigniture {
+    pub fn new(return_type: DataType, params: Vec<(String, DataType)>) -> Self {
+        Self {
             return_type,
             params,
-            body,
         }
     }
-
-    pub fn check_arg_types(&self, arg_types: &[DataType]) -> Result<(), CompileError> {
+    
+    pub fn check_argument_types(&self, arg_types: &[DataType]) -> Result<(), CompileError> {
         if self.params.len() != arg_types.len() {
-            return Err(CompileError::WrongNumberOfArguments { expected: self.params.len(), found: arg_types.len() });
+            return Err(CompileError::WrongNumberOfArguments {
+                expected: self.params.len(),
+                found: arg_types.len(),
+            });
         }
 
         for (i, (_, param_type)) in self.params.iter().enumerate() {
             if &arg_types[i] != param_type {
-                return Err(CompileError::WrongType { expected: *param_type, found: arg_types[i] });
+                return Err(CompileError::WrongType {
+                    expected: *param_type,
+                    found: arg_types[i],
+                });
             }
         }
 

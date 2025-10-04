@@ -1,32 +1,26 @@
-use crate::bytecode::{bytecode_type::BytecodeType, serializable::BytecodeSerializable};
+use crate::bytecode::{serializable::BytecodeSerializable};
 
 const MAGIC: &[u8] = &[0x00, 0x08, b'm', b'v', 0x00, b'b', 0x08];
-const CURRENT_VERSION: u8 = 1;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BytecodeHeader {
     pub version: u8,
-    pub bc_type: BytecodeType,
+    pub main_slot: Option<u32>,
     pub function_count: u32,
-    pub text_block_offset: u32,
 }
 
 impl BytecodeHeader {
+    pub const CURRENT_VERSION: u8 = 1;
     const ERROR_NOT_ENOUGH_BYTES: &'static str = "Not enough bytes for header";
 
     pub fn new(
-        version: u8,
-        bc_type: BytecodeType,
+        main_slot: Option<u32>,
         function_count: u32,
-        block_buffer_size: u32,
     ) -> Self {
-        let header_size = MAGIC.len() as u32 + 1 + bc_type.byte_count() + 4 + 4;
-        let text_block_offset = header_size + block_buffer_size;
         BytecodeHeader {
-            version,
-            bc_type,
+            version: Self::CURRENT_VERSION,
+            main_slot,
             function_count,
-            text_block_offset,
         }
     }
 }
@@ -43,43 +37,26 @@ impl BytecodeSerializable for BytecodeHeader {
 
         *cursor += MAGIC.len();
 
-        if bytes.len() < *cursor + 1 {
-            return Err(Self::ERROR_NOT_ENOUGH_BYTES.to_string());
-        }
+        let version = u8::from_bytecode(bytes, cursor)?;
 
-        let version = bytes[*cursor];
-
-        if version != CURRENT_VERSION {
+        if version != Self::CURRENT_VERSION {
             return Err(format!("Unsupported bytecode version: {}", version));
         }
 
-        *cursor += 1;
-
-        let bc_type = BytecodeType::from_bytecode(bytes, cursor)?;
-
-        if bytes.len() < *cursor + 8 {
-            return Err(Self::ERROR_NOT_ENOUGH_BYTES.to_string());
-        }
-
-        let function_count = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
-        *cursor += 4;
-
-        let text_block_offset = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
-        *cursor += 4;
+        let main_slot = Option::<u32>::from_bytecode(bytes, cursor)?;
+        let function_count = u32::from_bytecode(bytes, cursor)?;
 
         Ok(BytecodeHeader {
             version,
-            bc_type,
+            main_slot,
             function_count,
-            text_block_offset,
         })
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
         buffer.extend_from_slice(MAGIC);
-        buffer.push(self.version);
-        self.bc_type.write_bytecode(buffer);
-        buffer.extend_from_slice(&self.function_count.to_le_bytes());
-        buffer.extend_from_slice(&self.text_block_offset.to_le_bytes());
+        self.version.write_bytecode(buffer);
+        self.main_slot.write_bytecode(buffer);
+        self.function_count.write_bytecode(buffer);
     }
 }

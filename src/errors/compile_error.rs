@@ -18,4 +18,9 @@ pub enum CompileError {
     FunctionNotFound(String),
     FunctionAlreadyDefined(String),
     VarRedeclaration(String),
+    ModuleNotFound(String),
+    UnknownForeignFunction {
+        module: String,
+        name: String
+    },
 }

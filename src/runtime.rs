@@ -1,48 +1,46 @@
-use crate::errors::InterpreterError;
-use crate::function::{InternalFunctionSource};
+use std::collections::HashMap;
+
+use crate::errors::RuntimeError;
+use crate::function::InternalFunctionSource;
 use crate::instruction::Instruction;
-use crate::executable_module::ExecutableModule;
+use crate::module::Module;
 use crate::value::Value;
 
-pub struct Interpreter {
-    main_slot: u32,
-    functions: Vec<InternalFunctionSource>,
+pub struct Runtime<'a> {
+    module: &'a Module,
+    dependencies: &'a HashMap<String, Module>,
     stack: Vec<Value>,
 }
 
-impl Interpreter {
-    pub fn new(source: ExecutableModule) -> Self {
-        let ExecutableModule {
-            functions,
-            main_slot,
-        } = source;
-
+impl<'a> Runtime<'a> {
+    pub fn new(module: &'a Module, dependencies: &'a HashMap<String, Module>) -> Self {
         Self {
-            functions: functions,
-            main_slot,
+            module,
+            dependencies,
             stack: vec![],
         }
     }
 
-    pub fn interpret(&mut self) -> Result<(), InterpreterError> {
-        let main_source = &self.functions[self.main_slot as usize];
-        let val = interpret_function(&self.functions, &mut self.stack, main_source)?;
-        println!("RETURN: {:?}", val);
+    pub fn execute(mut self) -> Result<Value, RuntimeError> {
+        let main_function = self.module.get_main_source().ok_or(RuntimeError::Other(
+            "Module is not executable (missing main function)".to_string(),
+        ))?;
 
-        Ok(())
+        let functions = self.module.get_sources();
+        let val = InternalFunctionRuntime::new(
+            self.dependencies,
+            functions,
+            &mut self.stack,
+            main_function,
+        )
+        .interpret()?;
+
+        Ok(val)
     }
-
 }
 
-fn interpret_function(
-    functions: &[InternalFunctionSource],
-    stack: &mut Vec<Value>,
-    source: &InternalFunctionSource,
-) -> Result<Value, InterpreterError> {
-    InternalFunctionInterpreter::new(&functions, stack, source).interpret()
-}
-
-struct InternalFunctionInterpreter<'a> {
+struct InternalFunctionRuntime<'a> {
+    dependencies: &'a HashMap<String, Module>,
     functions: &'a [InternalFunctionSource],
     stack: &'a mut Vec<Value>,
     index: usize,
@@ -50,13 +48,15 @@ struct InternalFunctionInterpreter<'a> {
     source: &'a InternalFunctionSource,
 }
 
-impl<'a> InternalFunctionInterpreter<'a> {
+impl<'a> InternalFunctionRuntime<'a> {
     pub fn new(
+        dependencies: &'a HashMap<String, Module>,
         functions: &'a [InternalFunctionSource],
         stack: &'a mut Vec<Value>,
         source: &'a InternalFunctionSource,
     ) -> Self {
         Self {
+            dependencies,
             functions,
             stack,
             source,
@@ -65,13 +65,11 @@ impl<'a> InternalFunctionInterpreter<'a> {
         }
     }
 
-    fn pop(&mut self) -> Result<Value, InterpreterError> {
-        self.stack
-            .pop()
-            .ok_or(InterpreterError::ValueStackUnderflow)
+    fn pop(&mut self) -> Result<Value, RuntimeError> {
+        self.stack.pop().ok_or(RuntimeError::ValueStackUnderflow)
     }
 
-    pub fn interpret(&mut self) -> Result<Value, InterpreterError> {
+    pub fn interpret(mut self) -> Result<Value, RuntimeError> {
         while self.index < self.source.body.len() {
             let instruction = &self.source.body[self.index];
             match *instruction {
@@ -93,8 +91,42 @@ impl<'a> InternalFunctionInterpreter<'a> {
 
                 Instruction::Call { call_slot } => {
                     let source = &self.functions[call_slot as usize];
-                    let result =
-                        interpret_function(self.functions, &mut self.stack, source)?;
+                    let result = InternalFunctionRuntime::new(
+                        self.dependencies,
+                        self.functions,
+                        &mut self.stack,
+                        source,
+                    )
+                    .interpret()?;
+                    self.stack.push(result);
+                }
+
+                Instruction::ForeignCall {
+                    ref module_name,
+                    call_slot,
+                } => {
+                    let module = self
+                        .dependencies
+                        .get(module_name)
+                        .ok_or(RuntimeError::Other(format!(
+                            "Missing dependency: {}",
+                            module_name
+                        )))?;
+
+                    let source = module.get_function_source_by_slot(call_slot).ok_or(
+                        RuntimeError::Other(format!(
+                            "Function slot {} not found in module {}",
+                            call_slot, module_name
+                        )),
+                    )?;
+
+                    let result = InternalFunctionRuntime::new(
+                        self.dependencies,
+                        self.functions,
+                        &mut self.stack,
+                        source,
+                    )
+                    .interpret()?;
                     self.stack.push(result);
                 }
 
@@ -137,18 +169,18 @@ impl<'a> InternalFunctionInterpreter<'a> {
             self.index += 1;
         }
 
-        Err(InterpreterError::FunctionDidNotReturn)
+        Err(RuntimeError::FunctionDidNotReturn)
     }
 
     fn apply_bin_op(
         &mut self,
-        op: fn(&Value, Value) -> Result<Value, InterpreterError>,
-    ) -> Result<(), InterpreterError> {
+        op: fn(&Value, Value) -> Result<Value, RuntimeError>,
+    ) -> Result<(), RuntimeError> {
         let a = self.pop()?;
         let b = self
             .stack
             .last_mut()
-            .ok_or(InterpreterError::ValueStackUnderflow)?;
+            .ok_or(RuntimeError::ValueStackUnderflow)?;
 
         *b = op(&*b, a)?;
 
@@ -157,30 +189,15 @@ impl<'a> InternalFunctionInterpreter<'a> {
 
     fn apply_un_op(
         &mut self,
-        op: fn(&Value) -> Result<Value, InterpreterError>,
-    ) -> Result<(), InterpreterError> {
+        op: fn(&Value) -> Result<Value, RuntimeError>,
+    ) -> Result<(), RuntimeError> {
         let a = self
             .stack
             .last_mut()
-            .ok_or(InterpreterError::ValueStackUnderflow)?;
+            .ok_or(RuntimeError::ValueStackUnderflow)?;
 
         *a = op(&*a)?;
 
         Ok(())
     }
-}
-
-fn get_args_from_stack(
-    stack: &mut Vec<Value>,
-    arg_count: usize,
-) -> Result<Vec<Value>, InterpreterError> {
-    if stack.len() < arg_count {
-        return Err(InterpreterError::ValueStackUnderflow);
-    }
-
-    // Split the stack to get the arguments
-    let args = stack.split_off(stack.len() - arg_count);
-    // Reverse the arguments to maintain the order
-    let args = args.into_iter().rev().collect::<Vec<_>>();
-    Ok(args)
 }

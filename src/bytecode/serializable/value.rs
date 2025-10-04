@@ -17,67 +17,32 @@ impl BytecodeSerializable for Value {
 
         match self {
             Value::Void => (),
-            Value::Bool(b) => buffer.push(*b as u8),
-            Value::Int(x) => {
-                buffer.extend_from_slice(&x.to_le_bytes());
-            }
-            Value::Float(x) => {
-                buffer.extend_from_slice(&x.to_le_bytes());
-            }
-            Value::String(s) => {
-                let len = s.len() as u32; // TODO: handle length exceeding u32::MAX
-                buffer.extend_from_slice(&len.to_le_bytes());
-                buffer.extend_from_slice(s.as_bytes());
-            }
+            Value::Bool(b) => b.write_bytecode(buffer),
+            Value::Int(x) => x.write_bytecode(buffer),
+            Value::Float(x) => x.write_bytecode(buffer),
+            Value::String(s) => s.write_bytecode(buffer),
         }
     }
 
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        if *cursor + 4 > bytes.len() {
-            return Err("Not enough bytes for Value type ID".to_string());
-        }
-
-        let type_id = bytes[*cursor];
-        *cursor += 1;
+        let type_id = u8::from_bytecode(bytes, cursor)?;
 
         match type_id {
             DataTypeId::VOID => Ok(Value::Void),
             DataTypeId::BOOL => {
-                if *cursor >= bytes.len() {
-                    return Err("Insufficient bytes for Bool".to_string());
-                }
-                let b = bytes[*cursor] != 0;
+                let b = bool::from_bytecode(bytes, cursor)?;
                 Ok(Value::Bool(b))
             }
             DataTypeId::INT => {
-                if *cursor + 4 > bytes.len() {
-                    return Err("Insufficient bytes for Int".to_string());
-                }
-                let x = i32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
-                *cursor += 4;
+                let x = i32::from_bytecode(bytes, cursor)?;
                 Ok(Value::Int(x))
             }
             DataTypeId::FLOAT => {
-                if *cursor + 8 > bytes.len() {
-                    return Err("Insufficient bytes for Float".to_string());
-                }
-                let x = f64::from_le_bytes(bytes[*cursor..*cursor + 8].try_into().unwrap());
-                *cursor += 8;
+                let x = f64::from_bytecode(bytes, cursor)?;
                 Ok(Value::Float(x))
             }
             DataTypeId::STRING => {
-                if *cursor + 4 > bytes.len() {
-                    return Err("Insufficient bytes for String length".to_string());
-                }
-                let len = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap()) as usize;
-                *cursor += 4;
-
-                if *cursor + len > bytes.len() {
-                    return Err("Insufficient bytes for String content".to_string());
-                }
-                let s = String::from_utf8(bytes[*cursor..*cursor + len].to_vec())
-                    .map_err(|e| e.to_string())?;
-                *cursor += len;
+                let s = String::from_bytecode(bytes, cursor)?;
                 Ok(Value::String(s))
             }
             _ => Err(format!("Unknown type identifier: {}", type_id)),

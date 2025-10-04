@@ -26,7 +26,9 @@ pub enum Token {
     Let,
     While,
     Return,
-    External,
+    External, // NOT USED
+    Import,
+
 
     ParenL,
     ParenR,
@@ -36,6 +38,7 @@ pub enum Token {
     BraceR,
     Comma,
     DotDot,
+    Colon,
 
     DataType(DataType),
     Ident(String),
