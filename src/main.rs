@@ -9,17 +9,20 @@ mod interpreter;
 mod value;
 mod module;
 
-use interpreter::Interpreter;
 use std::{
     io::{Read, Write},
 };
 
-// use crate::{compiler::compile_from_str_to_bc, executable_module::ExecutableModule};
+use crate::module::Module;
 
 fn main() {
-    // let mut input = String::new();
-    // let mut file = std::fs::File::open("test.mv").unwrap();
-    // file.read_to_string(&mut input).unwrap();
+    let mut input = String::new();
+    let mut file = std::fs::File::open("test.mv").unwrap();
+    file.read_to_string(&mut input).unwrap();
+
+    let module = Module::from_string(&input).expect("Failed to compile module");
+    let result = module.execute().expect("Failed to execute module");
+    println!("Result: {:?}", result);
 
     // let compile_result = compile_from_str_to_bc(&input);
 

@@ -4,7 +4,7 @@ use crate::{
     bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
     errors::{CompileError, RuntimeError},
-    function::{InternalFunctionSigniture, InternalFunctionSource},
+    function::{InternalFunctionSigniture, InternalFunctionSource}, interpreter::Interpreter, value::Value,
 };
 
 pub struct Module {
@@ -42,6 +42,15 @@ impl Module {
         self.main_slot.is_some()
     }
 
+    pub fn get_main_source(&self) -> Option<&InternalFunctionSource> {
+        let slot = self.main_slot?;
+        self.function_sources.get(slot as usize)
+    }
+
+    pub fn get_sources(&self) -> &[InternalFunctionSource] {
+        &self.function_sources
+    }
+
     pub fn from_string(input: &str) -> Result<Self, CompileError> {
         let tokens = tokenize(input)?;
         let ast = Parser::new(&tokens).parse()?;
@@ -51,19 +60,8 @@ impl Module {
         Ok(module)
     }
 
-    pub fn execute(&self) -> Result<(), RuntimeError> {
-        todo!();
-        
-        // if !self.is_executable() {
-        //     return Err(RuntimeError::Other(
-        //         "Module is not executable (missing main function)".to_string(),
-        //     ));
-        // }
-
-        // let executable_module = crate::executable_module::ExecutableModule::from_module(self)?;
-
-        // let mut interpreter = crate::interpreter::Interpreter::new(executable_module);
-        // interpreter.interpret()
+    pub fn execute(&self) -> Result<Value, RuntimeError> {
+        Interpreter::new(self).execute()
     }
 }
 

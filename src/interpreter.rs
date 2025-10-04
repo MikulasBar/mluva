@@ -1,45 +1,33 @@
 use crate::errors::RuntimeError;
 use crate::function::{InternalFunctionSource};
 use crate::instruction::Instruction;
-use crate::executable_module::ExecutableModule;
+use crate::module::Module;
 use crate::value::Value;
 
-pub struct Interpreter {
-    main_slot: u32,
-    functions: Vec<InternalFunctionSource>,
+pub struct Interpreter<'a> {
+    module: &'a Module,
     stack: Vec<Value>,
 }
 
-impl Interpreter {
-    pub fn new(source: ExecutableModule) -> Self {
-        let ExecutableModule {
-            functions,
-            main_slot,
-        } = source;
-
+impl<'a> Interpreter<'a> {
+    pub fn new(module: &'a Module) -> Self {
         Self {
-            functions: functions,
-            main_slot,
+            module,
             stack: vec![],
         }
     }
 
-    pub fn interpret(&mut self) -> Result<(), RuntimeError> {
-        let main_source = &self.functions[self.main_slot as usize];
-        let val = interpret_function(&self.functions, &mut self.stack, main_source)?;
-        println!("RETURN: {:?}", val);
+    pub fn execute(mut self) -> Result<Value, RuntimeError> {
+        let main_function = self.module.get_main_source().ok_or(
+            RuntimeError::Other("Module is not executable (missing main function)".to_string()),
+        )?;
 
-        Ok(())
+        let functions = self.module.get_sources();
+        let val = InternalFunctionInterpreter::new(functions, &mut self.stack, main_function).interpret()?;
+        
+        Ok(val)
     }
 
-}
-
-fn interpret_function(
-    functions: &[InternalFunctionSource],
-    stack: &mut Vec<Value>,
-    source: &InternalFunctionSource,
-) -> Result<Value, RuntimeError> {
-    InternalFunctionInterpreter::new(&functions, stack, source).interpret()
 }
 
 struct InternalFunctionInterpreter<'a> {
@@ -71,7 +59,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
             .ok_or(RuntimeError::ValueStackUnderflow)
     }
 
-    pub fn interpret(&mut self) -> Result<Value, RuntimeError> {
+    pub fn interpret(mut self) -> Result<Value, RuntimeError> {
         while self.index < self.source.body.len() {
             let instruction = &self.source.body[self.index];
             match *instruction {
@@ -94,7 +82,7 @@ impl<'a> InternalFunctionInterpreter<'a> {
                 Instruction::Call { call_slot } => {
                     let source = &self.functions[call_slot as usize];
                     let result =
-                        interpret_function(self.functions, &mut self.stack, source)?;
+                        InternalFunctionInterpreter::new(self.functions, &mut self.stack, source).interpret()?;
                     self.stack.push(result);
                 }
 
