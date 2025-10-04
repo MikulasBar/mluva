@@ -28,10 +28,21 @@ impl<'a> TypeChecker<'a> {
         for slot in 0..self.ast.function_count() {
             self.scope.enter();
 
-            let stmts = todo!();
-            let return_type = todo!();
+            self.ast
+                .get_function_signiture_by_slot(slot).unwrap()
+                .params.iter()
+                .try_for_each(|(name, data_type)| {
+                    self.scope.insert_new(name.clone(), data_type.clone())
+                })?;
 
-            self.check_stmts(stmts, return_type)?;
+            let statements = self.ast.get_function_body_by_slot(slot).unwrap();
+            let return_type = self
+                .ast
+                .get_function_signiture_by_slot(slot)
+                .unwrap()
+                .return_type;
+
+            self.check_stmts(statements, return_type)?;
 
             self.scope.exit();
         }

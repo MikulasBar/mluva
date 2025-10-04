@@ -7,15 +7,11 @@ mod parser;
 pub mod token;
 mod type_checker;
 
-use std::collections::HashMap;
-
 pub use compiler::Compiler;
 pub use data_type::DataType;
 pub use lexer::tokenize;
 pub use parser::Parser;
 pub use type_checker::TypeChecker;
-
-use crate::{errors::CompileError, executable_module::ExecutableModule};
 
 // pub fn compile_from_str(input: &str) -> Result<ExecutableModule, CompileError> {
 //     let tokens = tokenize(input)?;
