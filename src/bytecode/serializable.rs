@@ -83,11 +83,7 @@ impl BytecodeSerializable for usize {
 
 impl BytecodeSerializable for String {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        if *cursor + 4 > bytes.len() {
-            return Err("Not enough bytes for string length".to_string());
-        }
-        let len = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap()) as usize;
-        *cursor += 4;
+        let len = usize::from_bytecode(bytes, cursor)?;
 
         if *cursor + len > bytes.len() {
             return Err("Not enough bytes for string data".to_string());
@@ -99,8 +95,7 @@ impl BytecodeSerializable for String {
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
-        let len = self.len() as u32; // TODO: handle length exceeding u32::MAX
-        buffer.extend_from_slice(&len.to_le_bytes());
+        self.len().write_bytecode(buffer);
         buffer.extend_from_slice(self.as_bytes());
     }
 }

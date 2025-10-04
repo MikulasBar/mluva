@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
+    bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
     errors::{CompileError, RuntimeError},
     function::{InternalFunctionSigniture, InternalFunctionSource}, interpreter::Interpreter, value::Value,
@@ -65,11 +65,22 @@ impl Module {
 
         let tokens = tokenize(input)?;
         let ast = Parser::new(&tokens).parse()?;
-        
+
         TypeChecker::new(&ast, &dependencies).check()?;
         let module = Compiler::new(ast, &dependencies).compile()?;
 
         Ok(module)
+    }
+
+    // TODO: rename this to something more meaningful
+    pub fn from_bytecode_bytes(bytes: &[u8]) -> Result<Self, String> {
+        Self::from_bytecode(bytes, &mut 0)
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut buffer = Vec::new();
+        self.write_bytecode(&mut buffer);
+        buffer
     }
 
     pub fn execute(&self) -> Result<Value, RuntimeError> {
@@ -79,7 +90,26 @@ impl Module {
 
 impl BytecodeSerializable for Module {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        todo!()
+        let header = BytecodeHeader::from_bytecode(bytes, cursor)?;
+
+        let function_map = read_fn_map_bytecode(bytes, cursor, header.function_count as usize)?;
+
+        let mut function_signitures = Vec::with_capacity(header.function_count as usize);
+        for _ in 0..header.function_count {
+            function_signitures.push(InternalFunctionSigniture::from_bytecode(bytes, cursor)?);
+        }
+
+        let mut function_sources = Vec::with_capacity(header.function_count as usize);
+        for _ in 0..header.function_count {
+            function_sources.push(InternalFunctionSource::from_bytecode(bytes, cursor)?);
+        }
+
+        Ok(Self {
+            main_slot: header.main_slot,
+            function_map,
+            function_signitures,
+            function_sources,
+        })
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {

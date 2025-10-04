@@ -1,21 +1,20 @@
 use crate::{
-    bytecode::serializable::BytecodeSerializable, function::{InternalFunctionSigniture, InternalFunctionSource}, instruction::Instruction
+    bytecode::serializable::BytecodeSerializable, compiler::DataType, function::{InternalFunctionSigniture, InternalFunctionSource}, instruction::Instruction
 };
 
 impl BytecodeSerializable for InternalFunctionSigniture {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
-        todo!("Implementation needs refactoring of function definition struct")
-        // let return_type = DataType::from_bytecode(bytes, cursor)?;
-        // let param_count = usize::from_bytecode(bytes, cursor)?;
+        let return_type = DataType::from_bytecode(bytes, cursor)?;
+        let param_count = usize::from_bytecode(bytes, cursor)?;
 
-        // let mut params = Vec::with_capacity(param_count);
-        // for _ in 0..param_count {
-        //     let name = String::from_bytecode(bytes, cursor)?;
-        //     let datatype = DataType::from_bytecode(bytes, cursor)?;
-        //     params.push((name, datatype));
-        // }
+        let mut params = Vec::with_capacity(param_count);
+        for _ in 0..param_count {
+            let name = String::from_bytecode(bytes, cursor)?;
+            let datatype = DataType::from_bytecode(bytes, cursor)?;
+            params.push((name, datatype));
+        }
 
-        // Ok(InternalFunctionDefinition { return_type, params })
+        Ok(InternalFunctionSigniture { return_type, params })        
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
