@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     bytecode::{write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
-    errors::{CompileError, InterpreterError},
+    errors::{CompileError, RuntimeError},
     function::{InternalFunctionSigniture, InternalFunctionSource},
 };
 
@@ -51,11 +51,11 @@ impl Module {
         Ok(module)
     }
 
-    pub fn execute(&self) -> Result<(), InterpreterError> {
+    pub fn execute(&self) -> Result<(), RuntimeError> {
         todo!();
         
         // if !self.is_executable() {
-        //     return Err(InterpreterError::Other(
+        //     return Err(RuntimeError::Other(
         //         "Module is not executable (missing main function)".to_string(),
         //     ));
         // }

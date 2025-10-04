@@ -1,4 +1,4 @@
-use crate::errors::InterpreterError;
+use crate::errors::RuntimeError;
 use crate::function::{InternalFunctionSource};
 use crate::instruction::Instruction;
 use crate::executable_module::ExecutableModule;
@@ -24,7 +24,7 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&mut self) -> Result<(), InterpreterError> {
+    pub fn interpret(&mut self) -> Result<(), RuntimeError> {
         let main_source = &self.functions[self.main_slot as usize];
         let val = interpret_function(&self.functions, &mut self.stack, main_source)?;
         println!("RETURN: {:?}", val);
@@ -38,7 +38,7 @@ fn interpret_function(
     functions: &[InternalFunctionSource],
     stack: &mut Vec<Value>,
     source: &InternalFunctionSource,
-) -> Result<Value, InterpreterError> {
+) -> Result<Value, RuntimeError> {
     InternalFunctionInterpreter::new(&functions, stack, source).interpret()
 }
 
@@ -65,13 +65,13 @@ impl<'a> InternalFunctionInterpreter<'a> {
         }
     }
 
-    fn pop(&mut self) -> Result<Value, InterpreterError> {
+    fn pop(&mut self) -> Result<Value, RuntimeError> {
         self.stack
             .pop()
-            .ok_or(InterpreterError::ValueStackUnderflow)
+            .ok_or(RuntimeError::ValueStackUnderflow)
     }
 
-    pub fn interpret(&mut self) -> Result<Value, InterpreterError> {
+    pub fn interpret(&mut self) -> Result<Value, RuntimeError> {
         while self.index < self.source.body.len() {
             let instruction = &self.source.body[self.index];
             match *instruction {
@@ -137,18 +137,18 @@ impl<'a> InternalFunctionInterpreter<'a> {
             self.index += 1;
         }
 
-        Err(InterpreterError::FunctionDidNotReturn)
+        Err(RuntimeError::FunctionDidNotReturn)
     }
 
     fn apply_bin_op(
         &mut self,
-        op: fn(&Value, Value) -> Result<Value, InterpreterError>,
-    ) -> Result<(), InterpreterError> {
+        op: fn(&Value, Value) -> Result<Value, RuntimeError>,
+    ) -> Result<(), RuntimeError> {
         let a = self.pop()?;
         let b = self
             .stack
             .last_mut()
-            .ok_or(InterpreterError::ValueStackUnderflow)?;
+            .ok_or(RuntimeError::ValueStackUnderflow)?;
 
         *b = op(&*b, a)?;
 
@@ -157,12 +157,12 @@ impl<'a> InternalFunctionInterpreter<'a> {
 
     fn apply_un_op(
         &mut self,
-        op: fn(&Value) -> Result<Value, InterpreterError>,
-    ) -> Result<(), InterpreterError> {
+        op: fn(&Value) -> Result<Value, RuntimeError>,
+    ) -> Result<(), RuntimeError> {
         let a = self
             .stack
             .last_mut()
-            .ok_or(InterpreterError::ValueStackUnderflow)?;
+            .ok_or(RuntimeError::ValueStackUnderflow)?;
 
         *a = op(&*a)?;
 
@@ -173,9 +173,9 @@ impl<'a> InternalFunctionInterpreter<'a> {
 fn get_args_from_stack(
     stack: &mut Vec<Value>,
     arg_count: usize,
-) -> Result<Vec<Value>, InterpreterError> {
+) -> Result<Vec<Value>, RuntimeError> {
     if stack.len() < arg_count {
-        return Err(InterpreterError::ValueStackUnderflow);
+        return Err(RuntimeError::ValueStackUnderflow);
     }
 
     // Split the stack to get the arguments

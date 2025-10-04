@@ -1,5 +1,5 @@
 #[derive(Debug, Clone)]
-pub enum InterpreterError {
+pub enum RuntimeError {
     ValueStackUnderflow,
     DivisionByZero,
     Unknown,
