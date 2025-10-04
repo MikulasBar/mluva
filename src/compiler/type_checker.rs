@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
 use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
@@ -7,12 +9,12 @@ use crate::module::Module;
 
 pub struct TypeChecker<'a> {
     ast: &'a Ast,
-    dependencies: &'a [Module],
+    dependencies: &'a HashMap<String, Module>,
     scope: DataTypeScope,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(ast: &'a Ast, dependencies: &'a [Module]) -> Self {
+    pub fn new(ast: &'a Ast, dependencies: &'a HashMap<String, Module>) -> Self {
         Self {
             ast,
             dependencies,
@@ -174,7 +176,22 @@ impl<'a> TypeChecker<'a> {
                 Ok(signiture.return_type)
             },
 
-            Expr::ForeignFunctionCall { .. } => todo!(), // TODO: handle this
+            Expr::ForeignFunctionCall { module_name, func_name, args } => {
+                let signiture = self.dependencies
+                    .get(module_name)
+                    .ok_or_else(|| CompileError::ModuleNotFound(module_name.clone()))?
+                    .get_function_signiture(func_name)
+                    .ok_or_else(|| CompileError::FunctionNotFound(func_name.clone()))?;
+
+                let arg_types: Vec<DataType> = args
+                    .iter()
+                    .map(|arg| self.check_expr(arg))
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+
+                signiture.check_argument_types(&arg_types)?;
+
+                Ok(signiture.return_type)
+            },
 
             Expr::BinaryOp(op, a, b) => {
                 let a = self.check_expr(a)?;

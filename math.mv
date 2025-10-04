@@ -1,0 +1,4 @@
+
+Float add_float(Float a, Float b) {
+    return a + b
+}

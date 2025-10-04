@@ -86,6 +86,10 @@ impl<'a> InternalFunctionInterpreter<'a> {
                     self.stack.push(result);
                 }
 
+                Instruction::ForeignCall { ref module_name, call_slot } => {
+                    unimplemented!("Foreign function calls are not implemented yet: {}::{}", module_name, call_slot);
+                }
+
                 Instruction::Return => {
                     return Ok(self.pop()?);
                 }

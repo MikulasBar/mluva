@@ -27,5 +27,6 @@ pub enum Instruction {
     Jump(u32),
     JumpIfFalse(u32),
     Call { call_slot: u32 },
+    ForeignCall { module_name: String, call_slot: u32 },
     Return,
 }

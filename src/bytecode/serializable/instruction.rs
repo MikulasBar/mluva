@@ -26,6 +26,7 @@ impl InstructionId {
     const STORE: u8 = 20;
     const POP: u8 = 21;
     const PUSH: u8 = 22;
+    const FOREIGNCALL: u8 = 23;
 }
 
 fn get_id(instruction: &Instruction) -> u8 {
@@ -53,6 +54,7 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Store{..} => InstructionId::STORE,
         Instruction::Pop => InstructionId::POP,
         Instruction::Push(_) => InstructionId::PUSH,
+        Instruction::ForeignCall{..} => InstructionId::FOREIGNCALL,
     }
 }
 
@@ -67,6 +69,10 @@ impl BytecodeSerializable for Instruction {
             Instruction::Load { slot } => slot.write_bytecode(buffer),
             Instruction::Store { slot } => slot.write_bytecode(buffer),
             Instruction::Push(value) => value.write_bytecode(buffer),
+            Instruction::ForeignCall { module_name, call_slot } => {
+                module_name.write_bytecode(buffer);
+                call_slot.write_bytecode(buffer);
+            }
             _ => (),
         }
     }
@@ -117,6 +123,11 @@ impl BytecodeSerializable for Instruction {
                 let value = Value::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Push(value))
             },
+            InstructionId::FOREIGNCALL => {
+                let module_name = String::from_bytecode(bytes, cursor)?;
+                let call_slot = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::ForeignCall { module_name, call_slot })
+            }
             _ => Err(format!("Unknown instruction ID: {}", id)),
         }
     }

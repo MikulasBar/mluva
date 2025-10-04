@@ -1,9 +1,9 @@
 use core::panic;
 use std::collections::HashMap;
 
+use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
 use crate::errors::CompileError;
 use crate::function::{InternalFunctionSigniture, InternalFunctionSource};
-use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
 use crate::instruction::Instruction;
 
 use crate::module::Module;
@@ -11,18 +11,20 @@ use crate::value::Value;
 
 use super::DataType;
 
-pub struct Compiler {
+pub struct Compiler<'a> {
     sources: Vec<InternalFunctionSource>,
     ast: Ast,
+    dependencies: &'a HashMap<String, Module>,
 }
 
-impl Compiler {
-    pub fn new(ast: Ast) -> Self {
+impl<'a> Compiler<'a> {
+    pub fn new(ast: Ast, dependencies: &'a HashMap<String, Module>) -> Self {
         let function_count = ast.function_count() as usize;
 
         Self {
             sources: Vec::with_capacity(function_count),
             ast,
+            dependencies,
         }
     }
 
@@ -33,12 +35,7 @@ impl Compiler {
 
         let (function_map, function_signitures, ..) = self.ast.deconstruct();
         let main_slot = function_map.get("main").copied();
-        let module = Module::new(
-            main_slot,
-            function_map,
-            function_signitures,
-            self.sources,
-        );
+        let module = Module::new(main_slot, function_map, function_signitures, self.sources);
 
         Ok(module)
     }
@@ -48,7 +45,7 @@ impl Compiler {
         let signiture = self.ast.get_function_signiture_by_slot(slot).unwrap();
         let body = self.ast.get_function_body_by_slot(slot).unwrap();
 
-        let source = FunctionCompiler::new(function_map, body, signiture).compile()?;
+        let source = FunctionCompiler::new(self.dependencies, function_map, body, signiture).compile()?;
 
         self.sources.push(source);
 
@@ -57,6 +54,7 @@ impl Compiler {
 }
 
 struct FunctionCompiler<'b> {
+    dependencies: &'b HashMap<String, Module>,
     function_map: &'b HashMap<String, u32>,
     body: &'b [Stmt],
     signiture: &'b InternalFunctionSigniture,
@@ -68,11 +66,13 @@ struct FunctionCompiler<'b> {
 
 impl<'b> FunctionCompiler<'b> {
     fn new(
+        dependencies: &'b HashMap<String, Module>,
         function_map: &'b HashMap<String, u32>,
         body: &'b [Stmt],
         signiture: &'b InternalFunctionSigniture,
     ) -> Self {
         Self {
+            dependencies,
             function_map,
             body,
             signiture,
@@ -106,14 +106,17 @@ impl<'b> FunctionCompiler<'b> {
     fn compile(mut self) -> Result<InternalFunctionSource, CompileError> {
         self.setup_parameters();
         self.compile_stmts(&self.body)?;
-        
+
         // implicit return at the end of Void functions
         if let DataType::Void = self.signiture.return_type {
             self.instructions.push(Instruction::Push(Value::Void));
             self.instructions.push(Instruction::Return);
         }
 
-        Ok(InternalFunctionSource::new(self.locals.len(), self.instructions))
+        Ok(InternalFunctionSource::new(
+            self.locals.len(),
+            self.instructions,
+        ))
     }
 
     fn setup_parameters(&mut self) {
@@ -152,7 +155,7 @@ impl<'b> FunctionCompiler<'b> {
 
             Stmt::While(cond, stmts) => {
                 self.compile_while_statement(cond, stmts)?;
-            },
+            }
 
             Stmt::Return(expr) => {
                 self.compile_expr(expr)?;
@@ -163,7 +166,12 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_if_statement(&mut self, cond: &Expr, stmts: &[Stmt], else_stmts: Option<&[Stmt]>) -> Result<(), CompileError> {
+    fn compile_if_statement(
+        &mut self,
+        cond: &Expr,
+        stmts: &[Stmt],
+        else_stmts: Option<&[Stmt]>,
+    ) -> Result<(), CompileError> {
         // Compile the condition expression
         self.compile_expr(cond)?;
 
@@ -183,7 +191,10 @@ impl<'b> FunctionCompiler<'b> {
             let post_if_index = self.instructions.len();
             // jump from the if condition to the else block
             // we should jump over the whole if-else block, only if block
-            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index as u32));
+            self.update_instruction_at(
+                cond_jump_index,
+                Instruction::JumpIfFalse(post_if_index as u32),
+            );
 
             // Compile the statements in the "else" block
             self.compile_stmts(else_stmts)?;
@@ -194,7 +205,10 @@ impl<'b> FunctionCompiler<'b> {
         } else {
             // If there is no "else" block, we can just jump over the "if" block
             let post_if_index = self.instructions.len();
-            self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(post_if_index as u32));
+            self.update_instruction_at(
+                cond_jump_index,
+                Instruction::JumpIfFalse(post_if_index as u32),
+            );
         }
 
         Ok(())
@@ -258,12 +272,34 @@ impl<'b> FunctionCompiler<'b> {
                     panic!("Function {} not found", name);
                 };
 
-                self.instructions.push(Instruction::Call {
+                self.instructions.push(Instruction::Call { call_slot });
+            }
+
+            Expr::ForeignFunctionCall {
+                module_name,
+                func_name,
+                args,
+            } => {
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+
+                let Some(call_slot) = self
+                    .dependencies
+                    .get(module_name)
+                    .and_then(|module| module.get_slot(func_name))
+                else {
+                    return Err(CompileError::UnknownForeignFunction {
+                        module: module_name.clone(),
+                        name: func_name.clone(),
+                    });
+                };
+
+                self.instructions.push(Instruction::ForeignCall {
+                    module_name: module_name.clone(),
                     call_slot,
                 });
-            },
-
-            Expr::ForeignFunctionCall { .. } => todo!(), // TODO
+            }
         }
 
         Ok(())

@@ -51,11 +51,23 @@ impl Module {
         &self.function_sources
     }
 
+    pub fn get_function_signiture(&self, name: &str) -> Option<&InternalFunctionSigniture> {
+        let slot = self.function_map.get(name)?;
+        self.function_signitures.get(*slot as usize)
+    }
+
+    pub fn get_slot(&self, name: &str) -> Option<u32> {
+        self.function_map.get(name).copied()
+    }
+
     pub fn from_string(input: &str) -> Result<Self, CompileError> {
+        let dependencies = HashMap::new();
+
         let tokens = tokenize(input)?;
         let ast = Parser::new(&tokens).parse()?;
-        TypeChecker::new(&ast, &[]).check()?;
-        let module = Compiler::new(ast).compile()?;
+        
+        TypeChecker::new(&ast, &dependencies).check()?;
+        let module = Compiler::new(ast, &dependencies).compile()?;
 
         Ok(module)
     }
