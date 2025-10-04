@@ -2,7 +2,6 @@ mod ast;
 mod bytecode;
 mod compiler;
 mod errors;
-mod executable_module;
 mod function;
 mod instruction;
 mod interpreter;

@@ -157,18 +157,3 @@ impl<'a> InternalFunctionInterpreter<'a> {
         Ok(())
     }
 }
-
-fn get_args_from_stack(
-    stack: &mut Vec<Value>,
-    arg_count: usize,
-) -> Result<Vec<Value>, RuntimeError> {
-    if stack.len() < arg_count {
-        return Err(RuntimeError::ValueStackUnderflow);
-    }
-
-    // Split the stack to get the arguments
-    let args = stack.split_off(stack.len() - arg_count);
-    // Reverse the arguments to maintain the order
-    let args = args.into_iter().rev().collect::<Vec<_>>();
-    Ok(args)
-}
