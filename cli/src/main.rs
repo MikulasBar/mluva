@@ -1,9 +1,7 @@
 use std::{fs::File, io::Write, path::Path};
-
 use clap::Parser;
 
 use crate::{cli::Cli, commands::Commands, config::Config};
-
 mod cli;
 mod commands;
 mod config;
@@ -83,5 +81,31 @@ fn init_command() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_command() -> Result<(), Box<dyn std::error::Error>> {
-    
+    let config_file_path = Path::new(CONFIG_FILE);
+
+    if !config_file_path.is_file() {
+        return Err(format!("Configuration file '{CONFIG_FILE}' does not exist. Please run 'mluva init' first.").into());
+    }
+
+    let config_file = File::open(config_file_path)?;
+    let config: Config = serde_yaml::from_reader(config_file)?;
+
+    let root_module_path = Path::new(&config.root_module).with_extension("mv");
+
+    if !root_module_path.is_file() {
+        return Err(format!("Root module file '{}' does not exist.", root_module_path.display()).into());
+    }
+
+    let root_module_content = std::fs::read_to_string(&root_module_path)?;
+    println!("Running Mluva project '{}'", config.project_name);
+
+    let module = mluva::module::Module::from_string(&root_module_content)
+        .map_err(|e| format!("Failed to compile root module '{}': {:?}", root_module_path.display(), e))?;
+
+    let result = module.execute_without_dependencies()
+        .map_err(|e| format!("Failed to execute root module '{}': {:?}", root_module_path.display(), e))?;
+
+    println!("Execution result: {:?}", result);
+
+    Ok(())
 }
