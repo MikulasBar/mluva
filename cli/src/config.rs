@@ -18,6 +18,14 @@ impl Default for Config {
     }
 }
 
+impl Config {
+    pub fn load_from_file(path: &std::path::Path) -> Result<Self, Box<dyn std::error::Error>> {
+        let file = std::fs::File::open(path)?;
+        let config: Config = serde_yaml::from_reader(file)?;
+        Ok(config)
+    }
+}
+
 fn default_root_module() -> String {
     "main".to_string()
 }

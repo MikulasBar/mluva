@@ -1,111 +1,42 @@
-use std::{fs::File, io::Write, path::Path};
 use clap::Parser;
 
-use crate::{cli::Cli, commands::Commands, config::Config};
+use crate::{cli::Cli, commands::Commands};
 mod cli;
 mod commands;
 mod config;
+mod module_metadata;
 
 fn main() {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Init => {
-            if let Err(e) = init_command() {
+            if let Err(e) = commands::init::command() {
                 eprintln!("Error during init: {}", e);
             }
         },
 
         Commands::Run => {
-            if let Err(e) = run_command() {
+            if let Err(e) = commands::run::command() {
                 eprintln!("Error during run: {}", e);
+            }
+        },
+
+        Commands::Uninit => {
+            if let Err(e) = commands::uninit::command() {
+                eprintln!("Error during uninit: {}", e);
+            }
+        },
+
+        Commands::Build => {
+            if let Err(e) = commands::build::command() {
+                eprintln!("Error during build: {}", e);
             }
         },
     }
 }
 
-const META_DIR: &str = ".mluva";
-const CONFIG_FILE: &str = "mluva.yaml";
-const ROOT_MODULE_DEFAULT_CONTENT: &str = r#"# This is the root module of your Mluva project.
-# You can change the name of this file in the 'mluva.yaml' configuration file.
-# Happy coding!
-
-Float main() {
-    return 0.0
-}
-"#;
-
-fn check_if_project_initialized() -> Result<(), Box<dyn std::error::Error>> {
-    let meta_dir_path = Path::new(META_DIR);
-    let config_file_path = Path::new(CONFIG_FILE);
-    
-    if meta_dir_path.is_dir() {
-        return Err(format!("Meta directory '{META_DIR}' does already exist. Aborting init...").into());
-    }
-
-    if config_file_path.is_file() {
-        return Err(format!("Configuration file '{CONFIG_FILE}' does already exist. Aborting init...").into());
-    }
-
-    Ok(())
-}
 
 
-fn init_command() -> Result<(), Box<dyn std::error::Error>> {
-    let meta_dir_path = Path::new(META_DIR);
-    let config_file_path = Path::new(CONFIG_FILE);
 
-    check_if_project_initialized()?;
 
-    std::fs::create_dir_all(meta_dir_path)?;
-    let config_file = File::create(config_file_path)?;
-    let default_config = Config::default();
-
-    serde_yaml::to_writer(config_file, &default_config)?;
-
-    let root_module_path = Path::new(&default_config.root_module).with_extension("mv");
-
-    if root_module_path.exists() {
-        return Err(format!("Root module file '{}' does already exist.", root_module_path.display()).into());
-    }
-    
-    let mut root_module_file = File::create(&root_module_path)?;
-    root_module_file.write_all(ROOT_MODULE_DEFAULT_CONTENT.as_bytes())?;
-
-    println!("Initialized new Mluva project:");
-    println!("- Created directory '{}'", meta_dir_path.display());
-    println!("- Created configuration file '{}'", config_file_path.display());
-    println!("- Created root module file '{}'", root_module_path.display());
-
-    Ok(())
-}
-
-fn run_command() -> Result<(), Box<dyn std::error::Error>> {
-    let config_file_path = Path::new(CONFIG_FILE);
-
-    if !config_file_path.is_file() {
-        return Err(format!("Configuration file '{CONFIG_FILE}' does not exist. Please run 'mluva init' first.").into());
-    }
-
-    let config_file = File::open(config_file_path)?;
-    let config: Config = serde_yaml::from_reader(config_file)?;
-
-    let root_module_path = Path::new(&config.root_module).with_extension("mv");
-
-    if !root_module_path.is_file() {
-        return Err(format!("Root module file '{}' does not exist.", root_module_path.display()).into());
-    }
-
-    let root_module_content = std::fs::read_to_string(&root_module_path)?;
-    println!("Running Mluva project '{}'", config.project_name);
-
-    let module = mluva::module::Module::from_string(&root_module_content)
-        .map_err(|e| format!("Failed to compile root module '{}': {:?}", root_module_path.display(), e))?;
-
-    let result = module.execute_without_dependencies()
-        .map_err(|e| format!("Failed to execute root module '{}': {:?}", root_module_path.display(), e))?;
-
-    println!("Execution result: {:?}", result);
-
-    Ok(())
-}

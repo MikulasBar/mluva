@@ -9,3 +9,4 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 
 mluva = { path = ".." }
+base64 = "0.22.1"
