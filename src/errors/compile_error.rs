@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::compiler::{data_type::DataType, token::Token};
 
 
@@ -23,4 +25,28 @@ pub enum CompileError {
         module: String,
         name: String
     },
+}
+
+impl ToString for CompileError {
+    fn to_string(&self) -> String {
+        match self {
+            CompileError::UnexpectedChar(c) => format!("Unexpected character: '{}'", c),
+            CompileError::UnexpectedToken(t) => format!("Unexpected token: {:?}", t),
+            CompileError::UnexpectedEndOfInput => "Unexpected end of input".to_string(),
+            CompileError::WrongType { expected, found } => {
+                format!("Type mismatch: expected {:?}, found {:?}", expected, found)
+            }
+            CompileError::WrongNumberOfArguments { expected, found } => {
+                format!("Wrong number of arguments: expected {}, found {}", expected, found)
+            }
+            CompileError::VariableNotFound(name) => format!("Variable not found: {}", name),
+            CompileError::FunctionNotFound(name) => format!("Function not found: {}", name),
+            CompileError::FunctionAlreadyDefined(name) => format!("Function already defined: {}", name),
+            CompileError::VarRedeclaration(name) => format!("Variable redeclaration: {}", name),
+            CompileError::ModuleNotFound(name) => format!("Module not found: {}", name),
+            CompileError::UnknownForeignFunction { module, name } => {
+                format!("Unknown foreign function '{}' in module '{}'", name, module)
+            }
+        }
+    }
 }
