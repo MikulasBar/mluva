@@ -13,7 +13,7 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             project_name: "My Mluva Project".to_string(),
-            root_module: "main".to_string(),
+            root_module: default_root_module(),
         }
     }
 }

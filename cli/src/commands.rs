@@ -19,7 +19,6 @@ const MODULES_META_FILE: &str = "modules.yaml";
 const CONFIG_FILE: &str = "mluva.yaml";
 const ROOT_MODULE_DEFAULT_CONTENT: &str = r#"# This is the root module of your Mluva project.
 # You can change the name of this file in the 'mluva.yaml' configuration file.
-# Happy coding!
 
 Float main() {
     return 0.0

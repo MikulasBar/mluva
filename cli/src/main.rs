@@ -17,8 +17,9 @@ fn main() {
         },
 
         Commands::Run => {
-            if let Err(e) = commands::run::command() {
-                eprintln!("Error during run: {}", e);
+            let res = commands::run::command();
+            if let Err(e) = res {
+                eprintln!("{}", e);
             }
         },
 
@@ -29,8 +30,9 @@ fn main() {
         },
 
         Commands::Build => {
-            if let Err(e) = commands::build::command() {
-                eprintln!("Error during build: {}", e);
+            let res = commands::build::command();
+            if let Err(e) = res {
+                eprintln!("{}", e);
             }
         },
     }
