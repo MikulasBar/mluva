@@ -95,7 +95,6 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::Ident(module_name) in self);
                     expect_pat!(Token::EOL in self);
 
-                    println!("Importing module: {}", module_name);
                     let import_path = Path::single(module_name);
 
                     self.ast.add_import(import_path);

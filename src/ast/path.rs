@@ -12,4 +12,8 @@ impl Path {
     pub fn single(segment: String) -> Self {
         Self { segments: vec![segment] }
     }
+
+    pub fn get_tail(&self) -> Option<&String> {
+        self.segments.last()
+    }
 }

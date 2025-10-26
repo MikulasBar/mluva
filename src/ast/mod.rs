@@ -12,7 +12,7 @@ pub use path::Path;
 pub use statement::Stmt;
 pub use unary_op::UnaryOp;
 
-use crate::function::InternalFunctionSigniture;
+use crate::{compiler::{tokenize, Parser}, errors::CompileError, function::InternalFunctionSigniture};
 
 pub struct Ast {
     function_map: HashMap<String, u32>,
@@ -34,6 +34,13 @@ impl Ast {
             function_bodies,
             imports,
         }
+    }
+
+    pub fn from_string(source: &str) -> Result<Self, CompileError> {
+        let tokens = tokenize(source)?;
+        let ast = Parser::new(&tokens).parse()?;
+        
+        Ok(ast)
     }
 
     pub fn empty() -> Self {
@@ -84,6 +91,10 @@ impl Ast {
 
     pub fn get_function_map(&self) -> &HashMap<String, u32> {
         &self.function_map
+    }
+
+    pub fn get_imports(&self) -> &Vec<Path> {
+        &self.imports
     }
 
     pub fn deconstruct(self) -> (

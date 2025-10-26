@@ -76,6 +76,16 @@ impl Module {
         Ok(module)
     }
 
+    pub fn from_ast_and_dependencies(
+        ast: crate::ast::Ast,
+        dependencies: &HashMap<String, Module>,
+    ) -> Result<Self, CompileError> {
+        TypeChecker::new(&ast, dependencies).check()?;
+        let module = Compiler::new(ast, dependencies).compile()?;
+
+        Ok(module)
+    }
+
     // TODO: rename this to something more meaningful
     pub fn from_bytecode_bytes(bytes: &[u8]) -> Result<Self, String> {
         Self::from_bytecode(bytes, &mut 0)
