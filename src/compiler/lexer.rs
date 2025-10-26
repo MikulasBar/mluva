@@ -270,3 +270,61 @@ fn match_kw(ident: String) -> Token {
         _       => Token::Ident(ident)
     }
 }
+
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_tokenize() {
+        let input = "let x: Int = 42;\nif x > 10 {\nreturn 'Hello';\n}";
+        let tokens = tokenize(input).unwrap();
+        let expected_tokens = vec![
+            Token::Let,
+            Token::Ident("x".to_string()),
+            Token::Colon,
+            Token::DataType(DataType::Int),
+            Token::Assign,
+            Token::Int(42),
+            Token::EOL,
+            Token::If,
+            Token::Ident("x".to_string()),
+            Token::Greater,
+            Token::Int(10),
+            Token::BraceL,
+            Token::EOL,
+            Token::Return,
+            Token::StringLiteral("Hello".to_string()),
+            Token::EOL,
+            Token::BraceR,
+            Token::EOL,
+        ];
+
+        assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
+    fn test_tokenize_string() {
+        let input = "'Hello, World!'";
+        let mut chars = input.chars().peekable();
+        let token = tokenize_string(&mut chars);
+        let expected_token = Token::StringLiteral("Hello, World!".to_string());
+        assert_eq!(token, expected_token);
+    }
+
+    #[test]
+    fn test_tokenize_number() {
+        let input = "12345";
+        let mut chars = input.chars().peekable();
+        let token_int = tokenize_number(&mut chars);
+        let expected_token_int = Token::Int(12345);
+        assert_eq!(token_int, expected_token_int);
+
+        let input_float = "123.45";
+        let mut chars_float = input_float.chars().peekable();
+        let token_float = tokenize_number(&mut chars_float);
+        let expected_token_float = Token::Float(123.45);
+        assert_eq!(token_float, expected_token_float);
+    }
+}

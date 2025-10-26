@@ -14,6 +14,7 @@ pub use unary_op::UnaryOp;
 
 use crate::{compiler::{tokenize, Parser}, errors::CompileError, function::InternalFunctionSigniture};
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     function_map: HashMap<String, u32>,
     function_signitures: Vec<InternalFunctionSigniture>,

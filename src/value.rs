@@ -5,7 +5,7 @@ use std::fmt::Display;
 use super::compiler::data_type::DataType;
 use crate::errors::RuntimeError;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Void,
     Int(i32),

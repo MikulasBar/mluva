@@ -1,5 +1,5 @@
 
-
+#[derive(Debug, Clone, PartialEq)]
 pub struct Path {
     segments: Vec<String>,   
 }

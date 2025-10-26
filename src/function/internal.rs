@@ -3,7 +3,7 @@ use crate::{compiler::DataType, instruction::Instruction};
 
 
 /// Signiture of an in-language function without name
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InternalFunctionSigniture {
     pub return_type: DataType,
     pub params: Vec<(String, DataType)>,
