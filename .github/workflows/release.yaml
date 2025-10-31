@@ -1,0 +1,118 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  RUSTFLAGS: "-C target-cpu=native"
+
+jobs:
+  build:
+    name: Build CLI (matrix)
+    # needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache cargo registry & target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+
+      - name: Build release
+        run: cargo build -p cli --release
+
+      - name: Prepare dist dir
+        run: |
+          mkdir -p dist/bin
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp target/release/cli.exe dist/bin/mluva.exe
+          else
+            cp target/release/cli dist/bin/mluva
+            chmod +x dist/bin/mluva || true
+          fi
+
+      - name: Archive artifact
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            powershell -Command "Compress-Archive -Path dist\\* -DestinationPath release-${{ matrix.os }}.zip"
+          else
+            tar -czf release-${{ matrix.os }}.tar.gz -C dist .
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: |
+            release-${{ matrix.os }}.zip
+            release-${{ matrix.os }}.tar.gz
+
+  # Publish GitHub Release and attach artifacts
+  publish:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download ubuntu artifact
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: release-ubuntu-latest
+          path: artifacts/ubuntu || true
+
+      - name: Download macos artifact
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos-latest
+          path: artifacts/macos || true
+
+      - name: Download windows artifact
+        if: always()
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows-latest
+          path: artifacts/windows || true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            Automated release for ${{ github.ref_name }}.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release artifacts
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: |
+            artifacts/ubuntu/release-ubuntu-latest.tar.gz
+            artifacts/macos/release-macos-latest.tar.gz
+            artifacts/windows/release-windows-latest.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

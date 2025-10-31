@@ -1,5 +1,3 @@
-use std::fmt::Display;
-
 use crate::compiler::{data_type::DataType, token::Token};
 
 
