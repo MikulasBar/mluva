@@ -45,7 +45,8 @@ impl<'a> Compiler<'a> {
         let signiture = self.ast.get_function_signiture_by_slot(slot).unwrap();
         let body = self.ast.get_function_body_by_slot(slot).unwrap();
 
-        let source = FunctionCompiler::new(self.dependencies, function_map, body, signiture).compile()?;
+        let source =
+            FunctionCompiler::new(self.dependencies, function_map, body, signiture).compile()?;
 
         self.sources.push(source);
 
@@ -328,5 +329,168 @@ fn un_op_to_instruction(op: &UnaryOp) -> Instruction {
     match op {
         UnaryOp::Negate => Instruction::Negate,
         UnaryOp::Not => Instruction::Not,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::ast::Stmt;
+
+    #[test]
+    fn compile_stmts() {
+        let stmts = vec![
+            Stmt::VarDeclare(
+                Some(DataType::Int),
+                "a".to_string(),
+                Expr::Literal(Value::Int(10)),
+            ),
+            Stmt::VarDeclare(
+                None,
+                "b".to_string(),
+                Expr::Literal(Value::Int(20)),
+            ),
+            Stmt::VarAssign(
+                "a".to_string(),
+                Expr::BinaryOp(
+                    BinaryOp::Add,
+                    Box::new(Expr::Var("a".to_string())),
+                    Box::new(Expr::Var("b".to_string())),
+                ),
+            ),
+            Stmt::Expr(Expr::Var("a".to_string())),
+            Stmt::If(
+                Expr::BinaryOp(
+                    BinaryOp::Greater,
+                    Box::new(Expr::Var("a".to_string())),
+                    Box::new(Expr::Literal(Value::Int(15))),
+                ),
+                vec![Stmt::Expr(Expr::Literal(Value::Int(1)))],
+                Some(vec![Stmt::Expr(Expr::Literal(Value::Int(0)))]),
+            ),
+            Stmt::While(
+                Expr::BinaryOp(
+                    BinaryOp::Less,
+                    Box::new(Expr::Var("a".to_string())),
+                    Box::new(Expr::Literal(Value::Int(100))),
+                ),
+                vec![Stmt::VarAssign(
+                    "a".to_string(),
+                    Expr::BinaryOp(
+                        BinaryOp::Add,
+                        Box::new(Expr::Var("a".to_string())),
+                        Box::new(Expr::Literal(Value::Int(10))),
+                    ),
+                )],
+            ),
+        ];
+
+        let dependencies = HashMap::new();
+        let function_map = HashMap::new();
+        let signiture = InternalFunctionSigniture::new(DataType::Void, vec![]);
+
+        let mut compiler = FunctionCompiler::new(&dependencies, &function_map, &stmts, &signiture);
+
+        compiler.compile_stmts(&stmts).unwrap();
+
+
+        assert_eq!(
+            compiler.instructions,
+            vec![
+                Instruction::Push(Value::Int(10)),
+                Instruction::Store { slot: 0 },
+                Instruction::Push(Value::Int(20)),
+                Instruction::Store { slot: 1 },
+                Instruction::Load { slot: 0 },
+                Instruction::Load { slot: 1 },
+                Instruction::Add,
+                Instruction::Store { slot: 0 },
+                Instruction::Load { slot: 0 },
+                Instruction::Pop,
+                Instruction::Load { slot: 0 },
+                Instruction::Push(Value::Int(15)),
+                Instruction::Greater,
+                Instruction::JumpIfFalse(17),
+                Instruction::Push(Value::Int(1)),
+                Instruction::Pop,
+                Instruction::Jump(19),
+                Instruction::Push(Value::Int(0)),
+                Instruction::Pop,
+                Instruction::Load { slot: 0 },
+                Instruction::Push(Value::Int(100)),
+                Instruction::Less,
+                Instruction::JumpIfFalse(28),
+                Instruction::Load { slot: 0 },
+                Instruction::Push(Value::Int(10)),
+                Instruction::Add,
+                Instruction::Store { slot: 0 },
+                Instruction::Jump(19),
+            ]
+        );
+    }
+
+    #[test]
+    fn compile_expr() {
+        // Expression: -2 * (x + 7) - (20 % 6) / !(1 == 5)
+        let expr = Expr::BinaryOp(
+            BinaryOp::Sub,
+            Box::new(Expr::BinaryOp(
+                BinaryOp::Mul,
+                Box::new(Expr::UnaryOp(
+                    UnaryOp::Negate,
+                    Box::new(Expr::Literal(Value::Int(2))),
+                )),
+                Box::new(Expr::BinaryOp(
+                    BinaryOp::Add,
+                    Box::new(Expr::Var("x".to_string())),
+                    Box::new(Expr::Literal(Value::Int(7))),
+                )),
+            )),
+            Box::new(Expr::BinaryOp(
+                BinaryOp::Div,
+                Box::new(Expr::BinaryOp(
+                    BinaryOp::Modulo,
+                    Box::new(Expr::Literal(Value::Int(20))),
+                    Box::new(Expr::Literal(Value::Int(6))),
+                )),
+                Box::new(Expr::UnaryOp(
+                    UnaryOp::Not,
+                    Box::new(Expr::BinaryOp(
+                        BinaryOp::Equal,
+                        Box::new(Expr::Literal(Value::Int(1))),
+                        Box::new(Expr::Literal(Value::Int(5))),
+                    )),
+                )),
+            )),
+        );
+
+        let dependencies = HashMap::new();
+        let function_map = HashMap::new();
+        let signiture = InternalFunctionSigniture::new(DataType::Int, vec![]);
+
+        let mut compiler = FunctionCompiler::new(&dependencies, &function_map, &[], &signiture);
+
+        compiler.compile_expr(&expr).unwrap();
+
+        assert_eq!(
+            compiler.instructions,
+            vec![
+                Instruction::Push(Value::Int(2)),
+                Instruction::Negate,
+                Instruction::Load { slot: 0 },
+                Instruction::Push(Value::Int(7)),
+                Instruction::Add,
+                Instruction::Mul,
+                Instruction::Push(Value::Int(20)),
+                Instruction::Push(Value::Int(6)),
+                Instruction::Modulo,
+                Instruction::Push(Value::Int(1)),
+                Instruction::Push(Value::Int(5)),
+                Instruction::Equal,
+                Instruction::Not,
+                Instruction::Div,
+                Instruction::Sub,
+            ]
+        );
     }
 }
