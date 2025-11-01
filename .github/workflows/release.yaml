@@ -10,9 +10,15 @@ env:
   RUSTFLAGS: "-C target-cpu=native"
 
 jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yaml
+    secrets:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   build:
     name: Build CLI (matrix)
-    # needs: test
+    needs: ci
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
