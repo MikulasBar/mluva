@@ -1,6 +1,6 @@
 use super::data_type::DataType;
-use crate::errors::CompileError;
 use super::token::Token;
+use crate::errors::CompileError;
 use crate::str_pat;
 
 type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
@@ -8,13 +8,13 @@ type CharIter<'a> = std::iter::Peekable<std::str::Chars<'a>>;
 pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
     let mut tokens = vec![];
     let mut chars = input.chars().peekable();
-    
+
     while let Some(&char) = chars.peek() {
         let token = match char {
             // comment
             '#' => {
                 chars.next();
-                
+
                 while chars.peek().is_some() {
                     if let '\n' = chars.peek().unwrap() {
                         break;
@@ -24,31 +24,31 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                 }
 
                 chars.next();
-                
+
                 continue;
             }
 
             '\'' => tokenize_string(&mut chars),
-            
+
             ';' | '\n' => {
                 chars.next();
                 if let Some(&Token::EOL) | None = tokens.last() {
                     continue;
                 }
                 Token::EOL
-            },
+            }
 
             // whitespaces -> skip
             str_pat!(WS) => {
                 chars.next();
                 continue;
-            },
+            }
 
             '{' => {
                 chars.next();
                 Token::BraceL
             }
-            
+
             '}' => {
                 chars.next();
                 Token::BraceR
@@ -58,7 +58,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                 chars.next();
                 Token::ParenL
             }
-            
+
             ')' => {
                 chars.next();
                 Token::ParenR
@@ -68,7 +68,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                 chars.next();
                 Token::BracketL
             }
-            
+
             ']' => {
                 chars.next();
                 Token::BracketR
@@ -81,7 +81,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
 
             '.' => {
                 chars.next();
-                
+
                 if let Some('.') = chars.peek() {
                     chars.next();
                     Token::DotDot
@@ -99,7 +99,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                     Token::Not
                 }
             }
-            
+
             ':' => {
                 chars.next();
                 Token::Colon
@@ -114,7 +114,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                 } else {
                     Token::Assign
                 }
-            },
+            }
 
             '>' => {
                 chars.next();
@@ -155,32 +155,32 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
                     return Err(CompileError::UnexpectedChar(char));
                 }
             }
-            
+
             '+' => {
                 chars.next();
                 Token::Plus
-            },
-            
+            }
+
             '-' => {
                 chars.next();
                 Token::Minus
-            },
-            
+            }
+
             '*' => {
                 chars.next();
                 Token::Asterisk
-            },
-            
+            }
+
             '/' => {
                 chars.next();
                 Token::Slash
-            },
+            }
 
             '%' => {
                 chars.next();
                 Token::Modulo
-            },
-            
+            }
+
             str_pat!(NUM) => tokenize_number(&mut chars),
             str_pat!(IDENT) => tokenize_ident(&mut chars),
 
@@ -195,11 +195,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, CompileError> {
     Ok(tokens)
 }
 
-
 fn tokenize_string(chars: &mut CharIter) -> Token {
     chars.next(); // consume the opening quote
     let mut string = String::new();
-    
+
     while let Some(&ch) = chars.peek() {
         if ch == '\'' {
             chars.next(); // consume the closing quote
@@ -215,7 +214,7 @@ fn tokenize_string(chars: &mut CharIter) -> Token {
 
 fn tokenize_number(chars: &mut CharIter) -> Token {
     let mut number = String::new();
-    
+
     while let Some(&digit @ str_pat!(NUM)) = chars.peek() {
         number.push(digit);
         chars.next();
@@ -238,7 +237,7 @@ fn tokenize_number(chars: &mut CharIter) -> Token {
 
 fn tokenize_ident(chars: &mut CharIter) -> Token {
     let mut ident = String::new();
-    
+
     while let Some(&ch @ (str_pat!(IDENT) | str_pat!(NUM))) = chars.peek() {
         ident.push(ch);
         chars.next();
@@ -247,30 +246,28 @@ fn tokenize_ident(chars: &mut CharIter) -> Token {
     match_kw(ident)
 }
 
-
 fn match_kw(ident: String) -> Token {
     match ident.as_str() {
         "Int" => Token::DataType(DataType::Int),
         "Float" => Token::DataType(DataType::Float),
-        "Bool"  => Token::DataType(DataType::Bool),
+        "Bool" => Token::DataType(DataType::Bool),
         "String" => Token::DataType(DataType::String),
-        "Void"  => Token::DataType(DataType::Void),
+        "Void" => Token::DataType(DataType::Void),
 
-        "true"  => Token::Bool(true),
+        "true" => Token::Bool(true),
         "false" => Token::Bool(false),
-        
-        "let"   => Token::Let,
-        "if"    => Token::If,
-        "else"  => Token::Else,
+
+        "let" => Token::Let,
+        "if" => Token::If,
+        "else" => Token::Else,
         "while" => Token::While,
         "return" => Token::Return,
         // "external" => Token::External,
         "import" => Token::Import,
 
-        _       => Token::Ident(ident)
+        _ => Token::Ident(ident),
     }
 }
-
 
 #[cfg(test)]
 mod test {

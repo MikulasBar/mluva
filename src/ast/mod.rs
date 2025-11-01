@@ -12,7 +12,11 @@ pub use path::Path;
 pub use statement::Stmt;
 pub use unary_op::UnaryOp;
 
-use crate::{compiler::{tokenize, Parser}, errors::CompileError, function::InternalFunctionSigniture};
+use crate::{
+    compiler::{tokenize, Parser},
+    errors::CompileError,
+    function::InternalFunctionSigniture,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
@@ -40,7 +44,7 @@ impl Ast {
     pub fn from_string(source: &str) -> Result<Self, CompileError> {
         let tokens = tokenize(source)?;
         let ast = Parser::new(&tokens).parse()?;
-        
+
         Ok(ast)
     }
 
@@ -87,7 +91,9 @@ impl Ast {
     }
 
     pub fn get_function_body_by_slot(&self, slot: u32) -> Option<&[Stmt]> {
-        self.function_bodies.get(slot as usize).map(|v| v.as_slice())
+        self.function_bodies
+            .get(slot as usize)
+            .map(|v| v.as_slice())
     }
 
     pub fn get_function_map(&self) -> &HashMap<String, u32> {
@@ -98,7 +104,9 @@ impl Ast {
         &self.imports
     }
 
-    pub fn deconstruct(self) -> (
+    pub fn deconstruct(
+        self,
+    ) -> (
         HashMap<String, u32>,
         Vec<InternalFunctionSigniture>,
         Vec<Vec<Stmt>>,

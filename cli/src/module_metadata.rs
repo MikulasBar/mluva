@@ -76,7 +76,6 @@ impl ModuleMetadata {
     }
 }
 
-
 fn default_hashes() -> HashMap<String, String> {
     HashMap::new()
 }

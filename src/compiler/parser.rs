@@ -82,10 +82,7 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::BraceL in self);
 
                     let body = self.parse_stmts(Token::BraceR)?;
-                    let signiture = InternalFunctionSigniture::new(
-                        return_type,
-                        params,
-                    );
+                    let signiture = InternalFunctionSigniture::new(return_type, params);
                     self.ast.add_function(name, signiture, body);
                 }
 
@@ -551,13 +548,8 @@ mod test {
 
         let expected_ast = {
             let mut ast = Ast::empty();
-            let signiture = InternalFunctionSigniture::new(
-                DataType::Int,
-                vec![],
-            );
-            let body = vec![
-                Stmt::Return(Expr::Literal(Value::Int(42))),
-            ];
+            let signiture = InternalFunctionSigniture::new(DataType::Int, vec![]);
+            let body = vec![Stmt::Return(Expr::Literal(Value::Int(42)))];
             ast.add_function("main".to_string(), signiture, body);
             ast
         };
@@ -582,11 +574,7 @@ mod test {
         let stmts = parser.parse_stmts(Token::EOL).unwrap();
 
         let expected_stmts = vec![
-            Stmt::VarDeclare(
-                None,
-                "x".to_string(),
-                Expr::Literal(Value::Int(42)),
-            ),
+            Stmt::VarDeclare(None, "x".to_string(), Expr::Literal(Value::Int(42))),
             Stmt::Return(Expr::Var("x".to_string())),
         ];
 
@@ -626,16 +614,12 @@ mod test {
             ),
             Expr::FunctionCall(
                 "x".to_string(),
-                vec![
-                    Expr::Literal(Value::Int(7)),
-                    Expr::Literal(Value::Int(8)),
-                ],
+                vec![Expr::Literal(Value::Int(7)), Expr::Literal(Value::Int(8))],
             ),
         );
 
         assert_eq!(expr, expected_expr);
     }
-
 
     #[test]
     fn parse_args() {

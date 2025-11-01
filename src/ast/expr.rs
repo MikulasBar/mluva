@@ -1,5 +1,5 @@
-use crate::value::Value;
 use super::{binary_op::BinaryOp, UnaryOp};
+use crate::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -12,7 +12,7 @@ pub enum Expr {
         module_name: String,
         func_name: String,
         args: Vec<Expr>,
-    }
+    },
 }
 
 impl Expr {

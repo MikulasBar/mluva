@@ -49,12 +49,12 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Negate => InstructionId::NEGATE,
         Instruction::Jump(_) => InstructionId::JUMP,
         Instruction::JumpIfFalse(_) => InstructionId::JUMPIFFALSE,
-        Instruction::Call{..} => InstructionId::CALL,
-        Instruction::Load{..} => InstructionId::LOAD,
-        Instruction::Store{..} => InstructionId::STORE,
+        Instruction::Call { .. } => InstructionId::CALL,
+        Instruction::Load { .. } => InstructionId::LOAD,
+        Instruction::Store { .. } => InstructionId::STORE,
         Instruction::Pop => InstructionId::POP,
         Instruction::Push(_) => InstructionId::PUSH,
-        Instruction::ForeignCall{..} => InstructionId::FOREIGNCALL,
+        Instruction::ForeignCall { .. } => InstructionId::FOREIGNCALL,
     }
 }
 
@@ -69,7 +69,10 @@ impl BytecodeSerializable for Instruction {
             Instruction::Load { slot } => slot.write_bytecode(buffer),
             Instruction::Store { slot } => slot.write_bytecode(buffer),
             Instruction::Push(value) => value.write_bytecode(buffer),
-            Instruction::ForeignCall { module_name, call_slot } => {
+            Instruction::ForeignCall {
+                module_name,
+                call_slot,
+            } => {
                 module_name.write_bytecode(buffer);
                 call_slot.write_bytecode(buffer);
             }
@@ -102,31 +105,34 @@ impl BytecodeSerializable for Instruction {
             InstructionId::JUMP => {
                 let target = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Jump(target))
-            },
+            }
             InstructionId::JUMPIFFALSE => {
                 let target = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::JumpIfFalse(target))
-            },
+            }
             InstructionId::CALL => {
                 let call_slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Call { call_slot })
-            },
+            }
             InstructionId::LOAD => {
                 let slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Load { slot })
-            },
+            }
             InstructionId::STORE => {
                 let slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Store { slot })
-            },
+            }
             InstructionId::PUSH => {
                 let value = Value::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Push(value))
-            },
+            }
             InstructionId::FOREIGNCALL => {
                 let module_name = String::from_bytecode(bytes, cursor)?;
                 let call_slot = u32::from_bytecode(bytes, cursor)?;
-                Ok(Instruction::ForeignCall { module_name, call_slot })
+                Ok(Instruction::ForeignCall {
+                    module_name,
+                    call_slot,
+                })
             }
             _ => Err(format!("Unknown instruction ID: {}", id)),
         }

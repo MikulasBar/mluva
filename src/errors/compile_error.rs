@@ -1,28 +1,18 @@
 use crate::compiler::{data_type::DataType, token::Token};
 
-
 #[derive(Debug, Clone)]
 pub enum CompileError {
     UnexpectedChar(char),
     UnexpectedToken(Token),
     UnexpectedEndOfInput,
-    WrongType {
-        expected: DataType,
-        found: DataType,
-    },
-    WrongNumberOfArguments {
-        expected: usize,
-        found: usize,
-    },
+    WrongType { expected: DataType, found: DataType },
+    WrongNumberOfArguments { expected: usize, found: usize },
     VariableNotFound(String),
     FunctionNotFound(String),
     FunctionAlreadyDefined(String),
     VarRedeclaration(String),
     ModuleNotFound(String),
-    UnknownForeignFunction {
-        module: String,
-        name: String
-    },
+    UnknownForeignFunction { module: String, name: String },
 }
 
 impl ToString for CompileError {
@@ -35,11 +25,16 @@ impl ToString for CompileError {
                 format!("Type mismatch: expected {:?}, found {:?}", expected, found)
             }
             CompileError::WrongNumberOfArguments { expected, found } => {
-                format!("Wrong number of arguments: expected {}, found {}", expected, found)
+                format!(
+                    "Wrong number of arguments: expected {}, found {}",
+                    expected, found
+                )
             }
             CompileError::VariableNotFound(name) => format!("Variable not found: {}", name),
             CompileError::FunctionNotFound(name) => format!("Function not found: {}", name),
-            CompileError::FunctionAlreadyDefined(name) => format!("Function already defined: {}", name),
+            CompileError::FunctionAlreadyDefined(name) => {
+                format!("Function already defined: {}", name)
+            }
             CompileError::VarRedeclaration(name) => format!("Variable redeclaration: {}", name),
             CompileError::ModuleNotFound(name) => format!("Module not found: {}", name),
             CompileError::UnknownForeignFunction { module, name } => {

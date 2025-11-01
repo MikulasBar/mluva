@@ -1,5 +1,3 @@
-
-
 use std::fmt::Display;
 
 use super::compiler::data_type::DataType;
@@ -48,7 +46,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a < b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a < b)),
-            _ => Err(RuntimeError::TypeError)
+            _ => Err(RuntimeError::TypeError),
         }
     }
 
@@ -56,7 +54,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a <= b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a <= b)),
-            _ => Err(RuntimeError::TypeError)
+            _ => Err(RuntimeError::TypeError),
         }
     }
 
@@ -64,7 +62,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a > b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a > b)),
-            _ => Err(RuntimeError::TypeError)
+            _ => Err(RuntimeError::TypeError),
         }
     }
 
@@ -72,7 +70,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Bool(*a >= b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Bool(*a >= b)),
-            _ => Err(RuntimeError::TypeError)
+            _ => Err(RuntimeError::TypeError),
         }
     }
 
@@ -80,7 +78,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Int(a + b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Float(a + b)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
@@ -88,7 +86,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Int(a * b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Float(a * b)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
@@ -96,7 +94,7 @@ impl Value {
         match (self, rhs) {
             (Self::Int(a), Self::Int(b)) => Ok(Value::Int(a - b)),
             (Self::Float(a), Self::Float(b)) => Ok(Value::Float(a - b)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
@@ -107,14 +105,14 @@ impl Value {
                     return Err(RuntimeError::DivisionByZero);
                 }
                 Ok(Value::Int(a / b))
-            },
+            }
             (Self::Float(a), Self::Float(b)) => {
                 if b == 0.0 {
                     return Err(RuntimeError::DivisionByZero);
                 }
                 Ok(Value::Float(a / b))
-            },
-            _ => return Err(RuntimeError::TypeError)
+            }
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
@@ -125,35 +123,35 @@ impl Value {
                     return Err(RuntimeError::DivisionByZero);
                 }
                 Ok(Value::Int(a % b))
-            },
+            }
             (Self::Float(a), Self::Float(b)) => {
                 if b == 0.0 {
                     return Err(RuntimeError::DivisionByZero);
                 }
                 Ok(Value::Float(a % b))
-            },
-            _ => return Err(RuntimeError::Unknown)
+            }
+            _ => return Err(RuntimeError::Unknown),
         }
     }
 
     pub fn and(&self, rhs: Self) -> Result<Value, RuntimeError> {
         match (self, rhs) {
             (Self::Bool(a), Self::Bool(b)) => Ok(Value::Bool(*a && b)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
     pub fn or(&self, rhs: Self) -> Result<Value, RuntimeError> {
         match (self, rhs) {
             (Self::Bool(a), Self::Bool(b)) => Ok(Value::Bool(*a || b)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
     pub fn not(&self) -> Result<Value, RuntimeError> {
         match self {
             Self::Bool(a) => Ok(Value::Bool(!*a)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 
@@ -161,7 +159,7 @@ impl Value {
         match self {
             Self::Int(a) => Ok(Value::Int(-a)),
             Self::Float(a) => Ok(Value::Float(-a)),
-            _ => return Err(RuntimeError::TypeError)
+            _ => return Err(RuntimeError::TypeError),
         }
     }
 }

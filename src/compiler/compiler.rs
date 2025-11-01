@@ -345,11 +345,7 @@ mod test {
                 "a".to_string(),
                 Expr::Literal(Value::Int(10)),
             ),
-            Stmt::VarDeclare(
-                None,
-                "b".to_string(),
-                Expr::Literal(Value::Int(20)),
-            ),
+            Stmt::VarDeclare(None, "b".to_string(), Expr::Literal(Value::Int(20))),
             Stmt::VarAssign(
                 "a".to_string(),
                 Expr::BinaryOp(
@@ -392,7 +388,6 @@ mod test {
         let mut compiler = FunctionCompiler::new(&dependencies, &function_map, &stmts, &signiture);
 
         compiler.compile_stmts(&stmts).unwrap();
-
 
         assert_eq!(
             compiler.instructions,

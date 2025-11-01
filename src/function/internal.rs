@@ -1,7 +1,6 @@
 use crate::errors::CompileError;
 use crate::{compiler::DataType, instruction::Instruction};
 
-
 /// Signiture of an in-language function without name
 #[derive(Debug, Clone, PartialEq)]
 pub struct InternalFunctionSigniture {
@@ -16,7 +15,7 @@ impl InternalFunctionSigniture {
             params,
         }
     }
-    
+
     pub fn check_argument_types(&self, arg_types: &[DataType]) -> Result<(), CompileError> {
         if self.params.len() != arg_types.len() {
             return Err(CompileError::WrongNumberOfArguments {

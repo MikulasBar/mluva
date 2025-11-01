@@ -31,8 +31,10 @@ impl<'a> TypeChecker<'a> {
             self.scope.enter();
 
             self.ast
-                .get_function_signiture_by_slot(slot).unwrap()
-                .params.iter()
+                .get_function_signiture_by_slot(slot)
+                .unwrap()
+                .params
+                .iter()
                 .try_for_each(|(name, data_type)| {
                     self.scope.insert_new(name.clone(), data_type.clone())
                 })?;
@@ -52,11 +54,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmts(
-        &mut self,
-        stmts: &[Stmt],
-        return_type: DataType,
-    ) -> Result<(), CompileError> {
+    fn check_stmts(&mut self, stmts: &[Stmt], return_type: DataType) -> Result<(), CompileError> {
         for s in stmts {
             self.check_stmt(s, return_type)?;
         }
@@ -64,11 +62,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmt(
-        &mut self,
-        stmt: &Stmt,
-        return_type: DataType,
-    ) -> Result<(), CompileError> {
+    fn check_stmt(&mut self, stmt: &Stmt, return_type: DataType) -> Result<(), CompileError> {
         match stmt {
             Stmt::If(cond, stmts, else_stmts) => {
                 let cond = self.check_expr(cond)?;
@@ -174,10 +168,15 @@ impl<'a> TypeChecker<'a> {
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
-            },
+            }
 
-            Expr::ForeignFunctionCall { module_name, func_name, args } => {
-                let signiture = self.dependencies
+            Expr::ForeignFunctionCall {
+                module_name,
+                func_name,
+                args,
+            } => {
+                let signiture = self
+                    .dependencies
                     .get(module_name)
                     .ok_or_else(|| CompileError::ModuleNotFound(module_name.clone()))?
                     .get_function_signiture(func_name)
@@ -191,7 +190,7 @@ impl<'a> TypeChecker<'a> {
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
-            },
+            }
 
             Expr::BinaryOp(op, a, b) => {
                 let a = self.check_expr(a)?;

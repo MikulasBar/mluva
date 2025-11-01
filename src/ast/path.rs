@@ -1,7 +1,6 @@
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Path {
-    segments: Vec<String>,   
+    segments: Vec<String>,
 }
 
 impl Path {
@@ -10,7 +9,9 @@ impl Path {
     }
 
     pub fn single(segment: String) -> Self {
-        Self { segments: vec![segment] }
+        Self {
+            segments: vec![segment],
+        }
     }
 
     pub fn get_tail(&self) -> Option<&String> {

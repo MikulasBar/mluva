@@ -10,9 +10,12 @@ pub fn command() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!("This will permanently delete all project configuration.");
-    print!("To confirm, type the project name '{}': ", config.project_name);
+    print!(
+        "To confirm, type the project name '{}': ",
+        config.project_name
+    );
     std::io::stdout().flush()?;
-    
+
     let mut input = String::new();
     std::io::stdin().read_line(&mut input)?;
 
@@ -26,7 +29,10 @@ pub fn command() -> Result<(), Box<dyn std::error::Error>> {
     if meta_dir_path.is_dir() {
         std::fs::remove_dir_all(meta_dir_path)?;
     } else {
-        println!("Meta directory '{}' does not exist. Skipping removal.", meta_dir_path.display());
+        println!(
+            "Meta directory '{}' does not exist. Skipping removal.",
+            meta_dir_path.display()
+        );
     }
 
     std::fs::remove_file(config_file_path)?;

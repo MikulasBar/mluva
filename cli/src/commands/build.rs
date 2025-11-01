@@ -41,7 +41,7 @@ pub fn command() -> Result<(Config, HashMap<String, Module>), Box<dyn std::error
         &mut module_hashes,
         &mut parent_stack,
     )?;
-    
+
     module_hashes.save_to_file(&module_meta_file)?;
     println!("Build completed!");
 
@@ -54,7 +54,8 @@ fn compile_module(
     module_metadata: &mut ModuleMetadata,
     parent_stack: &mut Vec<String>, // TODO: change to something that is not O(n) on search but has ordering
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let source_path = Path::new(source_module).with_extension("mv")
+    let source_path = Path::new(source_module)
+        .with_extension("mv")
         .to_string_lossy()
         .to_string();
 
@@ -82,9 +83,14 @@ fn compile_module(
         // TODO: resolve full path
         let import_path_str = import.get_tail().unwrap();
         let import_path = Path::new(import_path_str).with_extension("mv");
-        
+
         if !import_path.exists() {
-            return Err(format!("Dependecy module {} of module {} not found", import_path.display(), source_path).into());
+            return Err(format!(
+                "Dependecy module {} of module {} not found",
+                import_path.display(),
+                source_path
+            )
+            .into());
         }
 
         compile_module(
@@ -96,17 +102,17 @@ fn compile_module(
     }
 
     let modules_dir = Path::new(META_DIR).join("modules");
-    
+
     std::fs::create_dir_all(&modules_dir)?;
-    
+
     let bytecode_filename = ModuleMetadata::source_to_bytecode_filename(&source_path);
     let bytecode_path = modules_dir.join(&bytecode_filename);
 
     let needs_compilation = module_metadata.needs_recompilation(&source_path, &content);
-    
+
     if needs_compilation || !bytecode_path.exists() {
-        let module = Module::from_ast_and_dependencies(ast, compiled_modules)
-            .map_err(|e| e.to_string())?;
+        let module =
+            Module::from_ast_and_dependencies(ast, compiled_modules).map_err(|e| e.to_string())?;
 
         let bytecode = module.to_bytecode();
 
@@ -117,8 +123,7 @@ fn compile_module(
     } else {
         // load from cached bytecode
         let bytecode = std::fs::read(&bytecode_path)?;
-        let module = Module::from_bytecode_bytes(&bytecode)
-            .map_err(|e| e.to_string())?;
+        let module = Module::from_bytecode_bytes(&bytecode).map_err(|e| e.to_string())?;
         compiled_modules.insert(source_module.to_string(), module);
     }
 

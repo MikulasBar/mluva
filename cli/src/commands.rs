@@ -1,10 +1,9 @@
+pub mod build;
 pub mod init;
 pub mod run;
 pub mod uninit;
-pub mod build;
 
 use clap::Subcommand;
-
 
 #[derive(Subcommand)]
 pub enum Commands {

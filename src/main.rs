@@ -4,13 +4,17 @@ mod compiler;
 mod errors;
 mod function;
 mod instruction;
+mod module;
 mod runtime;
 mod value;
-mod module;
 
 use std::collections::HashMap;
 
-use crate::{compiler::{tokenize, Compiler, Parser, TypeChecker}, module::Module, runtime::Runtime};
+use crate::{
+    compiler::{tokenize, Compiler, Parser, TypeChecker},
+    module::Module,
+    runtime::Runtime,
+};
 
 fn main() {
     // let input = std::fs::read_to_string("test.mv").unwrap();
@@ -26,7 +30,6 @@ fn main() {
     // let result_from_bc = module_from_bc.execute_without_dependencies().expect("Failed to execute module from bytecode");
     // println!("Result from bytecode: {:?}", result_from_bc);
 
-
     let math_input = std::fs::read_to_string("math.mv").unwrap();
     let math_module = Module::from_string(&math_input).expect("Failed to compile module");
     let mut dependencies = HashMap::new();
@@ -39,7 +42,9 @@ fn main() {
     TypeChecker::new(&ast, &dependencies).check().unwrap();
     let module = Compiler::new(ast, &dependencies).compile().unwrap();
 
-    let result = Runtime::new(&module, &dependencies).execute().expect("Failed to execute module");
+    let result = Runtime::new(&module, &dependencies)
+        .execute()
+        .expect("Failed to execute module");
     println!("Result: {:?}", result);
 
     // let compile_result = compile_from_str_to_bc(&input);

@@ -4,7 +4,9 @@ use crate::{
     bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
     errors::{CompileError, RuntimeError},
-    function::{InternalFunctionSigniture, InternalFunctionSource}, runtime::Runtime, value::Value,
+    function::{InternalFunctionSigniture, InternalFunctionSource},
+    runtime::Runtime,
+    value::Value,
 };
 
 pub struct Module {
