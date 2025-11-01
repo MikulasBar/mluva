@@ -14,6 +14,7 @@ pub enum CompileError {
     ModuleNotFound(String),
     UnknownForeignFunction { module: String, name: String },
     ReservedFunctionName(String),
+    Other(String),
 }
 
 impl ToString for CompileError {
@@ -44,6 +45,7 @@ impl ToString for CompileError {
             CompileError::ReservedFunctionName(name) => {
                 format!("'{}' is a reserved function name", name)
             }
+            CompileError::Other(msg) => msg.clone(),
         }
     }
 }

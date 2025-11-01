@@ -1,3 +1,5 @@
+use std::str::FromStr as _;
+
 use crate::{
     ast::BuiltinFunction, bytecode::BytecodeSerializable, instruction::Instruction, value::Value,
 };
@@ -150,8 +152,7 @@ impl BytecodeSerializable for Instruction {
             InstructionId::BUILTINCALL => {
                 let function_name = String::from_bytecode(bytes, cursor)?;
                 let arg_count = u32::from_bytecode(bytes, cursor)?;
-                let function = BuiltinFunction::from_str(&function_name)
-                    .ok_or_else(|| format!("Unknown builtin function name: {}", function_name))?;
+                let function = BuiltinFunction::from_str(&function_name)?;
                 Ok(Instruction::BuiltinFunctionCall {
                     function,
                     arg_count,

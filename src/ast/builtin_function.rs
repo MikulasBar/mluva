@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
 use crate::{errors::RuntimeError, value::Value};
 
@@ -10,15 +10,6 @@ pub enum BuiltinFunction {
 }
 
 impl BuiltinFunction {
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "print" => Some(BuiltinFunction::Print),
-            "assert" => Some(BuiltinFunction::Assert),
-            "format" => Some(BuiltinFunction::Format),
-            _ => None,
-        }
-    }
-
     pub fn as_str(&self) -> &'static str {
         match self {
             BuiltinFunction::Print => "print",
@@ -61,6 +52,19 @@ impl BuiltinFunction {
                 }
                 Ok(Value::String(result))
             }
+        }
+    }
+}
+
+impl FromStr for BuiltinFunction {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "print" => Ok(BuiltinFunction::Print),
+            "assert" => Ok(BuiltinFunction::Assert),
+            "format" => Ok(BuiltinFunction::Format),
+            _ => Err("Not a builtin function".to_string()),
         }
     }
 }

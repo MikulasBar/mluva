@@ -106,6 +106,8 @@ impl Ast {
         &self.imports
     }
 
+    // we need to deconstruct these
+    #[allow(clippy::type_complexity)]
     pub fn deconstruct(
         self,
     ) -> (

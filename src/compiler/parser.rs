@@ -1,3 +1,5 @@
+use std::str::FromStr as _;
+
 use super::token::Token;
 use super::DataType;
 use crate::ast::*;
