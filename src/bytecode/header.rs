@@ -1,4 +1,4 @@
-use crate::bytecode::{serializable::BytecodeSerializable};
+use crate::bytecode::serializable::BytecodeSerializable;
 
 const MAGIC: &[u8] = &[0x00, 0x08, b'm', b'v', 0x00, b'b', 0x08];
 
@@ -13,10 +13,7 @@ impl BytecodeHeader {
     pub const CURRENT_VERSION: u8 = 1;
     const ERROR_NOT_ENOUGH_BYTES: &'static str = "Not enough bytes for header";
 
-    pub fn new(
-        main_slot: Option<u32>,
-        function_count: u32,
-    ) -> Self {
+    pub fn new(main_slot: Option<u32>, function_count: u32) -> Self {
         BytecodeHeader {
             version: Self::CURRENT_VERSION,
             main_slot,

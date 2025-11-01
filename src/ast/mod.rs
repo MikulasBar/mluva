@@ -1,4 +1,5 @@
 mod binary_op;
+mod builtin_function;
 mod expr;
 mod path;
 mod statement;
@@ -7,13 +8,19 @@ mod unary_op;
 use std::collections::HashMap;
 
 pub use binary_op::BinaryOp;
+pub use builtin_function::BuiltinFunction;
 pub use expr::Expr;
 pub use path::Path;
 pub use statement::Stmt;
 pub use unary_op::UnaryOp;
 
-use crate::function::InternalFunctionSigniture;
+use crate::{
+    compiler::{tokenize, Parser},
+    errors::CompileError,
+    function::InternalFunctionSigniture,
+};
 
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     function_map: HashMap<String, u32>,
     function_signitures: Vec<InternalFunctionSigniture>,
@@ -34,6 +41,13 @@ impl Ast {
             function_bodies,
             imports,
         }
+    }
+
+    pub fn from_string(source: &str) -> Result<Self, CompileError> {
+        let tokens = tokenize(source)?;
+        let ast = Parser::new(&tokens).parse()?;
+
+        Ok(ast)
     }
 
     pub fn empty() -> Self {
@@ -79,14 +93,24 @@ impl Ast {
     }
 
     pub fn get_function_body_by_slot(&self, slot: u32) -> Option<&[Stmt]> {
-        self.function_bodies.get(slot as usize).map(|v| v.as_slice())
+        self.function_bodies
+            .get(slot as usize)
+            .map(|v| v.as_slice())
     }
 
     pub fn get_function_map(&self) -> &HashMap<String, u32> {
         &self.function_map
     }
 
-    pub fn deconstruct(self) -> (
+    pub fn get_imports(&self) -> &Vec<Path> {
+        &self.imports
+    }
+
+    // we need to deconstruct these
+    #[allow(clippy::type_complexity)]
+    pub fn deconstruct(
+        self,
+    ) -> (
         HashMap<String, u32>,
         Vec<InternalFunctionSigniture>,
         Vec<Vec<Stmt>>,

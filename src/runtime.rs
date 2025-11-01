@@ -130,6 +130,20 @@ impl<'a> InternalFunctionRuntime<'a> {
                     self.stack.push(result);
                 }
 
+                Instruction::BuiltinFunctionCall {
+                    ref function,
+                    arg_count,
+                } => {
+                    let mut args = Vec::with_capacity(arg_count as usize);
+                    for _ in 0..arg_count {
+                        args.push(self.pop()?);
+                    }
+                    args.reverse();
+
+                    let result = function.execute(args)?;
+                    self.stack.push(result);
+                }
+
                 Instruction::Return => {
                     return Ok(self.pop()?);
                 }

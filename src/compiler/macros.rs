@@ -1,10 +1,7 @@
-
-
-
 #[macro_export]
 macro_rules! str_pat {
     (WS) => {
-        ' ' | '\n' | '\r' | '\t'
+        ' ' | '\r' | '\t'
     };
 
     (EOL) => {
@@ -23,28 +20,19 @@ macro_rules! str_pat {
 #[macro_export]
 macro_rules! bin_op_pat {
     (COMPARISON) => {
-        BinaryOp::Equal
-        | BinaryOp::NotEqual
+        BinaryOp::Equal | BinaryOp::NotEqual
     };
 
     (NUMERIC) => {
-        BinaryOp::Add
-        | BinaryOp::Sub
-        | BinaryOp::Mul
-        | BinaryOp::Div
-        | BinaryOp::Modulo
+        BinaryOp::Add | BinaryOp::Sub | BinaryOp::Mul | BinaryOp::Div | BinaryOp::Modulo
     };
 
     (NUMERIC_COMPARISON) => {
-        BinaryOp::Less
-        | BinaryOp::LessEqual
-        | BinaryOp::Greater
-        | BinaryOp::GreaterEqual
+        BinaryOp::Less | BinaryOp::LessEqual | BinaryOp::Greater | BinaryOp::GreaterEqual
     };
 
     (LOGICAL) => {
-        BinaryOp::And
-        | BinaryOp::Or
+        BinaryOp::And | BinaryOp::Or
     };
 }
 
@@ -63,10 +51,3 @@ macro_rules! expect_pat {
         };
     };
 }
-
-
-pub use {
-    str_pat,
-    bin_op_pat,
-    expect_pat,
-};

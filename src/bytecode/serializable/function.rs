@@ -1,5 +1,8 @@
 use crate::{
-    bytecode::serializable::BytecodeSerializable, compiler::DataType, function::{InternalFunctionSigniture, InternalFunctionSource}, instruction::Instruction
+    bytecode::serializable::BytecodeSerializable,
+    compiler::DataType,
+    function::{InternalFunctionSigniture, InternalFunctionSource},
+    instruction::Instruction,
 };
 
 impl BytecodeSerializable for InternalFunctionSigniture {
@@ -14,7 +17,10 @@ impl BytecodeSerializable for InternalFunctionSigniture {
             params.push((name, datatype));
         }
 
-        Ok(InternalFunctionSigniture { return_type, params })        
+        Ok(InternalFunctionSigniture {
+            return_type,
+            params,
+        })
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {

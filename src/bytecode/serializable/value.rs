@@ -1,5 +1,5 @@
-use crate::{bytecode::BytecodeSerializable, value::Value};
 use super::data_type::DataTypeId;
+use crate::{bytecode::BytecodeSerializable, value::Value};
 
 fn get_id(value: &Value) -> u8 {
     match value {

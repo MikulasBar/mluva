@@ -8,12 +8,6 @@ pub struct ModuleMetadata {
 }
 
 impl ModuleMetadata {
-    pub fn new() -> Self {
-        Self {
-            hashes: HashMap::new(),
-        }
-    }
-
     pub fn save_to_file(&self, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
         let content = serde_yaml::to_string(self)?;
         std::fs::write(path, content)?;
@@ -25,16 +19,6 @@ impl ModuleMetadata {
         let content = std::fs::read_to_string(path)?;
         let hashes: Self = serde_yaml::from_str(&content)?;
         Ok(hashes)
-    }
-
-    /// Convert bytecode filename back to source path
-    pub fn bytecode_filename_to_source(
-        filename: &str,
-    ) -> Result<String, Box<dyn std::error::Error>> {
-        let encoded = filename
-            .strip_suffix(".mvb")
-            .ok_or("Invalid bytecode filename: missing .mvb extension")?;
-        Self::decode_path(encoded)
     }
 
     /// Check if module needs recompilation
@@ -68,14 +52,7 @@ impl ModuleMetadata {
         let normalized = source_path.replace('\\', "/");
         URL_SAFE_NO_PAD.encode(normalized.as_bytes())
     }
-
-    /// Decode a base64 filename back to the original path
-    fn decode_path(encoded: &str) -> Result<String, Box<dyn std::error::Error>> {
-        let bytes = URL_SAFE_NO_PAD.decode(encoded)?;
-        Ok(String::from_utf8(bytes)?)
-    }
 }
-
 
 fn default_hashes() -> HashMap<String, String> {
     HashMap::new()

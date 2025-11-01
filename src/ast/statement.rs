@@ -1,7 +1,5 @@
-use crate::compiler::data_type::DataType;
 use super::expr::Expr;
-
-
+use crate::compiler::data_type::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt {

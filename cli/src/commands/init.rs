@@ -2,18 +2,23 @@ use std::{fs::File, io::Write as _, path::Path};
 
 use crate::config::Config;
 
-use super::{CONFIG_FILE, META_DIR, ROOT_MODULE_DEFAULT_CONTENT, MODULES_META_FILE};
+use super::{CONFIG_FILE, META_DIR, MODULES_META_FILE, ROOT_MODULE_DEFAULT_CONTENT};
 
 pub fn command() -> Result<(), Box<dyn std::error::Error>> {
     let meta_dir_path = Path::new(META_DIR);
     let config_file_path = Path::new(CONFIG_FILE);
 
     if meta_dir_path.is_dir() {
-        return Err(format!("Meta directory '{META_DIR}' does already exist. Aborting init...").into());
+        return Err(
+            format!("Meta directory '{META_DIR}' does already exist. Aborting init...").into(),
+        );
     }
 
     if config_file_path.is_file() {
-        return Err(format!("Configuration file '{CONFIG_FILE}' does already exist. Aborting init...").into());
+        return Err(format!(
+            "Configuration file '{CONFIG_FILE}' does already exist. Aborting init..."
+        )
+        .into());
     }
 
     std::fs::create_dir_all(meta_dir_path)?;
@@ -37,6 +42,6 @@ pub fn command() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Initialized new Mluva project");
-    
+
     Ok(())
 }

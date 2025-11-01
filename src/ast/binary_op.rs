@@ -14,4 +14,3 @@ pub enum BinaryOp {
     And,
     Or,
 }
-

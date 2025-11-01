@@ -6,7 +6,6 @@ pub use serializable::BytecodeSerializable;
 mod header;
 mod serializable;
 
-
 pub fn write_fn_map_bytecode(fn_map: &HashMap<String, u32>, buffer: &mut Vec<u8>) {
     for (name, slot) in fn_map {
         name.write_bytecode(buffer);

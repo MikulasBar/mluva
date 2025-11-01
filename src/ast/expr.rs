@@ -1,5 +1,5 @@
-use crate::value::Value;
 use super::{binary_op::BinaryOp, UnaryOp};
+use crate::{ast::BuiltinFunction, value::Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -12,7 +12,11 @@ pub enum Expr {
         module_name: String,
         func_name: String,
         args: Vec<Expr>,
-    }
+    },
+    BuiltinFunctionCall {
+        function: BuiltinFunction,
+        args: Vec<Expr>,
+    },
 }
 
 impl Expr {

@@ -4,6 +4,6 @@ pub mod compiler;
 pub mod errors;
 pub mod function;
 pub mod instruction;
+pub mod module;
 pub mod runtime;
 pub mod value;
-pub mod module;

@@ -1,4 +1,3 @@
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum DataType {
     Void,
@@ -7,7 +6,6 @@ pub enum DataType {
     Bool,
     String,
 }
-
 
 impl DataType {
     pub fn is_bool(&self) -> bool {

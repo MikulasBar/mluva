@@ -1,3 +1,5 @@
+use std::str::FromStr as _;
+
 use super::token::Token;
 use super::DataType;
 use crate::ast::*;
@@ -81,11 +83,12 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::ParenR in self);
                     expect_pat!(Token::BraceL in self);
 
+                    if BuiltinFunction::str_variants().contains(name.as_str()) {
+                        return Err(CompileError::ReservedFunctionName(name));
+                    }
+
                     let body = self.parse_stmts(Token::BraceR)?;
-                    let signiture = InternalFunctionSigniture::new(
-                        return_type,
-                        params,
-                    );
+                    let signiture = InternalFunctionSigniture::new(return_type, params);
                     self.ast.add_function(name, signiture, body);
                 }
 
@@ -95,28 +98,9 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::Ident(module_name) in self);
                     expect_pat!(Token::EOL in self);
 
-                    println!("Importing module: {}", module_name);
                     let import_path = Path::single(module_name);
 
                     self.ast.add_import(import_path);
-                }
-
-                Token::External => {
-                    expect_pat!(Token::External in self);
-                    expect_pat!(Token::DataType(return_type) in self);
-                    expect_pat!(Token::Ident(fn_name) in self);
-                    expect_pat!(Token::ParenL in self);
-
-                    let params = self.parse_params_of_external_fn()?;
-
-                    expect_pat!(Token::ParenR in self);
-                    expect_pat!(Token::EOL in self);
-
-                    unimplemented!("External functions are not yet supported");
-
-                    // items.push(Item::ExternalFunctionDef(
-                    //     ExternalFunctionDefinition::new(fn_name, return_type, params)
-                    // ));
                 }
 
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),
@@ -124,35 +108,6 @@ impl<'a> Parser<'a> {
         }
 
         Ok(())
-    }
-
-    fn parse_params_of_external_fn(&mut self) -> Result<Option<Vec<DataType>>, CompileError> {
-        if let Some(Token::DotDot) = self.peek() {
-            expect_pat!(Token::DotDot in self);
-            return Ok(None);
-        } else {
-            Ok(Some(self.parse_unnamed_parameters()?))
-        }
-    }
-
-    fn parse_unnamed_parameters(&mut self) -> Result<Vec<DataType>, CompileError> {
-        let mut params = vec![];
-        while let Some(token) = self.peek() {
-            if token == &Token::ParenR {
-                break;
-            }
-
-            expect_pat!(Token::DataType(data_type) in self);
-            params.push(data_type);
-
-            if self.peek() == Some(&Token::Comma) {
-                self.skip();
-            } else {
-                break;
-            }
-        }
-
-        Ok(params)
     }
 
     fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileError> {
@@ -441,6 +396,14 @@ impl<'a> Parser<'a> {
                 expect_pat!(Token::ParenL in self);
                 let args = self.parse_args()?;
                 expect_pat!(Token::ParenR in self);
+
+                if BuiltinFunction::str_variants().contains(ident.as_str()) {
+                    return Ok(Expr::BuiltinFunctionCall {
+                        function: BuiltinFunction::from_str(&ident).unwrap(),
+                        args,
+                    });
+                }
+
                 Ok(Expr::FunctionCall(ident, args))
             }
 
@@ -533,57 +496,96 @@ fn token_to_unary_op(token: &Token) -> Option<UnaryOp> {
 mod test {
     use super::*;
 
-    mod parse_ident_expr {
-        use super::*;
+    #[test]
+    fn parser() {
+        let tokens = vec![
+            Token::DataType(DataType::Int),
+            Token::Ident("main".to_string()),
+            Token::ParenL,
+            Token::ParenR,
+            Token::BraceL,
+            Token::Return,
+            Token::Int(42),
+            Token::EOL,
+            Token::BraceR,
+        ];
 
-        #[test]
-        fn var() {
-            let tokens = vec![Token::Ident("my_var".to_string())];
+        let parser = Parser::new(&tokens);
+        let ast = parser.parse().unwrap();
 
-            let mut parser = Parser::new(&tokens);
-            let expr = parser.parse_ident_expr().unwrap();
-            assert_eq!(expr, Expr::Var("my_var".to_string()));
-        }
+        let expected_ast = {
+            let mut ast = Ast::empty();
+            let signiture = InternalFunctionSigniture::new(DataType::Int, vec![]);
+            let body = vec![Stmt::Return(Expr::Literal(Value::Int(42)))];
+            ast.add_function("main".to_string(), signiture, body);
+            ast
+        };
 
-        #[test]
-        fn func_call() {
-            let tokens = vec![
-                Token::Ident("my_func".to_string()),
-                Token::ParenL,
-                Token::Int(42),
-                Token::ParenR,
-            ];
+        assert_eq!(ast, expected_ast);
+    }
 
-            let mut parser = Parser::new(&tokens);
-            let expr = parser.parse_ident_expr().unwrap();
-            assert_eq!(
-                expr,
-                Expr::FunctionCall("my_func".to_string(), vec![Expr::Literal(Value::Int(42)),])
-            );
-        }
+    #[test]
+    fn parse_stmts() {
+        let tokens = vec![
+            Token::Let,
+            Token::Ident("x".to_string()),
+            Token::Assign,
+            Token::Int(42),
+            Token::EOL,
+            Token::Return,
+            Token::Ident("x".to_string()),
+            Token::EOL,
+        ];
 
-        #[test]
-        fn foreign_func_call() {
-            let tokens = vec![
-                Token::Ident("Math".to_string()),
-                Token::Colon,
-                Token::Ident("sqrt".to_string()),
-                Token::ParenL,
-                Token::Float(16.0),
-                Token::ParenR,
-            ];
+        let mut parser = Parser::new(&tokens);
+        let stmts = parser.parse_stmts(Token::EOL).unwrap();
 
-            let mut parser = Parser::new(&tokens);
-            let expr = parser.parse_ident_expr().unwrap();
-            assert_eq!(
-                expr,
-                Expr::ForeignFunctionCall {
-                    module_name: "Math".to_string(),
-                    func_name: "sqrt".to_string(),
-                    args: vec![Expr::Literal(Value::Float(16.0)),],
-                }
-            );
-        }
+        let expected_stmts = vec![
+            Stmt::VarDeclare(None, "x".to_string(), Expr::Literal(Value::Int(42))),
+            Stmt::Return(Expr::Var("x".to_string())),
+        ];
+
+        assert_eq!(stmts, expected_stmts);
+    }
+
+    #[test]
+    fn parse_expr() {
+        let tokens = vec![
+            Token::Int(1),
+            Token::Plus,
+            Token::Int(2),
+            Token::Asterisk,
+            Token::Int(3),
+            Token::Equal,
+            Token::Ident("x".to_string()),
+            Token::ParenL,
+            Token::Int(7),
+            Token::Comma,
+            Token::Int(8),
+            Token::ParenR,
+        ];
+
+        let mut parser = Parser::new(&tokens);
+        let expr = parser.parse_expr().unwrap();
+
+        let expected_expr = Expr::new_binary_op(
+            BinaryOp::Equal,
+            Expr::new_binary_op(
+                BinaryOp::Add,
+                Expr::Literal(Value::Int(1)),
+                Expr::new_binary_op(
+                    BinaryOp::Mul,
+                    Expr::Literal(Value::Int(2)),
+                    Expr::Literal(Value::Int(3)),
+                ),
+            ),
+            Expr::FunctionCall(
+                "x".to_string(),
+                vec![Expr::Literal(Value::Int(7)), Expr::Literal(Value::Int(8))],
+            ),
+        );
+
+        assert_eq!(expr, expected_expr);
     }
 
     #[test]
@@ -599,13 +601,12 @@ mod test {
 
         let mut parser = Parser::new(&tokens);
         let args = parser.parse_args().unwrap();
-        assert_eq!(
-            args,
-            vec![
-                Expr::Literal(Value::Int(1)),
-                Expr::Literal(Value::Int(2)),
-                Expr::Literal(Value::Int(3))
-            ]
-        );
+        let expected_args = vec![
+            Expr::Literal(Value::Int(1)),
+            Expr::Literal(Value::Int(2)),
+            Expr::Literal(Value::Int(3)),
+        ];
+
+        assert_eq!(args, expected_args);
     }
 }

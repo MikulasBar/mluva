@@ -1,16 +1,12 @@
-
-
-mod value;
-mod instruction;
-mod function;
 mod data_type;
-
+mod function;
+mod instruction;
+mod value;
 
 pub trait BytecodeSerializable: Sized {
     fn write_bytecode(&self, buffer: &mut Vec<u8>);
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String>;
 }
-
 
 impl BytecodeSerializable for u8 {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
@@ -144,5 +140,3 @@ impl BytecodeSerializable for f64 {
         buffer.extend_from_slice(&self.to_le_bytes());
     }
 }
-
-

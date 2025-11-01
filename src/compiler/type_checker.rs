@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
-use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
+use crate::ast::{Ast, BinaryOp, BuiltinFunction, Expr, Stmt, UnaryOp};
 use crate::bin_op_pat;
 use crate::errors::CompileError;
 use crate::module::Module;
@@ -31,8 +31,10 @@ impl<'a> TypeChecker<'a> {
             self.scope.enter();
 
             self.ast
-                .get_function_signiture_by_slot(slot).unwrap()
-                .params.iter()
+                .get_function_signiture_by_slot(slot)
+                .unwrap()
+                .params
+                .iter()
                 .try_for_each(|(name, data_type)| {
                     self.scope.insert_new(name.clone(), data_type.clone())
                 })?;
@@ -52,11 +54,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmts(
-        &mut self,
-        stmts: &[Stmt],
-        return_type: DataType,
-    ) -> Result<(), CompileError> {
+    fn check_stmts(&mut self, stmts: &[Stmt], return_type: DataType) -> Result<(), CompileError> {
         for s in stmts {
             self.check_stmt(s, return_type)?;
         }
@@ -64,11 +62,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmt(
-        &mut self,
-        stmt: &Stmt,
-        return_type: DataType,
-    ) -> Result<(), CompileError> {
+    fn check_stmt(&mut self, stmt: &Stmt, return_type: DataType) -> Result<(), CompileError> {
         match stmt {
             Stmt::If(cond, stmts, else_stmts) => {
                 let cond = self.check_expr(cond)?;
@@ -174,10 +168,15 @@ impl<'a> TypeChecker<'a> {
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
-            },
+            }
 
-            Expr::ForeignFunctionCall { module_name, func_name, args } => {
-                let signiture = self.dependencies
+            Expr::ForeignFunctionCall {
+                module_name,
+                func_name,
+                args,
+            } => {
+                let signiture = self
+                    .dependencies
                     .get(module_name)
                     .ok_or_else(|| CompileError::ModuleNotFound(module_name.clone()))?
                     .get_function_signiture(func_name)
@@ -191,7 +190,38 @@ impl<'a> TypeChecker<'a> {
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
-            },
+            }
+
+            Expr::BuiltinFunctionCall { function, args } => {
+                let arg_types: Vec<DataType> = args
+                    .iter()
+                    .map(|arg| self.check_expr(arg))
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+
+                match function {
+                    BuiltinFunction::Print => {
+                        // Print can take any type of arguments
+                        Ok(DataType::Void)
+                    }
+                    BuiltinFunction::Assert => {
+                        // Assert arguments must be bool
+                        for arg_type in arg_types {
+                            if arg_type != DataType::Bool {
+                                return Err(CompileError::WrongType {
+                                    expected: DataType::Bool,
+                                    found: arg_type,
+                                });
+                            }
+                        }
+
+                        Ok(DataType::Void)
+                    }
+                    BuiltinFunction::Format => {
+                        // Format can take any type of arguments
+                        Ok(DataType::String)
+                    }
+                }
+            }
 
             Expr::BinaryOp(op, a, b) => {
                 let a = self.check_expr(a)?;

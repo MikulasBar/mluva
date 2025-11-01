@@ -1,4 +1,8 @@
-use crate::{bytecode::BytecodeSerializable, instruction::Instruction, value::Value};
+use std::str::FromStr as _;
+
+use crate::{
+    ast::BuiltinFunction, bytecode::BytecodeSerializable, instruction::Instruction, value::Value,
+};
 
 struct InstructionId;
 
@@ -27,6 +31,7 @@ impl InstructionId {
     const POP: u8 = 21;
     const PUSH: u8 = 22;
     const FOREIGNCALL: u8 = 23;
+    const BUILTINCALL: u8 = 24;
 }
 
 fn get_id(instruction: &Instruction) -> u8 {
@@ -49,12 +54,13 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Negate => InstructionId::NEGATE,
         Instruction::Jump(_) => InstructionId::JUMP,
         Instruction::JumpIfFalse(_) => InstructionId::JUMPIFFALSE,
-        Instruction::Call{..} => InstructionId::CALL,
-        Instruction::Load{..} => InstructionId::LOAD,
-        Instruction::Store{..} => InstructionId::STORE,
+        Instruction::Call { .. } => InstructionId::CALL,
+        Instruction::Load { .. } => InstructionId::LOAD,
+        Instruction::Store { .. } => InstructionId::STORE,
         Instruction::Pop => InstructionId::POP,
         Instruction::Push(_) => InstructionId::PUSH,
-        Instruction::ForeignCall{..} => InstructionId::FOREIGNCALL,
+        Instruction::ForeignCall { .. } => InstructionId::FOREIGNCALL,
+        Instruction::BuiltinFunctionCall { .. } => InstructionId::BUILTINCALL,
     }
 }
 
@@ -69,10 +75,22 @@ impl BytecodeSerializable for Instruction {
             Instruction::Load { slot } => slot.write_bytecode(buffer),
             Instruction::Store { slot } => slot.write_bytecode(buffer),
             Instruction::Push(value) => value.write_bytecode(buffer),
-            Instruction::ForeignCall { module_name, call_slot } => {
+            Instruction::ForeignCall {
+                module_name,
+                call_slot,
+            } => {
                 module_name.write_bytecode(buffer);
                 call_slot.write_bytecode(buffer);
             }
+            Instruction::BuiltinFunctionCall {
+                function,
+                arg_count,
+            } => {
+                let function_name = function.as_str().to_string();
+                function_name.write_bytecode(buffer);
+                arg_count.write_bytecode(buffer);
+            }
+
             _ => (),
         }
     }
@@ -102,31 +120,43 @@ impl BytecodeSerializable for Instruction {
             InstructionId::JUMP => {
                 let target = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Jump(target))
-            },
+            }
             InstructionId::JUMPIFFALSE => {
                 let target = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::JumpIfFalse(target))
-            },
+            }
             InstructionId::CALL => {
                 let call_slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Call { call_slot })
-            },
+            }
             InstructionId::LOAD => {
                 let slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Load { slot })
-            },
+            }
             InstructionId::STORE => {
                 let slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Store { slot })
-            },
+            }
             InstructionId::PUSH => {
                 let value = Value::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Push(value))
-            },
+            }
             InstructionId::FOREIGNCALL => {
                 let module_name = String::from_bytecode(bytes, cursor)?;
                 let call_slot = u32::from_bytecode(bytes, cursor)?;
-                Ok(Instruction::ForeignCall { module_name, call_slot })
+                Ok(Instruction::ForeignCall {
+                    module_name,
+                    call_slot,
+                })
+            }
+            InstructionId::BUILTINCALL => {
+                let function_name = String::from_bytecode(bytes, cursor)?;
+                let arg_count = u32::from_bytecode(bytes, cursor)?;
+                let function = BuiltinFunction::from_str(&function_name)?;
+                Ok(Instruction::BuiltinFunctionCall {
+                    function,
+                    arg_count,
+                })
             }
             _ => Err(format!("Unknown instruction ID: {}", id)),
         }
