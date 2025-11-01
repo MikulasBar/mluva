@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! str_pat {
     (WS) => {
-        ' ' | '\n' | '\r' | '\t'
+        ' ' | '\r' | '\t'
     };
 
     (EOL) => {
@@ -51,5 +51,3 @@ macro_rules! expect_pat {
         };
     };
 }
-
-pub use {bin_op_pat, expect_pat, str_pat};

@@ -100,58 +100,12 @@ impl<'a> Parser<'a> {
 
                     self.ast.add_import(import_path);
                 }
-
-                // Token::External => {
-                //     expect_pat!(Token::External in self);
-                //     expect_pat!(Token::DataType(return_type) in self);
-                //     expect_pat!(Token::Ident(fn_name) in self);
-                //     expect_pat!(Token::ParenL in self);
-
-                //     let params = self.parse_params_of_external_fn()?;
-
-                //     expect_pat!(Token::ParenR in self);
-                //     expect_pat!(Token::EOL in self);
-
-                //     unimplemented!("External functions are not yet supported");
-
-                //     // items.push(Item::ExternalFunctionDef(
-                //     //     ExternalFunctionDefinition::new(fn_name, return_type, params)
-                //     // ));
-                // }
+                
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),
             }
         }
 
         Ok(())
-    }
-
-    fn parse_params_of_external_fn(&mut self) -> Result<Option<Vec<DataType>>, CompileError> {
-        if let Some(Token::DotDot) = self.peek() {
-            expect_pat!(Token::DotDot in self);
-            return Ok(None);
-        } else {
-            Ok(Some(self.parse_unnamed_parameters()?))
-        }
-    }
-
-    fn parse_unnamed_parameters(&mut self) -> Result<Vec<DataType>, CompileError> {
-        let mut params = vec![];
-        while let Some(token) = self.peek() {
-            if token == &Token::ParenR {
-                break;
-            }
-
-            expect_pat!(Token::DataType(data_type) in self);
-            params.push(data_type);
-
-            if self.peek() == Some(&Token::Comma) {
-                self.skip();
-            } else {
-                break;
-            }
-        }
-
-        Ok(params)
     }
 
     fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileError> {
