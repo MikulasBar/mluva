@@ -1,4 +1,6 @@
-use crate::{bytecode::BytecodeSerializable, instruction::Instruction, value::Value};
+use crate::{
+    ast::BuiltinFunction, bytecode::BytecodeSerializable, instruction::Instruction, value::Value,
+};
 
 struct InstructionId;
 
@@ -27,6 +29,7 @@ impl InstructionId {
     const POP: u8 = 21;
     const PUSH: u8 = 22;
     const FOREIGNCALL: u8 = 23;
+    const BUILTINCALL: u8 = 24;
 }
 
 fn get_id(instruction: &Instruction) -> u8 {
@@ -55,6 +58,7 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Pop => InstructionId::POP,
         Instruction::Push(_) => InstructionId::PUSH,
         Instruction::ForeignCall { .. } => InstructionId::FOREIGNCALL,
+        Instruction::BuiltinFunctionCall { .. } => InstructionId::BUILTINCALL,
     }
 }
 
@@ -76,6 +80,15 @@ impl BytecodeSerializable for Instruction {
                 module_name.write_bytecode(buffer);
                 call_slot.write_bytecode(buffer);
             }
+            Instruction::BuiltinFunctionCall {
+                function,
+                arg_count,
+            } => {
+                let function_name = function.as_str().to_string();
+                function_name.write_bytecode(buffer);
+                arg_count.write_bytecode(buffer);
+            }
+
             _ => (),
         }
     }
@@ -132,6 +145,16 @@ impl BytecodeSerializable for Instruction {
                 Ok(Instruction::ForeignCall {
                     module_name,
                     call_slot,
+                })
+            }
+            InstructionId::BUILTINCALL => {
+                let function_name = String::from_bytecode(bytes, cursor)?;
+                let arg_count = u32::from_bytecode(bytes, cursor)?;
+                let function = BuiltinFunction::from_str(&function_name)
+                    .ok_or_else(|| format!("Unknown builtin function name: {}", function_name))?;
+                Ok(Instruction::BuiltinFunctionCall {
+                    function,
+                    arg_count,
                 })
             }
             _ => Err(format!("Unknown instruction ID: {}", id)),

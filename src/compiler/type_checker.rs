@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
-use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
+use crate::ast::{Ast, BinaryOp, BuiltinFunction, Expr, Stmt, UnaryOp};
 use crate::bin_op_pat;
 use crate::errors::CompileError;
 use crate::module::Module;
@@ -190,6 +190,37 @@ impl<'a> TypeChecker<'a> {
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
+            }
+
+            Expr::BuiltinFunctionCall { function, args } => {
+                let arg_types: Vec<DataType> = args
+                    .iter()
+                    .map(|arg| self.check_expr(arg))
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+
+                match function {
+                    BuiltinFunction::Print => {
+                        // Print can take any type of arguments
+                        Ok(DataType::Void)
+                    }
+                    BuiltinFunction::Assert => {
+                        // Assert arguments must be bool
+                        for arg_type in arg_types {
+                            if arg_type != DataType::Bool {
+                                return Err(CompileError::WrongType {
+                                    expected: DataType::Bool,
+                                    found: arg_type,
+                                });
+                            }
+                        }
+
+                        Ok(DataType::Void)
+                    }
+                    BuiltinFunction::Format => {
+                        // Format can take any type of arguments
+                        Ok(DataType::String)
+                    }
+                }
             }
 
             Expr::BinaryOp(op, a, b) => {

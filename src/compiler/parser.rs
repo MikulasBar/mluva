@@ -81,6 +81,10 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::ParenR in self);
                     expect_pat!(Token::BraceL in self);
 
+                    if BuiltinFunction::str_variants().contains(name.as_str()) {
+                        return Err(CompileError::ReservedFunctionName(name));
+                    }
+
                     let body = self.parse_stmts(Token::BraceR)?;
                     let signiture = InternalFunctionSigniture::new(return_type, params);
                     self.ast.add_function(name, signiture, body);
@@ -114,7 +118,6 @@ impl<'a> Parser<'a> {
                 //     //     ExternalFunctionDefinition::new(fn_name, return_type, params)
                 //     // ));
                 // }
-
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),
             }
         }
@@ -437,6 +440,14 @@ impl<'a> Parser<'a> {
                 expect_pat!(Token::ParenL in self);
                 let args = self.parse_args()?;
                 expect_pat!(Token::ParenR in self);
+
+                if BuiltinFunction::str_variants().contains(ident.as_str()) {
+                    return Ok(Expr::BuiltinFunctionCall {
+                        function: BuiltinFunction::from_str(&ident).unwrap(),
+                        args,
+                    });
+                }
+
                 Ok(Expr::FunctionCall(ident, args))
             }
 

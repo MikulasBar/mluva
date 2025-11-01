@@ -200,12 +200,30 @@ fn tokenize_string(chars: &mut CharIter) -> Token {
     let mut string = String::new();
 
     while let Some(&ch) = chars.peek() {
-        if ch == '\'' {
-            chars.next(); // consume the closing quote
-            break;
-        } else {
-            string.push(ch);
-            chars.next();
+        match ch {
+            '\\' => {
+                chars.next(); // consume the backslash
+                if let Some(&escaped_char) = chars.peek() {
+                    match escaped_char {
+                        'n' => string.push('\n'),
+                        't' => string.push('\t'),
+                        '\'' => string.push('\''),
+                        '\\' => string.push('\\'),
+                        other => string.push(other),
+                    }
+                    chars.next(); // consume the escaped character
+                }
+            }
+
+            '\'' => {
+                chars.next(); // consume the closing quote
+                break;
+            }
+
+            _ => {
+                string.push(ch);
+                chars.next();
+            }
         }
     }
 

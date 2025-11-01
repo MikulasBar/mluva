@@ -1,4 +1,5 @@
 mod binary_op;
+mod builtin_function;
 mod expr;
 mod path;
 mod statement;
@@ -7,6 +8,7 @@ mod unary_op;
 use std::collections::HashMap;
 
 pub use binary_op::BinaryOp;
+pub use builtin_function::BuiltinFunction;
 pub use expr::Expr;
 pub use path::Path;
 pub use statement::Stmt;

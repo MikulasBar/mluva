@@ -3,10 +3,15 @@
 ## Table of contents
 - [Introduction](#introduction)
 - [Data Types](#data-types)
+    - [Strings](#strings)
+    - [Void Type](#void-type)
 - [Variables](#variables)
 - [Operators](#operators)
 - [Control Structures](#control-structures)
+    - [If / Else Statements](#if--else-statements)
+    - [While Loops](#while-loops)
 - [Functions](#functions)
+    - [Built-in Functions](#built-in-functions)
 - [Modules](#modules)
 - [Comments](#comments)
 - [Conventions](#conventions)
@@ -32,6 +37,12 @@ Strings are immutable sequences of ASCII characters. They can be created using s
 let greeting: String = 'Hello, World!'
 ```
 Double quotes are not supported.
+
+Use backslash `\` as escape character to include special characters in strings:
+- `\'` - single quote
+- `\\` - backslash
+- `\n` - newline
+- `\t` - tab
 
 ### Void Type
 Void can be used anywhere a type is expected, but the syntax of the language doesn't allow you to create value of type Void.(Note that the value can be created in bytecode instructions, although it's not very useful.)
@@ -102,6 +113,14 @@ Functions can be called using standard syntax:
 ```
 let result: Int = add(5, 10)
 ```
+
+### Built-in Functions
+Mluva provides several built-in functions for common tasks:
+- `print` - prints all arguments to standard output
+- `assert` - checks if all arguments are true, otherwise raises runtime error
+- `format` - interpolates all arguments into string and returns it
+
+If you try to name your function the same as a built-in function, compiler will raise an error.
 
 ## Modules
 Modules are basic unit of code organization in Mluva. Each module is defined in its own file with `.mv` extension.

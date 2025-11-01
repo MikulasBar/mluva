@@ -1,5 +1,5 @@
 use super::{binary_op::BinaryOp, UnaryOp};
-use crate::value::Value;
+use crate::{ast::BuiltinFunction, value::Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
@@ -11,6 +11,10 @@ pub enum Expr {
     ForeignFunctionCall {
         module_name: String,
         func_name: String,
+        args: Vec<Expr>,
+    },
+    BuiltinFunctionCall {
+        function: BuiltinFunction,
         args: Vec<Expr>,
     },
 }

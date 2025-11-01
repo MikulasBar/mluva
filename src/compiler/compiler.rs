@@ -301,6 +301,17 @@ impl<'b> FunctionCompiler<'b> {
                     call_slot,
                 });
             }
+
+            Expr::BuiltinFunctionCall { function, args } => {
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+
+                self.instructions.push(Instruction::BuiltinFunctionCall {
+                    function: function.clone(),
+                    arg_count: args.len() as u32,
+                });
+            }
         }
 
         Ok(())

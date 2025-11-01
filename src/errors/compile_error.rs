@@ -13,6 +13,7 @@ pub enum CompileError {
     VarRedeclaration(String),
     ModuleNotFound(String),
     UnknownForeignFunction { module: String, name: String },
+    ReservedFunctionName(String),
 }
 
 impl ToString for CompileError {
@@ -39,6 +40,9 @@ impl ToString for CompileError {
             CompileError::ModuleNotFound(name) => format!("Module not found: {}", name),
             CompileError::UnknownForeignFunction { module, name } => {
                 format!("Unknown foreign function '{}' in module '{}'", name, module)
+            }
+            CompileError::ReservedFunctionName(name) => {
+                format!("'{}' is a reserved function name", name)
             }
         }
     }

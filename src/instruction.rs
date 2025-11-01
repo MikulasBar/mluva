@@ -37,4 +37,8 @@ pub enum Instruction {
         call_slot: u32,
     },
     Return,
+    BuiltinFunctionCall {
+        function: crate::ast::BuiltinFunction,
+        arg_count: u32,
+    },
 }

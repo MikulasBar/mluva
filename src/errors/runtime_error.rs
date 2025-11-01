@@ -9,5 +9,6 @@ pub enum RuntimeError {
     /// but I want to have a fallback for any type error
     TypeError,
     FunctionDidNotReturn,
+    AssertionFailed,
     Other(String),
 }
