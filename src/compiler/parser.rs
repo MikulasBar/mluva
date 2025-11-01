@@ -100,7 +100,7 @@ impl<'a> Parser<'a> {
 
                     self.ast.add_import(import_path);
                 }
-                
+
                 _ => return Err(CompileError::UnexpectedToken(token.clone())),
             }
         }
