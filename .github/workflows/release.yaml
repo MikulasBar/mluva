@@ -45,31 +45,42 @@ jobs:
       - name: Build release
         run: cargo build -p cli --release
 
-      - name: Prepare dist dir
+      - name: Prepare dist dir (unix)
+        if: ${{ matrix.os != 'windows-latest' }}
         run: |
           mkdir -p dist/bin
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp target/release/cli.exe dist/bin/mluva.exe
-          else
-            cp target/release/cli dist/bin/mluva
-            chmod +x dist/bin/mluva || true
-          fi
+          cp target/release/cli dist/bin/mluva
+          chmod +x dist/bin/mluva || true
 
-      - name: Archive artifact
+      - name: Prepare dist dir (windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            powershell -Command "Compress-Archive -Path dist\\* -DestinationPath release-${{ matrix.os }}.zip"
-          else
-            tar -czf release-${{ matrix.os }}.tar.gz -C dist .
-          fi
+          New-Item -ItemType Directory -Path dist\bin -Force | Out-Null
+          Copy-Item target\release\cli.exe dist\bin\mluva.exe -Force
 
-      - name: Upload build artifact
+      - name: Archive artifact (unix)
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: tar -czf release-${{ matrix.os }}.tar.gz -C dist .
+
+      - name: Archive artifact (windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: Compress-Archive -Path dist\* -DestinationPath release-${{ matrix.os }}.zip -Force
+
+      - name: Upload build artifact (unix)
+        if: ${{ matrix.os != 'windows-latest' }}
         uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.os }}
-          path: |
-            release-${{ matrix.os }}.zip
-            release-${{ matrix.os }}.tar.gz
+          path: release-${{ matrix.os }}.tar.gz
+
+      - name: Upload build artifact (windows)
+        if: ${{ matrix.os == 'windows-latest' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: release-${{ matrix.os }}.zip
 
   # Publish GitHub Release and attach artifacts
   publish:
@@ -84,21 +95,21 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: release-ubuntu-latest
-          path: artifacts/ubuntu || true
+          path: artifacts/ubuntu
 
       - name: Download macos artifact
         if: always()
         uses: actions/download-artifact@v4
         with:
           name: release-macos-latest
-          path: artifacts/macos || true
+          path: artifacts/macos
 
       - name: Download windows artifact
         if: always()
         uses: actions/download-artifact@v4
         with:
           name: release-windows-latest
-          path: artifacts/windows || true
+          path: artifacts/windows
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
