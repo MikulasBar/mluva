@@ -1,0 +1,22 @@
+## Core
+- [ ] better error logging, include line of the error
+- [ ] Builtin methods for datatypes
+- [ ] `Map`, `List` datatypes, indexing syntax,
+- [ ] add `for` loops + `iter` builtin function to convert datatypes to iterables
+- [ ] add pointers / references
+- [ ] rework typechecker, optimize it
+- [ ] add `Result` type and allow error handling
+- [ ] add `read_file` builtin function for reading local files
+
+## CLI
+- [ ] `--all` option for build command (to build all files included files that didnt change)
+- [ ] nested folders in source
+- [ ] `build` / `run` command creates `.mluva` dir, `init` command doesnt create it
+- [ ] remove `uninit` command
+
+## Language support
+- [ ] include VSCode extension in repo
+- [ ] improve syntax highlighting
+
+## Docs
+- [ ] fix docs
