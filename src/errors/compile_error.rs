@@ -6,7 +6,10 @@ use codespan_reporting::{
 };
 
 use crate::{
-    compiler::{data_type::DataType, token::Token},
+    compiler::{
+        data_type::DataType,
+        token::{Token, TokenKind},
+    },
     diagnostics::Span,
 };
 
@@ -40,50 +43,48 @@ impl CompileError {
         self
     }
 
-    // Convenience constructors
-    pub fn unexpected_char(ch: char) -> Self {
+    pub fn unexpected_char_at(ch: char, span: Span) -> Self {
         Self::new(
             CompileErrorKind::UnexpectedChar(ch),
             format!("unexpected character '{}'", ch),
         )
+        .with_span(span)
     }
 
-    pub fn unexpected_char_at(ch: char, span: Span) -> Self {
-        Self::unexpected_char(ch).with_span(span)
-    }
-
-    pub fn unterminated_string() -> Self {
+    pub fn unterminated_string_at(span: Span) -> Self {
         Self::new(
             CompileErrorKind::UnterminatedString,
             "unterminated string literal",
         )
+        .with_span(span)
     }
 
-    pub fn unterminated_string_at(span: Span) -> Self {
-        Self::unterminated_string().with_span(span)
-    }
-
-    pub fn unexpected_end_of_file() -> Self {
+    pub fn unexpected_end_of_file_at(span: Span) -> Self {
         Self::new(
             CompileErrorKind::UnexpectedEndOfFile,
             "unexpected end of file",
         )
+        .with_span(span)
     }
 
-    pub fn unexpected_end_of_file_at(span: Span) -> Self {
-        Self::unexpected_end_of_file().with_span(span)
+    pub fn reserved_function_name_at(name: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::ReservedFunctionName(name.clone().into()),
+            format!("use of reserved function name {}", name.into()),
+        )
+        .with_span(span)
     }
 
-    pub fn invalid_number() -> Self {
-        Self::new(CompileErrorKind::InvalidNumber, "invalid numeric literal")
+    pub fn unexpected_token_at(token_kind: TokenKind, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::UnexpectedToken(token_kind.clone()),
+            format!("unexpected token: {:?}", token_kind),
+        )
+        .with_span(span)
     }
 
-    pub fn invalid_number_at(span: Span) -> Self {
-        Self::invalid_number().with_span(span)
-    }
-
-    pub fn other(msg: impl Into<String>) -> Self {
-        Self::new(CompileErrorKind::Other, msg)
+    pub fn other_at(msg: impl Into<String>, span: Span) -> Self {
+        Self::new(CompileErrorKind::Other, msg).with_span(span)
     }
 
     /// Convert into a codespan_reporting::diagnostic::Diagnostic using the supplied files map.
@@ -123,7 +124,7 @@ impl std::error::Error for CompileError {}
 #[derive(Debug, Clone)]
 pub enum CompileErrorKind {
     UnexpectedChar(char),
-    UnexpectedToken(Token),
+    UnexpectedToken(TokenKind),
     UnterminatedString,
     InvalidNumber,
     UnexpectedEndOfFile,

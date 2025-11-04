@@ -11,7 +11,7 @@ pub use binary_op::BinaryOp;
 pub use builtin_function::BuiltinFunction;
 pub use expr::Expr;
 pub use path::Path;
-pub use statement::Stmt;
+pub use statement::Statement;
 pub use unary_op::UnaryOp;
 
 use crate::{
@@ -24,7 +24,7 @@ use crate::{
 pub struct Ast {
     function_map: HashMap<String, u32>,
     function_signitures: Vec<InternalFunctionSigniture>,
-    function_bodies: Vec<Vec<Stmt>>,
+    function_bodies: Vec<Vec<Statement>>,
     imports: Vec<Path>,
 }
 
@@ -32,7 +32,7 @@ impl Ast {
     pub fn new(
         function_map: HashMap<String, u32>,
         function_signitures: Vec<InternalFunctionSigniture>,
-        function_bodies: Vec<Vec<Stmt>>,
+        function_bodies: Vec<Vec<Statement>>,
         imports: Vec<Path>,
     ) -> Self {
         Self {
@@ -64,7 +64,7 @@ impl Ast {
         &mut self,
         name: String,
         signiture: InternalFunctionSigniture,
-        body: Vec<Stmt>,
+        body: Vec<Statement>,
     ) {
         let slot = self.function_signitures.len() as u32;
         self.function_map.insert(name, slot);
@@ -93,7 +93,7 @@ impl Ast {
         self.function_signitures.get(slot as usize)
     }
 
-    pub fn get_function_body_by_slot(&self, slot: u32) -> Option<&[Stmt]> {
+    pub fn get_function_body_by_slot(&self, slot: u32) -> Option<&[Statement]> {
         self.function_bodies
             .get(slot as usize)
             .map(|v| v.as_slice())
@@ -114,7 +114,7 @@ impl Ast {
     ) -> (
         HashMap<String, u32>,
         Vec<InternalFunctionSigniture>,
-        Vec<Vec<Stmt>>,
+        Vec<Vec<Statement>>,
         Vec<Path>,
     ) {
         (

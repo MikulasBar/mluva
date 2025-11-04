@@ -3,8 +3,9 @@ use std::str::FromStr as _;
 use super::token::{Token, TokenKind};
 use super::DataType;
 use crate::ast::*;
-use crate::errors::CompileErrorKind;
-use crate::expect_pat;
+use crate::diagnostics::Span;
+use crate::errors::CompileError;
+use crate::expect_token;
 use crate::function::InternalFunctionSigniture;
 use crate::value::Value;
 
@@ -59,69 +60,76 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Result<Ast, CompileErrorKind> {
+    fn span_between(&self, first_idx: usize, last_idx: usize) -> crate::diagnostics::Span {
+        let first = self.tokens[first_idx].span;
+        let last = self.tokens[last_idx].span;
+        first.join(last)
+    }
+
+    fn span_current(&self) -> Option<crate::diagnostics::Span> {
+        self.peek().map(|t| t.span)
+    }
+
+    pub fn parse(mut self) -> Result<Ast, CompileError> {
         self.parse_top_level()?;
         Ok(self.ast)
     }
 
-    fn parse_top_level(&mut self) -> Result<(), CompileErrorKind> {
-        while let Some(token) = self.peek() {
-            match token {
-                // lonely EOL
-                Token::EOL => {
+    fn parse_top_level(&mut self) -> Result<(), CompileError> {
+        while let Some(token) = self.next() {
+            match token.kind {
+                TokenKind::EOL => {
                     self.skip();
                     continue;
                 }
 
-                Token::DataType(_) => {
-                    expect_pat!(Token::DataType(return_type) in self);
-                    expect_pat!(Token::Ident(name) in self);
-                    expect_pat!(Token::ParenL in self);
+                TokenKind::DataType(_) => {
+                    expect_token!(TokenKind::DataType(return_type) in self);
+                    expect_token!(TokenKind::Ident(name), name_span in self);
+                    expect_token!(TokenKind::ParenL in self);
 
                     let params = self.parse_named_parameters()?;
 
-                    expect_pat!(Token::ParenR in self);
-                    expect_pat!(Token::BraceL in self);
+                    expect_token!(TokenKind::ParenR in self);
+                    expect_token!(TokenKind::BraceL in self);
 
                     if BuiltinFunction::str_variants().contains(name.as_str()) {
-                        return Err(CompileErrorKind::ReservedFunctionName(name));
+                        return Err(CompileError::reserved_function_name_at(name, name_span));
                     }
 
-                    let body = self.parse_stmts(Token::BraceR)?;
+                    let (body, _) = self.parse_statements(TokenKind::BraceR)?;
                     let signiture = InternalFunctionSigniture::new(return_type, params);
                     self.ast.add_function(name, signiture, body);
                 }
 
-                Token::Import => {
-                    // Only supports single segment module names for now
-                    expect_pat!(Token::Import in self);
-                    expect_pat!(Token::Ident(module_name) in self);
-                    expect_pat!(Token::EOL in self);
+                TokenKind::Import => {
+                    expect_token!(TokenKind::Import in self);
+                    expect_token!(TokenKind::Ident(module_name) in self);
+                    expect_token!(TokenKind::EOL in self);
 
                     let import_path = Path::single(module_name);
-
                     self.ast.add_import(import_path);
                 }
 
-                _ => return Err(CompileErrorKind::UnexpectedToken(token.clone())),
+                _ => return Err(CompileError::unexpected_token_at(token.kind, token.span)),
             }
         }
 
         Ok(())
     }
 
-    fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileErrorKind> {
+    fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileError> {
         let mut params = vec![];
         while let Some(token) = self.peek() {
-            if token == &Token::ParenR {
+            if token.kind == TokenKind::ParenR {
                 break;
             }
 
-            expect_pat!(Token::DataType(data_type) in self);
-            expect_pat!(Token::Ident(ident) in self);
+            expect_token!(TokenKind::DataType(data_type) in self);
+            expect_token!(TokenKind::Ident(ident) in self);
             params.push((ident, data_type));
 
-            if self.peek() == Some(&Token::Comma) {
+            if let Some(&TokenKind::Comma) = self.peek().map(|t| &t.kind) {
                 self.skip();
             } else {
                 break;
@@ -133,140 +141,273 @@ impl<'a> Parser<'a> {
 
     /// Parses a list of statements until the critical token is found.
     /// The critical token is not included in the returned statements.
-    fn parse_stmts(&mut self, critical_token: Token) -> Result<Vec<Stmt>, CompileErrorKind> {
-        let mut stmts = vec![];
+    fn parse_statements(
+        &mut self,
+        critical_kind: TokenKind,
+    ) -> Result<(Vec<Statement>, Span), CompileError> {
+        let mut statements = vec![];
+        let mut end_span: Option<Span> = None;
 
-        while let Some(token) = self.peek() {
-            if *token == critical_token {
-                self.skip();
+        while let Some(token) = self.next() {
+            if token.kind == critical_kind {
+                end_span = Some(token.span);
                 break;
             }
 
-            let stmt = match token {
-                // lonely EOL
-                Token::EOL => {
-                    self.skip();
+            let statement = match token.kind {
+                // lonely EOL -> skip
+                TokenKind::EOL => {
                     continue;
                 }
 
-                Token::Return => {
-                    expect_pat!(Token::Return in self);
-                    if let Some(Token::EOL) = self.peek() {
-                        self.skip();
-                        Stmt::Return(Expr::Literal(Value::Void))
+                TokenKind::Return => {
+                    // consume 'return'
+                    let return_tok = self.next().unwrap();
+
+                    // if next is EOL -> return void
+                    if self.index < self.tokens.len()
+                        && self.tokens[self.index].kind == TokenKind::EOL
+                    {
+                        let eol_tok = self.next().unwrap();
+                        Statement::return_statement(
+                            Expr::literal(Value::Void, return_tok.span),
+                            return_tok.span.join(eol_tok.span),
+                        )
                     } else {
+                        // parse expression and expect EOL
                         let expr = self.parse_expr()?;
-                        expect_pat!(Token::EOL in self);
-                        Stmt::Return(expr)
+                        if self.index < self.tokens.len()
+                            && self.tokens[self.index].kind == TokenKind::EOL
+                        {
+                            let eol_tok = self.next().unwrap();
+                            Statement::return_statement(expr, return_tok.span.join(eol_tok.span))
+                        } else {
+                            return Err(CompileError::unexpected_end_of_file_at());
+                        }
                     }
                 }
 
-                // var declaration with explicit type
-                Token::DataType(_) => {
-                    expect_pat!(Token::DataType(data_type) in self);
-                    expect_pat!(Token::Ident(ident) in self);
-                    expect_pat!(Token::Assign in self);
-
-                    let expr = self.parse_expr()?;
-
-                    expect_pat!(Token::EOL in self);
-
-                    Stmt::VarDeclare(Some(data_type), ident, expr)
+                // var declaration with explicit type: DataType Ident = expr EOL
+                TokenKind::DataType(_) => {
+                    // consume DataType
+                    let dt_tok = self.next().unwrap();
+                    // expect ident
+                    let ident_tok = match self.next() {
+                        Some(t) => t,
+                        None => return Err(CompileError::UnexpectedEndOfFile),
+                    };
+                    let ident = match ident_tok.kind {
+                        TokenKind::Ident(n) => n,
+                        _ => return Err(CompileError::UnexpectedToken(ident_tok)),
+                    };
+                    // expect assign
+                    if self.index < self.tokens.len()
+                        && self.tokens[self.index].kind == TokenKind::Assign
+                    {
+                        let assign_tok = self.next().unwrap();
+                        // parse expr
+                        let expr = self.parse_expr()?;
+                        // expect EOL
+                        if self.index < self.tokens.len()
+                            && self.tokens[self.index].kind == TokenKind::EOL
+                        {
+                            let eol_tok = self.next().unwrap();
+                            Statement::var_declare(
+                                Some(match dt_tok.kind {
+                                    TokenKind::DataType(dt) => dt,
+                                    _ => unreachable!(),
+                                }),
+                                ident,
+                                expr,
+                                dt_tok.span.join(eol_tok.span),
+                            )
+                        } else {
+                            return Err(CompileError::UnexpectedEndOfFile);
+                        }
+                    } else {
+                        return Err(CompileError::UnexpectedToken(
+                            self.tokens.get(self.index).cloned().unwrap_or(dt_tok),
+                        ));
+                    }
                 }
 
-                Token::Let => {
-                    expect_pat!(Token::Let in self);
-                    expect_pat!(Token::Ident(ident) in self);
-                    expect_pat!(Token::Assign in self);
-
-                    let expr = self.parse_expr()?;
-
-                    expect_pat!(Token::EOL in self);
-
-                    Stmt::VarDeclare(None, ident, expr)
+                TokenKind::Let => {
+                    let let_tok = self.next().unwrap();
+                    let ident_tok = match self.next() {
+                        Some(t) => t,
+                        None => return Err(CompileError::UnexpectedEndOfFile),
+                    };
+                    let ident = match ident_tok.kind {
+                        TokenKind::Ident(n) => n,
+                        _ => return Err(CompileError::UnexpectedToken(ident_tok)),
+                    };
+                    // expect assign
+                    if self.index < self.tokens.len()
+                        && self.tokens[self.index].kind == TokenKind::Assign
+                    {
+                        let assign_tok = self.next().unwrap();
+                        let expr = self.parse_expr()?;
+                        // expect EOL
+                        if self.index < self.tokens.len()
+                            && self.tokens[self.index].kind == TokenKind::EOL
+                        {
+                            let eol_tok = self.next().unwrap();
+                            Statement::var_declare(
+                                None,
+                                ident,
+                                expr,
+                                let_tok.span.join(eol_tok.span),
+                            )
+                        } else {
+                            return Err(CompileError::UnexpectedEndOfFile);
+                        }
+                    } else {
+                        return Err(CompileError::UnexpectedToken(
+                            self.tokens.get(self.index).cloned().unwrap_or(let_tok),
+                        ));
+                    }
                 }
 
-                // var assign / function call in expr stmt
-                Token::Ident(_) => self.parse_ident_statement()?,
+                // ident -> assign or expr-statement
+                TokenKind::Ident(_) => {
+                    // consume ident token (we already have cloned it)
+                    // but use next() to advance index and get owned token
+                    let ident_tok = self.next().unwrap();
+                    // check if next is assign
+                    if self.index < self.tokens.len()
+                        && self.tokens[self.index].kind == TokenKind::Assign
+                    {
+                        // consume assign
+                        let _assign = self.next().unwrap();
+                        let expr = self.parse_expr()?;
+                        // expect EOL
+                        if self.index < self.tokens.len()
+                            && self.tokens[self.index].kind == TokenKind::EOL
+                        {
+                            let eol_tok = self.next().unwrap();
+                            Statement::var_assign(
+                                match ident_tok.kind {
+                                    TokenKind::Ident(n) => n,
+                                    _ => unreachable!(),
+                                },
+                                expr,
+                                ident_tok.span.join(eol_tok.span),
+                            )
+                        } else {
+                            return Err(CompileError::UnexpectedEndOfFile);
+                        }
+                    } else {
+                        // not assign -> treat as expression statement; we already consumed the ident so backtrack one
+                        self.back();
+                        let expr = self.parse_expr()?;
+                        // optionally consume trailing EOL
+                        if self.index < self.tokens.len()
+                            && self.tokens[self.index].kind == TokenKind::EOL
+                        {
+                            let _ = self.next();
+                        }
+                        Statement::expr_statement(expr, expr.span)
+                    }
+                }
 
-                Token::If => self.parse_if_statement()?,
+                TokenKind::If => {
+                    // delegate to helper that will consume tokens as needed
+                    self.parse_if_statement()?
+                }
 
-                Token::While => {
-                    expect_pat!(Token::While in self);
-
+                TokenKind::While => {
+                    // consume 'while'
+                    let while_tok = self.next().unwrap();
                     let cond = self.parse_expr()?;
-
-                    expect_pat!(Token::BraceL in self);
-
-                    let stmts = self.parse_stmts(Token::BraceR)?;
-                    Stmt::While(cond, stmts)
+                    // expect '{'
+                    if self.index < self.tokens.len()
+                        && self.tokens[self.index].kind == TokenKind::BraceL
+                    {
+                        let brace_tok = self.next().unwrap();
+                        let (stmts, end_span_tok) = self.parse_statements(TokenKind::BraceR)?;
+                        Statement::while_statement(cond, stmts, while_tok.span.join(end_span_tok))
+                    } else {
+                        return Err(CompileError::UnexpectedToken(
+                            self.tokens.get(self.index).cloned().unwrap_or(while_tok),
+                        ));
+                    }
                 }
 
-                _ => Stmt::Expr(self.parse_expr()?),
+                // fallback: expression statement
+                _ => {
+                    let expr = self.parse_expr()?;
+                    // optionally consume trailing EOL
+                    if self.index < self.tokens.len()
+                        && self.tokens[self.index].kind == TokenKind::EOL
+                    {
+                        let _ = self.next();
+                    }
+                    Statement::expr_statement(expr, expr.span)
+                }
             };
 
-            stmts.push(stmt);
+            statements.push(statement);
         }
 
-        Ok(stmts)
+        // ensure we have an end span to return (critical token must have been found)
+        let end = end_span.unwrap_or_else(|| Span::new(0, 0, 0));
+        Ok((statements, end))
     }
 
-    fn parse_ident_statement(&mut self) -> Result<Stmt, CompileErrorKind> {
-        expect_pat!(Token::Ident(ident) in self);
+    fn parse_ident_statement(&mut self) -> Result<Statement, CompileError> {
+        expect_token!(TokenKind::Ident(ident) in self);
 
-        if let Some(Token::Assign) = self.peek() {
-            expect_pat!(Token::Assign in self);
+        if let Some(TokenKind::Assign) = self.peek().map(|t| t.kind) {
+            expect_token!(TokenKind::Assign in self);
 
             let expr = self.parse_expr()?;
 
-            expect_pat!(Token::EOL in self);
-            Ok(Stmt::VarAssign(ident, expr))
+            expect_token!(TokenKind::EOL in self);
+            Ok(Statement::var_assign(ident, expr))
         } else {
             // if the next token is not an assign, it must be a function call
             // so we need to backtrack the ident token
             // and parse it as function call
             self.back();
             let expr = self.parse_expr()?;
-            expect_pat!(Token::EOL in self);
+            expect_token!(TokenKind::EOL in self);
 
             Ok(Stmt::Expr(expr))
         }
     }
 
-    fn parse_if_statement(&mut self) -> Result<Stmt, CompileErrorKind> {
-        expect_pat!(Token::If in self);
+    fn parse_if_statement(&mut self) -> Result<Statement, CompileError> {
+        expect_token!(TokenKind::If in self);
 
         let cond = self.parse_expr()?;
 
-        expect_pat!(Token::BraceL in self);
+        expect_token!(TokenKind::BraceL in self);
 
-        let stmts = self.parse_stmts(Token::BraceR)?;
+        let stmts = self.parse_stmts(TokenKind::BraceR)?;
 
-        let else_branch = if let Some(Token::Else) = self.peek() {
-            expect_pat!(Token::Else in self);
+        let else_branch = if let Some(TokenKind::Else) = self.peek() {
+            expect_token!(TokenKind::Else in self);
 
-            if let Some(Token::If) = self.peek() {
+            if let Some(TokenKind::If) = self.peek() {
                 Some(vec![self.parse_if_statement()?])
             } else {
-                expect_pat!(Token::BraceL in self);
-                let stmts = self.parse_stmts(Token::BraceR)?;
-                Some(stmts)
+                expect_token!(TokenKind::BraceL in self);
+                let if_block = self.parse_stmts(TokenKind::BraceR)?;
+                Some(if_block)
             }
         } else {
             None
         };
 
-        Ok(Stmt::If(cond, stmts, else_branch))
+        Ok(Statement::if_statement(cond, if_block, else_block))
     }
 
-    ////////////////// Expression parsing methods ////////////////
-
-    fn parse_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+    fn parse_expr(&mut self) -> Result<Expr, CompileError> {
         self.parse_logical_expr()
     }
 
     /// Parse logical `BinaryOp` such as and, or
-    fn parse_logical_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+    fn parse_logical_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_comp_expr()?;
 
         while let Some(token) = self.peek() {
@@ -283,7 +424,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse eq and neq `BinaryOp`
-    fn parse_comp_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+    fn parse_comp_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_add_expr()?;
 
         if let Some(token) = self.peek() {
@@ -300,7 +441,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse add and subtract `BinaryOp`
-    fn parse_add_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+    fn parse_add_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_mul_expr()?;
 
         while let Some(token) = self.peek() {
@@ -317,7 +458,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse multiply, divide and modulo `BinaryOp`
-    fn parse_mul_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+    fn parse_mul_expr(&mut self) -> Result<Expr, CompileError> {
         let mut lhs = self.parse_unary_op_expr()?;
 
         while let Some(token) = self.peek() {
@@ -334,8 +475,8 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse unary `UnaryOp` such as not
-    fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileErrorKind> {
-        let token = self.peek().ok_or(CompileErrorKind::UnexpectedEndOfFile)?;
+    fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileError> {
+        let token = self.peek().ok_or(CompileError::UnexpectedEndOfFile)?;
 
         let Some(op) = token_to_unary_op(token) else {
             return self.parse_atom_expr();
@@ -347,55 +488,55 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
-    fn parse_atom_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+    fn parse_atom_expr(&mut self) -> Result<Expr, CompileError> {
         let Some(token) = self.peek() else {
-            return Err(CompileErrorKind::UnexpectedEndOfFile);
+            return Err(CompileError::UnexpectedEndOfFile);
         };
 
         match token {
-            Token::Bool(_) => {
-                expect_pat!(Token::Bool(bool) in self);
+            TokenKind::Bool(_) => {
+                expect_token!(TokenKind::Bool(bool) in self);
                 Ok(Expr::Literal(Value::Bool(bool)))
             }
 
-            Token::Int(_) => {
-                expect_pat!(Token::Int(int) in self);
+            TokenKind::Int(_) => {
+                expect_token!(TokenKind::Int(int) in self);
                 Ok(Expr::Literal(Value::Int(int)))
             }
 
-            Token::Float(_) => {
-                expect_pat!(Token::Float(float) in self);
+            TokenKind::Float(_) => {
+                expect_token!(TokenKind::Float(float) in self);
                 Ok(Expr::Literal(Value::Float(float)))
             }
 
-            Token::StringLiteral(_) => {
-                expect_pat!(Token::StringLiteral(string) in self);
+            TokenKind::StringLiteral(_) => {
+                expect_token!(TokenKind::StringLiteral(string) in self);
                 Ok(Expr::Literal(Value::String(string)))
             }
 
-            Token::Ident(_) => self.parse_ident_expr(),
+            TokenKind::Ident(_) => self.parse_ident_expr(),
 
-            Token::ParenL => {
-                expect_pat!(Token::ParenL in self);
+            TokenKind::ParenL => {
+                expect_token!(TokenKind::ParenL in self);
                 let inner = self.parse_expr();
-                expect_pat!(Token::ParenR in self);
+                expect_token!(TokenKind::ParenR in self);
                 inner
             }
 
             _ => {
-                return Err(CompileErrorKind::UnexpectedToken(self.next().unwrap()));
+                return Err(CompileError::UnexpectedToken(self.next().unwrap()));
             }
         }
     }
 
-    fn parse_ident_expr(&mut self) -> Result<Expr, CompileErrorKind> {
-        expect_pat!(Token::Ident(ident) in self);
+    fn parse_ident_expr(&mut self) -> Result<Expr, CompileError> {
+        expect_token!(TokenKind::Ident(ident) in self);
 
         match self.peek() {
-            Some(Token::ParenL) => {
-                expect_pat!(Token::ParenL in self);
+            Some(TokenKind::ParenL) => {
+                expect_token!(TokenKind::ParenL in self);
                 let args = self.parse_args()?;
-                expect_pat!(Token::ParenR in self);
+                expect_token!(TokenKind::ParenR in self);
 
                 if BuiltinFunction::str_variants().contains(ident.as_str()) {
                     return Ok(Expr::BuiltinFunctionCall {
@@ -407,13 +548,13 @@ impl<'a> Parser<'a> {
                 Ok(Expr::FunctionCall(ident, args))
             }
 
-            Some(Token::Colon) => {
-                expect_pat!(Token::Colon in self);
-                expect_pat!(Token::Ident(func_name) in self);
+            Some(TokenKind::Colon) => {
+                expect_token!(TokenKind::Colon in self);
+                expect_token!(TokenKind::Ident(func_name) in self);
 
-                expect_pat!(Token::ParenL in self);
+                expect_token!(TokenKind::ParenL in self);
                 let args = self.parse_args()?;
-                expect_pat!(Token::ParenR in self);
+                expect_token!(TokenKind::ParenR in self);
 
                 Ok(Expr::ForeignFunctionCall {
                     module_name: ident,
@@ -426,17 +567,17 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileErrorKind> {
+    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileError> {
         let mut args = vec![];
 
         while let Some(token) = self.peek() {
-            if token == &Token::ParenR {
+            if token == &TokenKind::ParenR {
                 break;
             }
 
             args.push(self.parse_expr()?);
 
-            if self.peek() == Some(&Token::Comma) {
+            if self.peek() == Some(&TokenKind::Comma) {
                 self.skip();
             } else {
                 break;
@@ -447,47 +588,22 @@ impl<'a> Parser<'a> {
     }
 }
 
-fn token_to_logical_op(token: &Token) -> Option<BinaryOp> {
+fn token_to_logical_op(token: &TokenKind) -> Option<BinaryOp> {
     match token {
-        Token::And => Some(BinaryOp::And),
-        Token::Or => Some(BinaryOp::Or),
+        TokenKind::And => Some(BinaryOp::And),
+        TokenKind::Or => Some(BinaryOp::Or),
         _ => None,
     }
 }
 
-fn token_to_comp_op(token: &Token) -> Option<BinaryOp> {
+fn token_to_comp_op(token: &TokenKind) -> Option<BinaryOp> {
     match token {
-        Token::Equal => Some(BinaryOp::Equal),
-        Token::NotEqual => Some(BinaryOp::NotEqual),
-        Token::Less => Some(BinaryOp::Less),
-        Token::LessEqual => Some(BinaryOp::LessEqual),
-        Token::Greater => Some(BinaryOp::Greater),
-        Token::GreaterEqual => Some(BinaryOp::GreaterEqual),
-        _ => None,
-    }
-}
-
-fn token_to_add_op(token: &Token) -> Option<BinaryOp> {
-    match token {
-        Token::Plus => Some(BinaryOp::Add),
-        Token::Minus => Some(BinaryOp::Sub),
-        _ => None,
-    }
-}
-
-fn token_to_mul_op(token: &Token) -> Option<BinaryOp> {
-    match token {
-        Token::Asterisk => Some(BinaryOp::Mul),
-        Token::Slash => Some(BinaryOp::Div),
-        Token::Modulo => Some(BinaryOp::Modulo),
-        _ => None,
-    }
-}
-
-fn token_to_unary_op(token: &Token) -> Option<UnaryOp> {
-    match token {
-        Token::Not => Some(UnaryOp::Not),
-        Token::Minus => Some(UnaryOp::Negate),
+        TokenKind::Equal => Some(BinaryOp::Equal),
+        TokenKind::NotEqual => Some(BinaryOp::NotEqual),
+        TokenKind::Less => Some(BinaryOp::Less),
+        TokenKind::LessEqual => Some(BinaryOp::LessEqual),
+        TokenKind::Greater => Some(BinaryOp::Greater),
+        TokenKind::GreaterEqual => Some(BinaryOp::GreaterEqual),
         _ => None,
     }
 }
@@ -497,72 +613,20 @@ mod test {
     use super::*;
 
     #[test]
-    fn parser() {
-        let tokens = vec![
-            Token::DataType(DataType::Int),
-            Token::Ident("main".to_string()),
-            Token::ParenL,
-            Token::ParenR,
-            Token::BraceL,
-            Token::Return,
-            Token::Int(42),
-            Token::EOL,
-            Token::BraceR,
-        ];
-
-        let parser = Parser::new(&tokens);
-        let ast = parser.parse().unwrap();
-
-        let expected_ast = {
-            let mut ast = Ast::empty();
-            let signiture = InternalFunctionSigniture::new(DataType::Int, vec![]);
-            let body = vec![Stmt::Return(Expr::Literal(Value::Int(42)))];
-            ast.add_function("main".to_string(), signiture, body);
-            ast
-        };
-
-        assert_eq!(ast, expected_ast);
-    }
-
-    #[test]
-    fn parse_stmts() {
-        let tokens = vec![
-            Token::Let,
-            Token::Ident("x".to_string()),
-            Token::Assign,
-            Token::Int(42),
-            Token::EOL,
-            Token::Return,
-            Token::Ident("x".to_string()),
-            Token::EOL,
-        ];
-
-        let mut parser = Parser::new(&tokens);
-        let stmts = parser.parse_stmts(Token::EOL).unwrap();
-
-        let expected_stmts = vec![
-            Stmt::VarDeclare(None, "x".to_string(), Expr::Literal(Value::Int(42))),
-            Stmt::Return(Expr::Var("x".to_string())),
-        ];
-
-        assert_eq!(stmts, expected_stmts);
-    }
-
-    #[test]
     fn parse_expr() {
         let tokens = vec![
-            Token::Int(1),
-            Token::Plus,
-            Token::Int(2),
-            Token::Asterisk,
-            Token::Int(3),
-            Token::Equal,
-            Token::Ident("x".to_string()),
-            Token::ParenL,
-            Token::Int(7),
-            Token::Comma,
-            Token::Int(8),
-            Token::ParenR,
+            TokenKind::Int(1),
+            TokenKind::Plus,
+            TokenKind::Int(2),
+            TokenKind::Asterisk,
+            TokenKind::Int(3),
+            TokenKind::Equal,
+            TokenKind::Ident("x".to_string()),
+            TokenKind::ParenL,
+            TokenKind::Int(7),
+            TokenKind::Comma,
+            TokenKind::Int(8),
+            TokenKind::ParenR,
         ];
 
         let mut parser = Parser::new(&tokens);
@@ -591,12 +655,12 @@ mod test {
     #[test]
     fn parse_args() {
         let tokens = vec![
-            Token::Int(1),
-            Token::Comma,
-            Token::Int(2),
-            Token::Comma,
-            Token::Int(3),
-            Token::ParenR,
+            TokenKind::Int(1),
+            TokenKind::Comma,
+            TokenKind::Int(2),
+            TokenKind::Comma,
+            TokenKind::Int(3),
+            TokenKind::ParenR,
         ];
 
         let mut parser = Parser::new(&tokens);

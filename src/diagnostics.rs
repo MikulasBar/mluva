@@ -1,6 +1,6 @@
 pub type FileId = usize;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span {
     pub file: FileId,
     pub lo: usize,
