@@ -77,7 +77,7 @@ fn compile_module(
     let content = std::fs::read(&source_path)?;
     let content_str = String::from_utf8(content.clone())?;
 
-    let ast = Ast::from_string(&content_str).map_err(|e| e.to_string())?;
+    let ast = Ast::from_string(&content_str).map_err(|e| todo!() /*e.to_string()*/)?;
 
     for import in ast.get_imports() {
         // TODO: resolve full path
@@ -111,8 +111,8 @@ fn compile_module(
     let needs_compilation = module_metadata.needs_recompilation(&source_path, &content);
 
     if needs_compilation || !bytecode_path.exists() {
-        let module =
-            Module::from_ast_and_dependencies(ast, compiled_modules).map_err(|e| e.to_string())?;
+        let module = Module::from_ast_and_dependencies(ast, compiled_modules)
+            .map_err(|e| todo!() /*e.to_string()*/)?;
 
         let bytecode = module.to_bytecode();
 
