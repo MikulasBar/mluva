@@ -1,25 +1,37 @@
 use super::{binary_op::BinaryOp, UnaryOp};
-use crate::{ast::BuiltinFunction, value::Value};
+use crate::{ast::BuiltinFunction, diagnostics::Span, value::Value};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
+pub struct Expr {
+    pub kind: ExprKind,
+    pub span: Span,
+}
+
+impl Expr {
+    pub fn new(kind: ExprKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ExprKind {
     Literal(Value),
     Var(String),
     BinaryOp(BinaryOp, Box<Self>, Box<Self>),
     UnaryOp(UnaryOp, Box<Self>),
-    FunctionCall(String, Vec<Expr>),
+    FunctionCall(String, Vec<ExprKind>),
     ForeignFunctionCall {
         module_name: String,
         func_name: String,
-        args: Vec<Expr>,
+        args: Vec<ExprKind>,
     },
     BuiltinFunctionCall {
         function: BuiltinFunction,
-        args: Vec<Expr>,
+        args: Vec<ExprKind>,
     },
 }
 
-impl Expr {
+impl ExprKind {
     pub fn new_binary_op(op: BinaryOp, lhs: Self, rhs: Self) -> Self {
         Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
     }

@@ -16,7 +16,7 @@ pub use unary_op::UnaryOp;
 
 use crate::{
     compiler::{tokenize, Parser},
-    errors::CompileError,
+    errors::CompileErrorKind,
     function::InternalFunctionSigniture,
 };
 
@@ -43,11 +43,12 @@ impl Ast {
         }
     }
 
-    pub fn from_string(source: &str) -> Result<Self, CompileError> {
-        let tokens = tokenize(source)?;
-        let ast = Parser::new(&tokens).parse()?;
+    pub fn from_string(source: &str) -> Result<Self, CompileErrorKind> {
+        todo!();
+        // let tokens = tokenize(source)?;
+        // let ast = Parser::new(&tokens).parse()?;
 
-        Ok(ast)
+        // Ok(ast)
     }
 
     pub fn empty() -> Self {

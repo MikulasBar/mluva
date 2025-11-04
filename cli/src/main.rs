@@ -11,7 +11,7 @@ use std::fs;
 
 use codespan_reporting::files::SimpleFiles;
 use codespan_reporting::term::termcolor::{ColorChoice, StandardStream};
-use codespan_reporting::term::{Config, emit_to_io_write};
+use codespan_reporting::term::{Config, DisplayStyle, emit_to_io_write};
 
 fn run_tokenize_test(path: &str) -> Result<(), Box<dyn Error>> {
     // read source
@@ -21,7 +21,7 @@ fn run_tokenize_test(path: &str) -> Result<(), Box<dyn Error>> {
     let mut files = SimpleFiles::<String, String>::new();
     let file_id = files.add(path.to_string(), src.clone());
 
-    // call library lexer that returns SpannedToken or CompileError
+    // call library lexer that returns Token or CompileError
     match mluva::compiler::tokenize(file_id, &src) {
         Ok(tokens) => {
             println!("OK: tokenized {} tokens", tokens.len());
@@ -31,6 +31,7 @@ fn run_tokenize_test(path: &str) -> Result<(), Box<dyn Error>> {
             // convert to a codespan Diagnostic and print nicely to stderr
             let diag = compile_error.to_diagnostic(&files);
             let writer = StandardStream::stderr(ColorChoice::Auto);
+            let mut config = Config::default();
             emit_to_io_write(&mut writer.lock(), &Config::default(), &files, &diag)?;
             // return an error for non-zero exit code
             Err("tokenization failed".into())

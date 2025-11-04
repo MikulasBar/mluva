@@ -1,9 +1,9 @@
 use std::str::FromStr as _;
 
-use super::token::Token;
+use super::token::{Token, TokenKind};
 use super::DataType;
 use crate::ast::*;
-use crate::errors::CompileError;
+use crate::errors::CompileErrorKind;
 use crate::expect_pat;
 use crate::function::InternalFunctionSigniture;
 use crate::value::Value;
@@ -59,12 +59,12 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Result<Ast, CompileError> {
+    pub fn parse(mut self) -> Result<Ast, CompileErrorKind> {
         self.parse_top_level()?;
         Ok(self.ast)
     }
 
-    fn parse_top_level(&mut self) -> Result<(), CompileError> {
+    fn parse_top_level(&mut self) -> Result<(), CompileErrorKind> {
         while let Some(token) = self.peek() {
             match token {
                 // lonely EOL
@@ -84,7 +84,7 @@ impl<'a> Parser<'a> {
                     expect_pat!(Token::BraceL in self);
 
                     if BuiltinFunction::str_variants().contains(name.as_str()) {
-                        return Err(CompileError::ReservedFunctionName(name));
+                        return Err(CompileErrorKind::ReservedFunctionName(name));
                     }
 
                     let body = self.parse_stmts(Token::BraceR)?;
@@ -103,14 +103,14 @@ impl<'a> Parser<'a> {
                     self.ast.add_import(import_path);
                 }
 
-                _ => return Err(CompileError::UnexpectedToken(token.clone())),
+                _ => return Err(CompileErrorKind::UnexpectedToken(token.clone())),
             }
         }
 
         Ok(())
     }
 
-    fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileError> {
+    fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileErrorKind> {
         let mut params = vec![];
         while let Some(token) = self.peek() {
             if token == &Token::ParenR {
@@ -133,7 +133,7 @@ impl<'a> Parser<'a> {
 
     /// Parses a list of statements until the critical token is found.
     /// The critical token is not included in the returned statements.
-    fn parse_stmts(&mut self, critical_token: Token) -> Result<Vec<Stmt>, CompileError> {
+    fn parse_stmts(&mut self, critical_token: Token) -> Result<Vec<Stmt>, CompileErrorKind> {
         let mut stmts = vec![];
 
         while let Some(token) = self.peek() {
@@ -211,7 +211,7 @@ impl<'a> Parser<'a> {
         Ok(stmts)
     }
 
-    fn parse_ident_statement(&mut self) -> Result<Stmt, CompileError> {
+    fn parse_ident_statement(&mut self) -> Result<Stmt, CompileErrorKind> {
         expect_pat!(Token::Ident(ident) in self);
 
         if let Some(Token::Assign) = self.peek() {
@@ -233,7 +233,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_if_statement(&mut self) -> Result<Stmt, CompileError> {
+    fn parse_if_statement(&mut self) -> Result<Stmt, CompileErrorKind> {
         expect_pat!(Token::If in self);
 
         let cond = self.parse_expr()?;
@@ -261,12 +261,12 @@ impl<'a> Parser<'a> {
 
     ////////////////// Expression parsing methods ////////////////
 
-    fn parse_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         self.parse_logical_expr()
     }
 
     /// Parse logical `BinaryOp` such as and, or
-    fn parse_logical_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_logical_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         let mut lhs = self.parse_comp_expr()?;
 
         while let Some(token) = self.peek() {
@@ -283,7 +283,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse eq and neq `BinaryOp`
-    fn parse_comp_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_comp_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         let mut lhs = self.parse_add_expr()?;
 
         if let Some(token) = self.peek() {
@@ -300,7 +300,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse add and subtract `BinaryOp`
-    fn parse_add_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_add_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         let mut lhs = self.parse_mul_expr()?;
 
         while let Some(token) = self.peek() {
@@ -317,7 +317,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse multiply, divide and modulo `BinaryOp`
-    fn parse_mul_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_mul_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         let mut lhs = self.parse_unary_op_expr()?;
 
         while let Some(token) = self.peek() {
@@ -334,8 +334,8 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse unary `UnaryOp` such as not
-    fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileError> {
-        let token = self.peek().ok_or(CompileError::UnexpectedEndOfInput)?;
+    fn parse_unary_op_expr(&mut self) -> Result<Expr, CompileErrorKind> {
+        let token = self.peek().ok_or(CompileErrorKind::UnexpectedEndOfFile)?;
 
         let Some(op) = token_to_unary_op(token) else {
             return self.parse_atom_expr();
@@ -347,9 +347,9 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse atom expr such as Ident, Num, Bool, not ops.
-    fn parse_atom_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_atom_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         let Some(token) = self.peek() else {
-            return Err(CompileError::UnexpectedEndOfInput);
+            return Err(CompileErrorKind::UnexpectedEndOfFile);
         };
 
         match token {
@@ -383,12 +383,12 @@ impl<'a> Parser<'a> {
             }
 
             _ => {
-                return Err(CompileError::UnexpectedToken(self.next().unwrap()));
+                return Err(CompileErrorKind::UnexpectedToken(self.next().unwrap()));
             }
         }
     }
 
-    fn parse_ident_expr(&mut self) -> Result<Expr, CompileError> {
+    fn parse_ident_expr(&mut self) -> Result<Expr, CompileErrorKind> {
         expect_pat!(Token::Ident(ident) in self);
 
         match self.peek() {
@@ -426,7 +426,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileError> {
+    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileErrorKind> {
         let mut args = vec![];
 
         while let Some(token) = self.peek() {

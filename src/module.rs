@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
-    errors::{CompileError, RuntimeError},
+    errors::{CompileErrorKind, RuntimeError},
     function::{InternalFunctionSigniture, InternalFunctionSource},
     runtime::Runtime,
     value::Value,
@@ -66,22 +66,23 @@ impl Module {
         self.function_map.get(name).copied()
     }
 
-    pub fn from_string(input: &str) -> Result<Self, CompileError> {
-        let dependencies = HashMap::new();
+    pub fn from_string(input: &str) -> Result<Self, CompileErrorKind> {
+        todo!()
+        // let dependencies = HashMap::new();
 
-        let tokens = tokenize(input)?;
-        let ast = Parser::new(&tokens).parse()?;
+        // let tokens = tokenize(input)?;
+        // let ast = Parser::new(&tokens).parse()?;
 
-        TypeChecker::new(&ast, &dependencies).check()?;
-        let module = Compiler::new(ast, &dependencies).compile()?;
+        // TypeChecker::new(&ast, &dependencies).check()?;
+        // let module = Compiler::new(ast, &dependencies).compile()?;
 
-        Ok(module)
+        // Ok(module)
     }
 
     pub fn from_ast_and_dependencies(
         ast: crate::ast::Ast,
         dependencies: &HashMap<String, Module>,
-    ) -> Result<Self, CompileError> {
+    ) -> Result<Self, CompileErrorKind> {
         TypeChecker::new(&ast, dependencies).check()?;
         let module = Compiler::new(ast, dependencies).compile()?;
 

@@ -1,9 +1,10 @@
 pub mod ast;
 pub mod bytecode;
 pub mod compiler;
+mod diagnostics;
 pub mod errors;
 pub mod function;
-pub mod instruction;
+mod instruction;
 pub mod module;
 pub mod runtime;
 pub mod value;

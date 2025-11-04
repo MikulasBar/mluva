@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::data_type::DataType;
-use crate::errors::CompileError;
+use crate::errors::CompileErrorKind;
 
 pub struct DataTypeScope {
     scopes: Vec<HashMap<String, DataType>>,
@@ -29,9 +29,13 @@ impl DataTypeScope {
             .any(|scope| scope.contains_key(name))
     }
 
-    pub fn insert_new(&mut self, name: String, data_type: DataType) -> Result<(), CompileError> {
+    pub fn insert_new(
+        &mut self,
+        name: String,
+        data_type: DataType,
+    ) -> Result<(), CompileErrorKind> {
         if self.contains(&name) {
-            return Err(CompileError::VarRedeclaration(name));
+            return Err(CompileErrorKind::VarRedeclaration(name));
         }
 
         self.scopes

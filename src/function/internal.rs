@@ -1,4 +1,4 @@
-use crate::errors::CompileError;
+use crate::errors::CompileErrorKind;
 use crate::{compiler::DataType, instruction::Instruction};
 
 /// Signiture of an in-language function without name
@@ -16,9 +16,9 @@ impl InternalFunctionSigniture {
         }
     }
 
-    pub fn check_argument_types(&self, arg_types: &[DataType]) -> Result<(), CompileError> {
+    pub fn check_argument_types(&self, arg_types: &[DataType]) -> Result<(), CompileErrorKind> {
         if self.params.len() != arg_types.len() {
-            return Err(CompileError::WrongNumberOfArguments {
+            return Err(CompileErrorKind::WrongNumberOfArguments {
                 expected: self.params.len(),
                 found: arg_types.len(),
             });
@@ -26,7 +26,7 @@ impl InternalFunctionSigniture {
 
         for (i, (_, param_type)) in self.params.iter().enumerate() {
             if &arg_types[i] != param_type {
-                return Err(CompileError::WrongType {
+                return Err(CompileErrorKind::WrongType {
                     expected: *param_type,
                     found: arg_types[i],
                 });

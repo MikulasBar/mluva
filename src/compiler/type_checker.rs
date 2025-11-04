@@ -4,7 +4,7 @@ use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
 use crate::ast::{Ast, BinaryOp, BuiltinFunction, Expr, Stmt, UnaryOp};
 use crate::bin_op_pat;
-use crate::errors::CompileError;
+use crate::errors::CompileErrorKind;
 use crate::module::Module;
 
 pub struct TypeChecker<'a> {
@@ -22,11 +22,11 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    pub fn check(mut self) -> Result<(), CompileError> {
+    pub fn check(mut self) -> Result<(), CompileErrorKind> {
         self.check_functions()
     }
 
-    fn check_functions(&mut self) -> Result<(), CompileError> {
+    fn check_functions(&mut self) -> Result<(), CompileErrorKind> {
         for slot in 0..self.ast.function_count() {
             self.scope.enter();
 
@@ -54,7 +54,11 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmts(&mut self, stmts: &[Stmt], return_type: DataType) -> Result<(), CompileError> {
+    fn check_stmts(
+        &mut self,
+        stmts: &[Stmt],
+        return_type: DataType,
+    ) -> Result<(), CompileErrorKind> {
         for s in stmts {
             self.check_stmt(s, return_type)?;
         }
@@ -62,12 +66,12 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmt(&mut self, stmt: &Stmt, return_type: DataType) -> Result<(), CompileError> {
+    fn check_stmt(&mut self, stmt: &Stmt, return_type: DataType) -> Result<(), CompileErrorKind> {
         match stmt {
             Stmt::If(cond, stmts, else_stmts) => {
                 let cond = self.check_expr(cond)?;
                 if !cond.is_bool() {
-                    return Err(CompileError::WrongType {
+                    return Err(CompileErrorKind::WrongType {
                         expected: DataType::Bool,
                         found: cond,
                     });
@@ -86,7 +90,7 @@ impl<'a> TypeChecker<'a> {
                 let expr_type = self.check_expr(expr)?;
                 let data_type = if let Some(data_type) = data_type {
                     if expr_type != *data_type {
-                        return Err(CompileError::WrongType {
+                        return Err(CompileErrorKind::WrongType {
                             expected: *data_type,
                             found: expr_type,
                         });
@@ -102,13 +106,13 @@ impl<'a> TypeChecker<'a> {
 
             Stmt::VarAssign(ident, expr) => {
                 let Some(&data_type) = self.scope.get(&ident) else {
-                    return Err(CompileError::VariableNotFound(ident.clone()));
+                    return Err(CompileErrorKind::VariableNotFound(ident.clone()));
                 };
 
                 let expr_type = self.check_expr(expr)?;
 
                 if expr_type != data_type {
-                    return Err(CompileError::WrongType {
+                    return Err(CompileErrorKind::WrongType {
                         expected: data_type,
                         found: expr_type,
                     });
@@ -118,7 +122,7 @@ impl<'a> TypeChecker<'a> {
             Stmt::While(cond, stmts) => {
                 let cond = self.check_expr(cond)?;
                 if !cond.is_bool() {
-                    return Err(CompileError::WrongType {
+                    return Err(CompileErrorKind::WrongType {
                         expected: DataType::Bool,
                         found: cond,
                     });
@@ -134,7 +138,7 @@ impl<'a> TypeChecker<'a> {
             Stmt::Return(expr) => {
                 let expr_type = self.check_expr(expr)?;
                 if expr_type != return_type {
-                    return Err(CompileError::WrongType {
+                    return Err(CompileErrorKind::WrongType {
                         expected: return_type,
                         found: expr_type,
                     });
@@ -145,11 +149,11 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_expr(&self, expr: &Expr) -> Result<DataType, CompileError> {
+    fn check_expr(&self, expr: &Expr) -> Result<DataType, CompileErrorKind> {
         match expr {
             Expr::Var(ident) => {
                 let Some(data_type) = self.scope.get(ident) else {
-                    return Err(CompileError::VariableNotFound(ident.clone()));
+                    return Err(CompileErrorKind::VariableNotFound(ident.clone()));
                 };
 
                 Ok(data_type.clone())
@@ -157,13 +161,13 @@ impl<'a> TypeChecker<'a> {
             Expr::Literal(lit) => Ok(lit.get_type()),
             Expr::FunctionCall(name, args) => {
                 let Some(signiture) = self.ast.get_function_signiture(name) else {
-                    return Err(CompileError::FunctionNotFound(name.clone()));
+                    return Err(CompileErrorKind::FunctionNotFound(name.clone()));
                 };
 
                 let arg_types: Vec<DataType> = args
                     .iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+                    .collect::<Result<Vec<DataType>, CompileErrorKind>>()?;
 
                 signiture.check_argument_types(&arg_types)?;
 
@@ -178,14 +182,14 @@ impl<'a> TypeChecker<'a> {
                 let signiture = self
                     .dependencies
                     .get(module_name)
-                    .ok_or_else(|| CompileError::ModuleNotFound(module_name.clone()))?
+                    .ok_or_else(|| CompileErrorKind::ModuleNotFound(module_name.clone()))?
                     .get_function_signiture(func_name)
-                    .ok_or_else(|| CompileError::FunctionNotFound(func_name.clone()))?;
+                    .ok_or_else(|| CompileErrorKind::FunctionNotFound(func_name.clone()))?;
 
                 let arg_types: Vec<DataType> = args
                     .iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+                    .collect::<Result<Vec<DataType>, CompileErrorKind>>()?;
 
                 signiture.check_argument_types(&arg_types)?;
 
@@ -196,7 +200,7 @@ impl<'a> TypeChecker<'a> {
                 let arg_types: Vec<DataType> = args
                     .iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+                    .collect::<Result<Vec<DataType>, CompileErrorKind>>()?;
 
                 match function {
                     BuiltinFunction::Print => {
@@ -207,7 +211,7 @@ impl<'a> TypeChecker<'a> {
                         // Assert arguments must be bool
                         for arg_type in arg_types {
                             if arg_type != DataType::Bool {
-                                return Err(CompileError::WrongType {
+                                return Err(CompileErrorKind::WrongType {
                                     expected: DataType::Bool,
                                     found: arg_type,
                                 });
@@ -231,19 +235,19 @@ impl<'a> TypeChecker<'a> {
                         (DataType::Int, DataType::Int) => Ok(DataType::Int),
                         (DataType::Float, DataType::Float) => Ok(DataType::Float),
                         (DataType::Int | DataType::Float, _) => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: a,
                                 found: b,
                             })
                         }
                         (_, DataType::Int | DataType::Float) => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: b,
                                 found: a,
                             })
                         }
                         _ => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: DataType::Int,
                                 found: a,
                             })
@@ -254,19 +258,19 @@ impl<'a> TypeChecker<'a> {
                         (DataType::Int, DataType::Int) => Ok(DataType::Bool),
                         (DataType::Float, DataType::Float) => Ok(DataType::Bool),
                         (DataType::Int | DataType::Float, _) => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: a,
                                 found: b,
                             })
                         }
                         (_, DataType::Int | DataType::Float) => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: b,
                                 found: a,
                             })
                         }
                         _ => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: DataType::Int,
                                 found: a,
                             })
@@ -277,14 +281,14 @@ impl<'a> TypeChecker<'a> {
 
                     bin_op_pat!(LOGICAL) => {
                         if a != DataType::Bool {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: DataType::Bool,
                                 found: a,
                             });
                         }
 
                         if b != DataType::Bool {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: DataType::Bool,
                                 found: b,
                             });
@@ -300,7 +304,7 @@ impl<'a> TypeChecker<'a> {
                 match op {
                     UnaryOp::Not => {
                         if a != DataType::Bool {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: DataType::Bool,
                                 found: a,
                             });
@@ -313,7 +317,7 @@ impl<'a> TypeChecker<'a> {
                         DataType::Int => Ok(DataType::Int),
                         DataType::Float => Ok(DataType::Float),
                         _ => {
-                            return Err(CompileError::WrongType {
+                            return Err(CompileErrorKind::WrongType {
                                 expected: DataType::Int,
                                 found: a,
                             })

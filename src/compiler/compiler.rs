@@ -2,7 +2,7 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
-use crate::errors::CompileError;
+use crate::errors::CompileErrorKind;
 use crate::function::{InternalFunctionSigniture, InternalFunctionSource};
 use crate::instruction::Instruction;
 
@@ -28,7 +28,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(mut self) -> Result<Module, CompileError> {
+    pub fn compile(mut self) -> Result<Module, CompileErrorKind> {
         for slot in 0..self.ast.function_count() {
             self.compile_function(slot)?;
         }
@@ -40,7 +40,7 @@ impl<'a> Compiler<'a> {
         Ok(module)
     }
 
-    fn compile_function(&mut self, slot: u32) -> Result<(), CompileError> {
+    fn compile_function(&mut self, slot: u32) -> Result<(), CompileErrorKind> {
         let function_map = self.ast.get_function_map();
         let signiture = self.ast.get_function_signiture_by_slot(slot).unwrap();
         let body = self.ast.get_function_body_by_slot(slot).unwrap();
@@ -104,7 +104,7 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions.push(instr);
     }
 
-    fn compile(mut self) -> Result<InternalFunctionSource, CompileError> {
+    fn compile(mut self) -> Result<InternalFunctionSource, CompileErrorKind> {
         self.setup_parameters();
         self.compile_stmts(&self.body)?;
 
@@ -127,7 +127,7 @@ impl<'b> FunctionCompiler<'b> {
         }
     }
 
-    fn compile_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileError> {
+    fn compile_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileErrorKind> {
         for stmt in stmts {
             self.compile_stmt(stmt)?;
         }
@@ -135,7 +135,7 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), CompileError> {
+    fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), CompileErrorKind> {
         match stmt {
             // there is no difference between declaration and assignment at this point
             Stmt::VarDeclare(_, name, expr) | Stmt::VarAssign(name, expr) => {
@@ -172,7 +172,7 @@ impl<'b> FunctionCompiler<'b> {
         cond: &Expr,
         stmts: &[Stmt],
         else_stmts: Option<&[Stmt]>,
-    ) -> Result<(), CompileError> {
+    ) -> Result<(), CompileErrorKind> {
         // Compile the condition expression
         self.compile_expr(cond)?;
 
@@ -215,7 +215,11 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_while_statement(&mut self, cond: &Expr, stmts: &[Stmt]) -> Result<(), CompileError> {
+    fn compile_while_statement(
+        &mut self,
+        cond: &Expr,
+        stmts: &[Stmt],
+    ) -> Result<(), CompileErrorKind> {
         // Store the index of the start of the "while" block
         // this includes the condition evaluation and check
         // because every iteration we need to check the condition
@@ -240,7 +244,7 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
+    fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileErrorKind> {
         match expr {
             Expr::Literal(v) => {
                 self.instructions.push(Instruction::Push(v.clone()));
@@ -290,7 +294,7 @@ impl<'b> FunctionCompiler<'b> {
                     .get(module_name)
                     .and_then(|module| module.get_slot(func_name))
                 else {
-                    return Err(CompileError::UnknownForeignFunction {
+                    return Err(CompileErrorKind::UnknownForeignFunction {
                         module: module_name.clone(),
                         name: func_name.clone(),
                     });

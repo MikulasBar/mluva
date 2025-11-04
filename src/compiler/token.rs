@@ -1,7 +1,21 @@
+use crate::diagnostics::Span;
+
 use super::data_type::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Token {
+pub struct Token {
+    pub kind: TokenKind,
+    pub span: Span,
+}
+
+impl Token {
+    pub fn new(kind: TokenKind, span: Span) -> Self {
+        Self { kind, span }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum TokenKind {
     EOF,
     EOL,
 

@@ -1,23 +1,4 @@
 #[macro_export]
-macro_rules! str_pat {
-    (WS) => {
-        ' ' | '\r' | '\t'
-    };
-
-    (EOL) => {
-        '\n' | '\r'
-    };
-
-    (IDENT) => {
-        '_' | 'a'..='z' | 'A'..='Z'
-    };
-
-    (NUM) => {
-        '0'..='9'
-    };
-}
-
-#[macro_export]
 macro_rules! bin_op_pat {
     (COMPARISON) => {
         BinaryOp::Equal | BinaryOp::NotEqual
@@ -44,10 +25,10 @@ macro_rules! expect_pat {
             $iter.next().unwrap()
         } else {
             // there is no token to return
-            return Err(CompileError::UnexpectedToken(Token::EOF));
+            return Err(CompileErrorKind::UnexpectedToken(TokenKind::EOF));
         }) else {
             // the token is not the expected one
-            return Err(CompileError::UnexpectedToken($iter.next().unwrap()));
+            return Err(CompileErrorKind::UnexpectedToken($iter.next().unwrap()));
         };
     };
 }
