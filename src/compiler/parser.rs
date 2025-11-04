@@ -148,8 +148,9 @@ impl<'a> Parser<'a> {
         let mut statements = vec![];
         let mut end_span: Option<Span> = None;
 
-        while let Some(token) = self.next() {
+        while let Some(token) = self.peek() {
             if token.kind == critical_kind {
+                self.skip();
                 end_span = Some(token.span);
                 break;
             }
@@ -157,193 +158,64 @@ impl<'a> Parser<'a> {
             let statement = match token.kind {
                 // lonely EOL -> skip
                 TokenKind::EOL => {
+                    self.skip();
                     continue;
                 }
 
                 TokenKind::Return => {
-                    // consume 'return'
-                    let return_tok = self.next().unwrap();
-
-                    // if next is EOL -> return void
-                    if self.index < self.tokens.len()
-                        && self.tokens[self.index].kind == TokenKind::EOL
-                    {
-                        let eol_tok = self.next().unwrap();
-                        Statement::return_statement(
-                            Expr::literal(Value::Void, return_tok.span),
-                            return_tok.span.join(eol_tok.span),
-                        )
+                    expect_token!(TokenKind::Return in self);
+                    if let Some(TokenKind::EOL) = self.peek() {
+                        self.skip();
+                        Statement::return_statement(Expr::literal(Value::Void))
                     } else {
-                        // parse expression and expect EOL
                         let expr = self.parse_expr()?;
-                        if self.index < self.tokens.len()
-                            && self.tokens[self.index].kind == TokenKind::EOL
-                        {
-                            let eol_tok = self.next().unwrap();
-                            Statement::return_statement(expr, return_tok.span.join(eol_tok.span))
-                        } else {
-                            return Err(CompileError::unexpected_end_of_file_at());
-                        }
+                        expect_token!(TokenKind::EOL in self);
+                        Statement::Return(expr)
                     }
                 }
 
-                // var declaration with explicit type: DataType Ident = expr EOL
+                // var declaration with explicit type
                 TokenKind::DataType(_) => {
-                    // consume DataType
-                    let dt_tok = self.next().unwrap();
-                    // expect ident
-                    let ident_tok = match self.next() {
-                        Some(t) => t,
-                        None => return Err(CompileError::UnexpectedEndOfFile),
-                    };
-                    let ident = match ident_tok.kind {
-                        TokenKind::Ident(n) => n,
-                        _ => return Err(CompileError::UnexpectedToken(ident_tok)),
-                    };
-                    // expect assign
-                    if self.index < self.tokens.len()
-                        && self.tokens[self.index].kind == TokenKind::Assign
-                    {
-                        let assign_tok = self.next().unwrap();
-                        // parse expr
-                        let expr = self.parse_expr()?;
-                        // expect EOL
-                        if self.index < self.tokens.len()
-                            && self.tokens[self.index].kind == TokenKind::EOL
-                        {
-                            let eol_tok = self.next().unwrap();
-                            Statement::var_declare(
-                                Some(match dt_tok.kind {
-                                    TokenKind::DataType(dt) => dt,
-                                    _ => unreachable!(),
-                                }),
-                                ident,
-                                expr,
-                                dt_tok.span.join(eol_tok.span),
-                            )
-                        } else {
-                            return Err(CompileError::UnexpectedEndOfFile);
-                        }
-                    } else {
-                        return Err(CompileError::UnexpectedToken(
-                            self.tokens.get(self.index).cloned().unwrap_or(dt_tok),
-                        ));
-                    }
+                    expect_token!(TokenKind::DataType(data_type) in self);
+                    expect_token!(TokenKind::Ident(ident) in self);
+                    expect_token!(TokenKind::Assign in self);
+
+                    let expr = self.parse_expr()?;
+
+                    expect_token!(TokenKind::EOL in self);
+
+                    Statement::var_declare(Some(data_type), ident, expr)
                 }
 
                 TokenKind::Let => {
-                    let let_tok = self.next().unwrap();
-                    let ident_tok = match self.next() {
-                        Some(t) => t,
-                        None => return Err(CompileError::UnexpectedEndOfFile),
-                    };
-                    let ident = match ident_tok.kind {
-                        TokenKind::Ident(n) => n,
-                        _ => return Err(CompileError::UnexpectedToken(ident_tok)),
-                    };
-                    // expect assign
-                    if self.index < self.tokens.len()
-                        && self.tokens[self.index].kind == TokenKind::Assign
-                    {
-                        let assign_tok = self.next().unwrap();
-                        let expr = self.parse_expr()?;
-                        // expect EOL
-                        if self.index < self.tokens.len()
-                            && self.tokens[self.index].kind == TokenKind::EOL
-                        {
-                            let eol_tok = self.next().unwrap();
-                            Statement::var_declare(
-                                None,
-                                ident,
-                                expr,
-                                let_tok.span.join(eol_tok.span),
-                            )
-                        } else {
-                            return Err(CompileError::UnexpectedEndOfFile);
-                        }
-                    } else {
-                        return Err(CompileError::UnexpectedToken(
-                            self.tokens.get(self.index).cloned().unwrap_or(let_tok),
-                        ));
-                    }
+                    expect_token!(TokenKind::Let in self);
+                    expect_token!(TokenKind::Ident(ident) in self);
+                    expect_token!(TokenKind::Assign in self);
+
+                    let expr = self.parse_expr()?;
+
+                    expect_token!(TokenKind::EOL in self);
+
+                    Statement::var_declare(None, ident, expr)
                 }
 
-                // ident -> assign or expr-statement
-                TokenKind::Ident(_) => {
-                    // consume ident token (we already have cloned it)
-                    // but use next() to advance index and get owned token
-                    let ident_tok = self.next().unwrap();
-                    // check if next is assign
-                    if self.index < self.tokens.len()
-                        && self.tokens[self.index].kind == TokenKind::Assign
-                    {
-                        // consume assign
-                        let _assign = self.next().unwrap();
-                        let expr = self.parse_expr()?;
-                        // expect EOL
-                        if self.index < self.tokens.len()
-                            && self.tokens[self.index].kind == TokenKind::EOL
-                        {
-                            let eol_tok = self.next().unwrap();
-                            Statement::var_assign(
-                                match ident_tok.kind {
-                                    TokenKind::Ident(n) => n,
-                                    _ => unreachable!(),
-                                },
-                                expr,
-                                ident_tok.span.join(eol_tok.span),
-                            )
-                        } else {
-                            return Err(CompileError::UnexpectedEndOfFile);
-                        }
-                    } else {
-                        // not assign -> treat as expression statement; we already consumed the ident so backtrack one
-                        self.back();
-                        let expr = self.parse_expr()?;
-                        // optionally consume trailing EOL
-                        if self.index < self.tokens.len()
-                            && self.tokens[self.index].kind == TokenKind::EOL
-                        {
-                            let _ = self.next();
-                        }
-                        Statement::expr_statement(expr, expr.span)
-                    }
-                }
+                // var assign / function call in expr stmt
+                TokenKind::Ident(_) => self.parse_ident_statement()?,
 
-                TokenKind::If => {
-                    // delegate to helper that will consume tokens as needed
-                    self.parse_if_statement()?
-                }
+                TokenKind::If => self.parse_if_statement()?,
 
                 TokenKind::While => {
-                    // consume 'while'
-                    let while_tok = self.next().unwrap();
+                    expect_token!(TokenKind::While in self);
+
                     let cond = self.parse_expr()?;
-                    // expect '{'
-                    if self.index < self.tokens.len()
-                        && self.tokens[self.index].kind == TokenKind::BraceL
-                    {
-                        let brace_tok = self.next().unwrap();
-                        let (stmts, end_span_tok) = self.parse_statements(TokenKind::BraceR)?;
-                        Statement::while_statement(cond, stmts, while_tok.span.join(end_span_tok))
-                    } else {
-                        return Err(CompileError::UnexpectedToken(
-                            self.tokens.get(self.index).cloned().unwrap_or(while_tok),
-                        ));
-                    }
+
+                    expect_token!(TokenKind::BraceL in self);
+
+                    let stmts = self.parse_stmts(TokenKind::BraceR)?;
+                    Statement::while_statement(cond, stmts)
                 }
 
-                // fallback: expression statement
-                _ => {
-                    let expr = self.parse_expr()?;
-                    // optionally consume trailing EOL
-                    if self.index < self.tokens.len()
-                        && self.tokens[self.index].kind == TokenKind::EOL
-                    {
-                        let _ = self.next();
-                    }
-                    Statement::expr_statement(expr, expr.span)
-                }
+                _ => Statement::expr_statement(self.parse_expr()?),
             };
 
             statements.push(statement);
@@ -372,7 +244,7 @@ impl<'a> Parser<'a> {
             let expr = self.parse_expr()?;
             expect_token!(TokenKind::EOL in self);
 
-            Ok(Stmt::Expr(expr))
+            Ok(Statement::Expr(expr))
         }
     }
 
