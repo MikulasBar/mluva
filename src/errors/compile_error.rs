@@ -1,9 +1,6 @@
 use std::fmt;
 
-use codespan_reporting::{
-    diagnostic::{Diagnostic, Label, Severity},
-    files::SimpleFiles,
-};
+use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
 use crate::{
     compiler::{data_type::DataType, token::TokenKind},
@@ -75,7 +72,7 @@ impl CompileError {
     pub fn unexpected_token_at(token_kind: TokenKind, span: Span) -> Self {
         Self::new(
             CompileErrorKind::UnexpectedToken(token_kind.clone()),
-            format!("unexpected token: {:?}", token_kind),
+            format!("unexpected token {}", token_kind),
         )
         .with_span(span)
     }
@@ -83,7 +80,7 @@ impl CompileError {
     pub fn wrong_type_at(expected: DataType, found: DataType, span: Span) -> Self {
         Self::new(
             CompileErrorKind::WrongType { expected, found },
-            format!("wrong type: expected {:?}, found {:?}", expected, found),
+            format!("wrong type: expected {}, found {}", expected, found),
         )
         .with_span(span)
     }
@@ -142,7 +139,7 @@ impl CompileError {
                 name: name.clone().into(),
             },
             format!(
-                "unknown foreign function: {}::{}",
+                "unknown foreign function: {}:{}",
                 module.into(),
                 name.into()
             ),
@@ -156,7 +153,7 @@ impl CompileError {
 
     /// Convert into a codespan_reporting::diagnostic::Diagnostic using the supplied files map.
     /// Caller provides the `SimpleFiles<String, String>` instance that holds the source text(s).
-    pub fn to_diagnostic(&self, files: &SimpleFiles<String, String>) -> Diagnostic<usize> {
+    pub fn to_diagnostic(&self) -> Diagnostic<usize> {
         let mut diag = Diagnostic::new(Severity::Error).with_message(self.message.clone());
 
         if let Some(span) = &self.span {

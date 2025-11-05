@@ -18,8 +18,8 @@ pub use unary_op::UnaryOp;
 
 use crate::{
     compiler::{tokenize, Parser},
-    errors::CompileErrorKind,
-    function::FunctionSigniture,
+    diagnostics::FileId,
+    errors::CompileError,
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,12 +45,11 @@ impl Ast {
         }
     }
 
-    pub fn from_string(source: &str) -> Result<Self, CompileErrorKind> {
-        todo!();
-        // let tokens = tokenize(source)?;
-        // let ast = Parser::new(&tokens).parse()?;
+    pub fn from_string(source: &str, file_id: FileId) -> Result<Self, CompileError> {
+        let tokens = tokenize(source, file_id)?;
+        let ast = Parser::new(&tokens, file_id).parse()?;
 
-        // Ok(ast)
+        Ok(ast)
     }
 
     pub fn empty() -> Self {

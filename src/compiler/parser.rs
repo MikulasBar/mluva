@@ -65,24 +65,16 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn span_between(&self, first_idx: usize, last_idx: usize) -> crate::diagnostics::Span {
-        let first = self.tokens[first_idx].span;
-        let last = self.tokens[last_idx].span;
-        first.join(last)
-    }
-
-    fn span_current(&self) -> Option<crate::diagnostics::Span> {
-        self.peek().map(|t| t.span)
-    }
-
     pub fn parse(mut self) -> Result<Ast, CompileError> {
         self.parse_top_level()?;
         Ok(self.ast)
     }
 
     fn parse_top_level(&mut self) -> Result<(), CompileError> {
-        while let Some(token) = self.next() {
-            match token.kind {
+        while let Some(token) = self.peek() {
+            let token_span = token.span;
+
+            match &token.kind {
                 TokenKind::EOL => {
                     self.skip();
                     continue;
@@ -109,7 +101,7 @@ impl<'a> Parser<'a> {
                     let signiture = SpannedFunctionSigniture::new(
                         return_type,
                         params,
-                        token.span.join(paren_r_span),
+                        token_span.join(paren_r_span),
                     );
 
                     self.ast.add_function(name, signiture, body);
@@ -124,7 +116,12 @@ impl<'a> Parser<'a> {
                     self.ast.add_import(import_path);
                 }
 
-                _ => return Err(CompileError::unexpected_token_at(token.kind, token.span)),
+                _ => {
+                    return Err(CompileError::unexpected_token_at(
+                        token.kind.clone(),
+                        token.span,
+                    ))
+                }
             }
         }
 

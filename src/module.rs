@@ -3,7 +3,8 @@ use std::collections::HashMap;
 use crate::{
     bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
-    errors::{CompileError, CompileErrorKind, RuntimeError},
+    diagnostics::FileId,
+    errors::{CompileError, RuntimeError},
     function::{FunctionSigniture, FunctionSource},
     runtime::Runtime,
     value::Value,
@@ -66,17 +67,16 @@ impl Module {
         self.function_map.get(name).copied()
     }
 
-    pub fn from_string(input: &str) -> Result<Self, CompileErrorKind> {
-        todo!()
-        // let dependencies = HashMap::new();
+    pub fn from_string(input: &str, file_id: FileId) -> Result<Self, CompileError> {
+        let dependencies = HashMap::new();
 
-        // let tokens = tokenize(input)?;
-        // let ast = Parser::new(&tokens).parse()?;
+        let tokens = tokenize(input, file_id)?;
+        let ast = Parser::new(&tokens, file_id).parse()?;
 
-        // TypeChecker::new(&ast, &dependencies).check()?;
-        // let module = Compiler::new(ast, &dependencies).compile()?;
+        TypeChecker::new(&ast, &dependencies).check()?;
+        let module = Compiler::new(ast, &dependencies).compile()?;
 
-        // Ok(module)
+        Ok(module)
     }
 
     pub fn from_ast_and_dependencies(

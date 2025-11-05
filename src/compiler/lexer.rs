@@ -9,7 +9,7 @@ use crate::errors::CompileError;
 /// Tokenize input and attach byte-span info to each token.
 /// Returns Vec<Token> where each token carries a Span { file, lo, hi }.
 /// `file_id` should come from your SimpleFiles / SourceMap (codespan-reporting).
-pub fn tokenize(file_id: usize, input: &str) -> Result<Vec<Token>, CompileError> {
+pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError> {
     let mut tokens: Vec<Token> = vec![];
     let mut chars = input.char_indices().peekable();
 
@@ -381,7 +381,7 @@ mod test {
     #[test]
     fn test_tokenize() {
         let input = "let x: Int = 42;\nif x > 10 {\nreturn 'Hello';\n}";
-        let tokens = tokenize(0, input).unwrap();
+        let tokens = tokenize(input, 0).unwrap();
         let expected_tokens = vec![
             TokenKind::Let,
             TokenKind::Ident("x".to_string()),
