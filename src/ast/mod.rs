@@ -1,6 +1,7 @@
 mod binary_op;
 mod builtin_function;
 mod expr;
+mod function_ast;
 mod path;
 mod statement;
 mod unary_op;
@@ -9,30 +10,31 @@ use std::collections::HashMap;
 
 pub use binary_op::BinaryOp;
 pub use builtin_function::BuiltinFunction;
-pub use expr::Expr;
+pub use expr::{Expr, ExprKind};
+pub use function_ast::{SpannedFunctionSigniture, SpannedParameter};
 pub use path::Path;
-pub use statement::Stmt;
+pub use statement::{Statement, StatementKind};
 pub use unary_op::UnaryOp;
 
 use crate::{
     compiler::{tokenize, Parser},
+    diagnostics::FileId,
     errors::CompileError,
-    function::InternalFunctionSigniture,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     function_map: HashMap<String, u32>,
-    function_signitures: Vec<InternalFunctionSigniture>,
-    function_bodies: Vec<Vec<Stmt>>,
+    function_signitures: Vec<SpannedFunctionSigniture>,
+    function_bodies: Vec<Vec<Statement>>,
     imports: Vec<Path>,
 }
 
 impl Ast {
     pub fn new(
         function_map: HashMap<String, u32>,
-        function_signitures: Vec<InternalFunctionSigniture>,
-        function_bodies: Vec<Vec<Stmt>>,
+        function_signitures: Vec<SpannedFunctionSigniture>,
+        function_bodies: Vec<Vec<Statement>>,
         imports: Vec<Path>,
     ) -> Self {
         Self {
@@ -43,9 +45,9 @@ impl Ast {
         }
     }
 
-    pub fn from_string(source: &str) -> Result<Self, CompileError> {
-        let tokens = tokenize(source)?;
-        let ast = Parser::new(&tokens).parse()?;
+    pub fn from_string(source: &str, file_id: FileId) -> Result<Self, CompileError> {
+        let tokens = tokenize(source, file_id)?;
+        let ast = Parser::new(&tokens, file_id).parse()?;
 
         Ok(ast)
     }
@@ -62,8 +64,8 @@ impl Ast {
     pub fn add_function(
         &mut self,
         name: String,
-        signiture: InternalFunctionSigniture,
-        body: Vec<Stmt>,
+        signiture: SpannedFunctionSigniture,
+        body: Vec<Statement>,
     ) {
         let slot = self.function_signitures.len() as u32;
         self.function_map.insert(name, slot);
@@ -83,16 +85,16 @@ impl Ast {
         self.function_map.get(name).copied()
     }
 
-    pub fn get_function_signiture(&self, name: &str) -> Option<&InternalFunctionSigniture> {
+    pub fn get_function_signiture(&self, name: &str) -> Option<&SpannedFunctionSigniture> {
         let slot = *self.function_map.get(name)?;
         self.function_signitures.get(slot as usize)
     }
 
-    pub fn get_function_signiture_by_slot(&self, slot: u32) -> Option<&InternalFunctionSigniture> {
+    pub fn get_function_signiture_by_slot(&self, slot: u32) -> Option<&SpannedFunctionSigniture> {
         self.function_signitures.get(slot as usize)
     }
 
-    pub fn get_function_body_by_slot(&self, slot: u32) -> Option<&[Stmt]> {
+    pub fn get_function_body_by_slot(&self, slot: u32) -> Option<&[Statement]> {
         self.function_bodies
             .get(slot as usize)
             .map(|v| v.as_slice())
@@ -112,8 +114,8 @@ impl Ast {
         self,
     ) -> (
         HashMap<String, u32>,
-        Vec<InternalFunctionSigniture>,
-        Vec<Vec<Stmt>>,
+        Vec<SpannedFunctionSigniture>,
+        Vec<Vec<Statement>>,
         Vec<Path>,
     ) {
         (
