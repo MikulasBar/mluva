@@ -131,6 +131,25 @@ impl CompileError {
         .with_span(span)
     }
 
+    pub fn unknown_foreign_function_at(
+        module: impl Into<String> + Clone,
+        name: impl Into<String> + Clone,
+        span: Span,
+    ) -> Self {
+        Self::new(
+            CompileErrorKind::UnknownForeignFunction {
+                module: module.clone().into(),
+                name: name.clone().into(),
+            },
+            format!(
+                "unknown foreign function: {}::{}",
+                module.into(),
+                name.into()
+            ),
+        )
+        .with_span(span)
+    }
+
     pub fn other_at(msg: impl Into<String>, span: Span) -> Self {
         Self::new(CompileErrorKind::Other, msg).with_span(span)
     }

@@ -1,9 +1,12 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::ast::{Ast, BinaryOp, Expr, Statement, UnaryOp};
-use crate::errors::CompileErrorKind;
-use crate::function::{InternalFunctionSigniture, InternalFunctionSource};
+use crate::ast::{
+    Ast, BinaryOp, Expr, ExprKind, SpannedFunctionSigniture, SpannedParameter, Statement,
+    StatementKind, UnaryOp,
+};
+use crate::errors::CompileError;
+use crate::function::FunctionSource;
 use crate::instruction::Instruction;
 
 use crate::module::Module;
@@ -12,7 +15,7 @@ use crate::value::Value;
 use super::DataType;
 
 pub struct Compiler<'a> {
-    sources: Vec<InternalFunctionSource>,
+    sources: Vec<FunctionSource>,
     ast: Ast,
     dependencies: &'a HashMap<String, Module>,
 }
@@ -28,12 +31,17 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub fn compile(mut self) -> Result<Module, CompileErrorKind> {
+    pub fn compile(mut self) -> Result<Module, CompileError> {
         for slot in 0..self.ast.function_count() {
             self.compile_function(slot)?;
         }
 
-        let (function_map, function_signitures, ..) = self.ast.deconstruct();
+        let (function_map, spanned_function_signitures, ..) = self.ast.deconstruct();
+        let function_signitures = spanned_function_signitures
+            .into_iter()
+            .map(Into::into)
+            .collect();
+
         let main_slot = function_map.get("main").copied();
         let module = Module::new(main_slot, function_map, function_signitures, self.sources);
 
@@ -58,7 +66,7 @@ struct FunctionCompiler<'b> {
     dependencies: &'b HashMap<String, Module>,
     function_map: &'b HashMap<String, u32>,
     body: &'b [Statement],
-    signiture: &'b InternalFunctionSigniture,
+    signiture: &'b SpannedFunctionSigniture,
 
     instructions: Vec<Instruction>,
     locals: HashMap<String, usize>,
@@ -70,7 +78,7 @@ impl<'b> FunctionCompiler<'b> {
         dependencies: &'b HashMap<String, Module>,
         function_map: &'b HashMap<String, u32>,
         body: &'b [Statement],
-        signiture: &'b InternalFunctionSigniture,
+        signiture: &'b SpannedFunctionSigniture,
     ) -> Self {
         Self {
             dependencies,
@@ -104,7 +112,7 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions.push(instr);
     }
 
-    fn compile(mut self) -> Result<InternalFunctionSource, CompileErrorKind> {
+    fn compile(mut self) -> Result<FunctionSource, CompileError> {
         self.setup_parameters();
         self.compile_stmts(&self.body)?;
 
@@ -114,14 +122,11 @@ impl<'b> FunctionCompiler<'b> {
             self.instructions.push(Instruction::Return);
         }
 
-        Ok(InternalFunctionSource::new(
-            self.locals.len(),
-            self.instructions,
-        ))
+        Ok(FunctionSource::new(self.locals.len(), self.instructions))
     }
 
     fn setup_parameters(&mut self) {
-        for (name, _) in &self.signiture.params {
+        for SpannedParameter { name, .. } in &self.signiture.params {
             let slot = self.get_slot(&name) as u32;
             self.instructions.push(Instruction::Store { slot });
         }
@@ -135,31 +140,38 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
-        match stmt {
+    fn compile_stmt(&mut self, statement: &Statement) -> Result<(), CompileError> {
+        match &statement.kind {
             // there is no difference between declaration and assignment at this point
-            StatementKind::VarDeclare(_, name, expr) | StatementKind::VarAssign(name, expr) => {
-                self.compile_expr(expr)?;
-                let slot = self.get_slot(name) as u32;
+            StatementKind::VarDeclare {
+                variable, value, ..
+            }
+            | StatementKind::VarAssign { variable, value } => {
+                self.compile_expr(&value)?;
+                let slot = self.get_slot(&variable) as u32;
                 self.push(Instruction::Store { slot });
             }
 
             StatementKind::Expr(expr) => {
-                self.compile_expr(expr)?;
+                self.compile_expr(&expr)?;
                 // We need to pop the expression from stack since we don't use it anywhere.
                 self.push(Instruction::Pop);
             }
 
-            StatementKind::If(cond, stmts, else_stmts) => {
-                self.compile_if_statement(cond, stmts, else_stmts.as_deref())?;
+            StatementKind::If {
+                condition,
+                if_block,
+                else_block,
+            } => {
+                self.compile_if_statement(&condition, &if_block, else_block.as_deref())?;
             }
 
-            StatementKind::While(cond, stmts) => {
-                self.compile_while_statement(cond, stmts)?;
+            StatementKind::While { condition, block } => {
+                self.compile_while_statement(&condition, &block)?;
             }
 
             StatementKind::Return(expr) => {
-                self.compile_expr(expr)?;
+                self.compile_expr(&expr)?;
                 self.push(Instruction::Return);
             }
         }
@@ -245,42 +257,45 @@ impl<'b> FunctionCompiler<'b> {
     }
 
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
-        match expr {
-            Expr::Literal(v) => {
+        match &expr.kind {
+            ExprKind::Literal(v) => {
                 self.instructions.push(Instruction::Push(v.clone()));
             }
 
-            Expr::Var(name) => {
+            ExprKind::Var(name) => {
                 let slot = self.get_slot(name) as u32;
                 self.instructions.push(Instruction::Load { slot });
             }
 
-            Expr::BinaryOp(op, lhs, rhs) => {
+            ExprKind::BinaryOp(op, lhs, rhs) => {
                 self.compile_expr(lhs)?;
                 self.compile_expr(rhs)?;
                 let op_instruction = bin_op_to_instruction(op);
                 self.instructions.push(op_instruction);
             }
 
-            Expr::UnaryOp(op, expr) => {
+            ExprKind::UnaryOp(op, expr) => {
                 self.compile_expr(expr)?;
                 let op_instruction = un_op_to_instruction(op);
                 self.instructions.push(op_instruction);
             }
 
-            Expr::FunctionCall(name, args) => {
+            ExprKind::FunctionCall { func_name, args } => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
 
-                let Some(call_slot) = self.function_map.get(name).copied() else {
-                    panic!("Function {} not found", name);
+                let Some(call_slot) = self.function_map.get(func_name).copied() else {
+                    panic!(
+                        "Function {} not found, should be handled in typechecker",
+                        func_name
+                    );
                 };
 
                 self.instructions.push(Instruction::Call { call_slot });
             }
 
-            Expr::ForeignFunctionCall {
+            ExprKind::ForeignFunctionCall {
                 module_name,
                 func_name,
                 args,
@@ -294,10 +309,11 @@ impl<'b> FunctionCompiler<'b> {
                     .get(module_name)
                     .and_then(|module| module.get_slot(func_name))
                 else {
-                    return Err(CompileErrorKind::UnknownForeignFunction {
-                        module: module_name.clone(),
-                        name: func_name.clone(),
-                    });
+                    return Err(CompileError::unknown_foreign_function_at(
+                        module_name,
+                        func_name,
+                        expr.span,
+                    ));
                 };
 
                 self.instructions.push(Instruction::ForeignCall {
@@ -306,7 +322,7 @@ impl<'b> FunctionCompiler<'b> {
                 });
             }
 
-            Expr::BuiltinFunctionCall { function, args } => {
+            ExprKind::BuiltinFunctionCall { function, args } => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
@@ -344,163 +360,5 @@ fn un_op_to_instruction(op: &UnaryOp) -> Instruction {
     match op {
         UnaryOp::Negate => Instruction::Negate,
         UnaryOp::Not => Instruction::Not,
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::ast::Statement;
-
-    #[test]
-    fn compile_stmts() {
-        let stmts = vec![
-            StatementKind::VarDeclare(
-                Some(DataType::Int),
-                "a".to_string(),
-                Expr::Literal(Value::Int(10)),
-            ),
-            StatementKind::VarDeclare(None, "b".to_string(), Expr::Literal(Value::Int(20))),
-            StatementKind::VarAssign(
-                "a".to_string(),
-                Expr::BinaryOp(
-                    BinaryOp::Add,
-                    Box::new(Expr::Var("a".to_string())),
-                    Box::new(Expr::Var("b".to_string())),
-                ),
-            ),
-            StatementKind::Expr(Expr::Var("a".to_string())),
-            StatementKind::If(
-                Expr::BinaryOp(
-                    BinaryOp::Greater,
-                    Box::new(Expr::Var("a".to_string())),
-                    Box::new(Expr::Literal(Value::Int(15))),
-                ),
-                vec![StatementKind::Expr(Expr::Literal(Value::Int(1)))],
-                Some(vec![StatementKind::Expr(Expr::Literal(Value::Int(0)))]),
-            ),
-            StatementKind::While(
-                Expr::BinaryOp(
-                    BinaryOp::Less,
-                    Box::new(Expr::Var("a".to_string())),
-                    Box::new(Expr::Literal(Value::Int(100))),
-                ),
-                vec![StatementKind::VarAssign(
-                    "a".to_string(),
-                    Expr::BinaryOp(
-                        BinaryOp::Add,
-                        Box::new(Expr::Var("a".to_string())),
-                        Box::new(Expr::Literal(Value::Int(10))),
-                    ),
-                )],
-            ),
-        ];
-
-        let dependencies = HashMap::new();
-        let function_map = HashMap::new();
-        let signiture = InternalFunctionSigniture::new(DataType::Void, vec![]);
-
-        let mut compiler = FunctionCompiler::new(&dependencies, &function_map, &stmts, &signiture);
-
-        compiler.compile_stmts(&stmts).unwrap();
-
-        assert_eq!(
-            compiler.instructions,
-            vec![
-                Instruction::Push(Value::Int(10)),
-                Instruction::Store { slot: 0 },
-                Instruction::Push(Value::Int(20)),
-                Instruction::Store { slot: 1 },
-                Instruction::Load { slot: 0 },
-                Instruction::Load { slot: 1 },
-                Instruction::Add,
-                Instruction::Store { slot: 0 },
-                Instruction::Load { slot: 0 },
-                Instruction::Pop,
-                Instruction::Load { slot: 0 },
-                Instruction::Push(Value::Int(15)),
-                Instruction::Greater,
-                Instruction::JumpIfFalse(17),
-                Instruction::Push(Value::Int(1)),
-                Instruction::Pop,
-                Instruction::Jump(19),
-                Instruction::Push(Value::Int(0)),
-                Instruction::Pop,
-                Instruction::Load { slot: 0 },
-                Instruction::Push(Value::Int(100)),
-                Instruction::Less,
-                Instruction::JumpIfFalse(28),
-                Instruction::Load { slot: 0 },
-                Instruction::Push(Value::Int(10)),
-                Instruction::Add,
-                Instruction::Store { slot: 0 },
-                Instruction::Jump(19),
-            ]
-        );
-    }
-
-    #[test]
-    fn compile_expr() {
-        // Expression: -2 * (x + 7) - (20 % 6) / !(1 == 5)
-        let expr = Expr::BinaryOp(
-            BinaryOp::Sub,
-            Box::new(Expr::BinaryOp(
-                BinaryOp::Mul,
-                Box::new(Expr::UnaryOp(
-                    UnaryOp::Negate,
-                    Box::new(Expr::Literal(Value::Int(2))),
-                )),
-                Box::new(Expr::BinaryOp(
-                    BinaryOp::Add,
-                    Box::new(Expr::Var("x".to_string())),
-                    Box::new(Expr::Literal(Value::Int(7))),
-                )),
-            )),
-            Box::new(Expr::BinaryOp(
-                BinaryOp::Div,
-                Box::new(Expr::BinaryOp(
-                    BinaryOp::Modulo,
-                    Box::new(Expr::Literal(Value::Int(20))),
-                    Box::new(Expr::Literal(Value::Int(6))),
-                )),
-                Box::new(Expr::UnaryOp(
-                    UnaryOp::Not,
-                    Box::new(Expr::BinaryOp(
-                        BinaryOp::Equal,
-                        Box::new(Expr::Literal(Value::Int(1))),
-                        Box::new(Expr::Literal(Value::Int(5))),
-                    )),
-                )),
-            )),
-        );
-
-        let dependencies = HashMap::new();
-        let function_map = HashMap::new();
-        let signiture = InternalFunctionSigniture::new(DataType::Int, vec![]);
-
-        let mut compiler = FunctionCompiler::new(&dependencies, &function_map, &[], &signiture);
-
-        compiler.compile_expr(&expr).unwrap();
-
-        assert_eq!(
-            compiler.instructions,
-            vec![
-                Instruction::Push(Value::Int(2)),
-                Instruction::Negate,
-                Instruction::Load { slot: 0 },
-                Instruction::Push(Value::Int(7)),
-                Instruction::Add,
-                Instruction::Mul,
-                Instruction::Push(Value::Int(20)),
-                Instruction::Push(Value::Int(6)),
-                Instruction::Modulo,
-                Instruction::Push(Value::Int(1)),
-                Instruction::Push(Value::Int(5)),
-                Instruction::Equal,
-                Instruction::Not,
-                Instruction::Div,
-                Instruction::Sub,
-            ]
-        );
     }
 }

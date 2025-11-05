@@ -358,11 +358,3 @@ impl<'a> TypeChecker<'a> {
         }
     }
 }
-
-// #[cfg(test)]
-// mod test {
-//     use super::*;
-
-//     #[test]
-
-// }

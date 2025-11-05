@@ -1,5 +1,6 @@
 use crate::{
-    compiler::DataType, diagnostics::Span, errors::CompileError, instruction::Instruction,
+    ast::SpannedFunctionSigniture, compiler::DataType, diagnostics::Span, errors::CompileError,
+    instruction::Instruction,
 };
 
 /// Signiture of an in-language function without name
@@ -42,6 +43,19 @@ impl FunctionSigniture {
         }
 
         Ok(())
+    }
+}
+
+impl From<SpannedFunctionSigniture> for FunctionSigniture {
+    fn from(spanned: SpannedFunctionSigniture) -> Self {
+        Self {
+            return_type: spanned.return_type,
+            params: spanned
+                .params
+                .into_iter()
+                .map(|p| Parameter::new(p.name, p.data_type))
+                .collect(),
+        }
     }
 }
 
