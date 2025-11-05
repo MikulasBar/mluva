@@ -6,10 +6,7 @@ use codespan_reporting::{
 };
 
 use crate::{
-    compiler::{
-        data_type::DataType,
-        token::{Token, TokenKind},
-    },
+    compiler::{data_type::DataType, token::TokenKind},
     diagnostics::{FileId, Span},
 };
 
@@ -119,6 +116,17 @@ impl CompileError {
         Self::new(
             CompileErrorKind::VarRedeclaration(name.clone().into()),
             format!("variable redeclaration: {}", name.into()),
+        )
+        .with_span(span)
+    }
+
+    pub fn wrong_number_of_arguments_at(expected: usize, found: usize, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::WrongNumberOfArguments { expected, found },
+            format!(
+                "wrong number of arguments: expected {}, found {}",
+                expected, found
+            ),
         )
         .with_span(span)
     }

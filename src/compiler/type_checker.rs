@@ -6,6 +6,7 @@ use crate::ast::{
     Ast, BinaryOp, BuiltinFunction, Expr, ExprKind, Statement, StatementKind, UnaryOp,
 };
 use crate::bin_op_pat;
+use crate::diagnostics::Span;
 use crate::errors::CompileError;
 use crate::module::Module;
 
@@ -37,8 +38,9 @@ impl<'a> TypeChecker<'a> {
                 .unwrap()
                 .params
                 .iter()
-                .try_for_each(|(name, data_type)| {
-                    self.scope.insert_new(name.clone(), data_type.clone())
+                .try_for_each(|param| {
+                    self.scope
+                        .insert_new(param.name.clone(), param.data_type.clone(), param.span)
                 })?;
 
             let statements = self.ast.get_function_body_by_slot(slot).unwrap();
@@ -73,7 +75,7 @@ impl<'a> TypeChecker<'a> {
         statement: &Statement,
         return_type: DataType,
     ) -> Result<(), CompileError> {
-        match statement.kind {
+        match &statement.kind {
             StatementKind::If {
                 condition,
                 if_block,
@@ -104,20 +106,21 @@ impl<'a> TypeChecker<'a> {
                 // if no then do essentialy nothing
                 let expr_type = self.check_expr(&value)?;
                 let data_type = if let Some(data_type) = data_type {
-                    if expr_type != data_type {
+                    if expr_type != *data_type {
                         return Err(CompileError::wrong_type_at(
-                            data_type,
+                            *data_type,
                             expr_type,
                             statement.span,
                         ));
                     }
 
-                    data_type
+                    *data_type
                 } else {
                     expr_type
                 };
 
-                self.scope.insert_new(variable.clone(), data_type)?;
+                self.scope
+                    .insert_new(variable.clone(), data_type, statement.span)?;
             }
 
             StatementKind::VarAssign { variable, value } => {
@@ -172,7 +175,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_expr(&self, expr: &Expr) -> Result<DataType, CompileError> {
-        match expr.kind {
+        match &expr.kind {
             ExprKind::Var(ident) => {
                 let Some(data_type) = self.scope.get(&ident) else {
                     return Err(CompileError::variable_not_found_at(
@@ -192,12 +195,12 @@ impl<'a> TypeChecker<'a> {
                     ));
                 };
 
-                let arg_types: Vec<DataType> = args
+                let arg_types: Vec<(DataType, Span)> = args
                     .iter()
-                    .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+                    .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
+                    .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
 
-                signiture.check_argument_types(&arg_types)?;
+                signiture.check_argument_types(&arg_types, expr.span)?;
 
                 Ok(signiture.return_type)
             }
@@ -209,7 +212,7 @@ impl<'a> TypeChecker<'a> {
             } => {
                 let signiture = self
                     .dependencies
-                    .get(&module_name)
+                    .get(module_name)
                     .ok_or_else(|| {
                         CompileError::module_not_found_at(module_name.clone(), expr.span)
                     })?
@@ -218,12 +221,12 @@ impl<'a> TypeChecker<'a> {
                         CompileError::function_not_found_at(func_name.clone(), expr.span)
                     })?;
 
-                let arg_types: Vec<DataType> = args
+                let arg_types: Vec<(DataType, Span)> = args
                     .iter()
-                    .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileError>>()?;
+                    .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
+                    .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
 
-                signiture.check_argument_types(&arg_types)?;
+                signiture.check_argument_types(&arg_types, expr.span)?;
 
                 Ok(signiture.return_type)
             }
@@ -355,3 +358,11 @@ impl<'a> TypeChecker<'a> {
         }
     }
 }
+
+// #[cfg(test)]
+// mod test {
+//     use super::*;
+
+//     #[test]
+
+// }

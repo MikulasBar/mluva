@@ -4,7 +4,7 @@ use crate::{
     bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
     errors::{CompileError, CompileErrorKind, RuntimeError},
-    function::{InternalFunctionSigniture, InternalFunctionSource},
+    function::{FunctionSigniture, FunctionSource},
     runtime::Runtime,
     value::Value,
 };
@@ -12,16 +12,16 @@ use crate::{
 pub struct Module {
     main_slot: Option<u32>,
     function_map: HashMap<String, u32>,
-    function_signitures: Vec<InternalFunctionSigniture>,
-    function_sources: Vec<InternalFunctionSource>,
+    function_signitures: Vec<FunctionSigniture>,
+    function_sources: Vec<FunctionSource>,
 }
 
 impl Module {
     pub fn new(
         main_slot: Option<u32>,
         function_map: HashMap<String, u32>,
-        function_signitures: Vec<InternalFunctionSigniture>,
-        function_sources: Vec<InternalFunctionSource>,
+        function_signitures: Vec<FunctionSigniture>,
+        function_sources: Vec<FunctionSource>,
     ) -> Self {
         Self {
             main_slot,
@@ -44,20 +44,20 @@ impl Module {
         self.main_slot.is_some()
     }
 
-    pub fn get_main_source(&self) -> Option<&InternalFunctionSource> {
+    pub fn get_main_source(&self) -> Option<&FunctionSource> {
         let slot = self.main_slot?;
         self.function_sources.get(slot as usize)
     }
 
-    pub fn get_sources(&self) -> &[InternalFunctionSource] {
+    pub fn get_sources(&self) -> &[FunctionSource] {
         &self.function_sources
     }
 
-    pub fn get_function_source_by_slot(&self, slot: u32) -> Option<&InternalFunctionSource> {
+    pub fn get_function_source_by_slot(&self, slot: u32) -> Option<&FunctionSource> {
         self.function_sources.get(slot as usize)
     }
 
-    pub fn get_function_signiture(&self, name: &str) -> Option<&InternalFunctionSigniture> {
+    pub fn get_function_signiture(&self, name: &str) -> Option<&FunctionSigniture> {
         let slot = self.function_map.get(name)?;
         self.function_signitures.get(*slot as usize)
     }
@@ -113,12 +113,12 @@ impl BytecodeSerializable for Module {
 
         let mut function_signitures = Vec::with_capacity(header.function_count as usize);
         for _ in 0..header.function_count {
-            function_signitures.push(InternalFunctionSigniture::from_bytecode(bytes, cursor)?);
+            function_signitures.push(FunctionSigniture::from_bytecode(bytes, cursor)?);
         }
 
         let mut function_sources = Vec::with_capacity(header.function_count as usize);
         for _ in 0..header.function_count {
-            function_sources.push(InternalFunctionSource::from_bytecode(bytes, cursor)?);
+            function_sources.push(FunctionSource::from_bytecode(bytes, cursor)?);
         }
 
         Ok(Self {

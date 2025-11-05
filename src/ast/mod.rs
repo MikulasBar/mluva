@@ -1,6 +1,7 @@
 mod binary_op;
 mod builtin_function;
 mod expr;
+mod function_ast;
 mod path;
 mod statement;
 mod unary_op;
@@ -10,6 +11,7 @@ use std::collections::HashMap;
 pub use binary_op::BinaryOp;
 pub use builtin_function::BuiltinFunction;
 pub use expr::{Expr, ExprKind};
+pub use function_ast::{SpannedFunctionSigniture, SpannedParameter};
 pub use path::Path;
 pub use statement::{Statement, StatementKind};
 pub use unary_op::UnaryOp;
@@ -17,13 +19,13 @@ pub use unary_op::UnaryOp;
 use crate::{
     compiler::{tokenize, Parser},
     errors::CompileErrorKind,
-    function::InternalFunctionSigniture,
+    function::FunctionSigniture,
 };
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
     function_map: HashMap<String, u32>,
-    function_signitures: Vec<InternalFunctionSigniture>,
+    function_signitures: Vec<SpannedFunctionSigniture>,
     function_bodies: Vec<Vec<Statement>>,
     imports: Vec<Path>,
 }
@@ -31,7 +33,7 @@ pub struct Ast {
 impl Ast {
     pub fn new(
         function_map: HashMap<String, u32>,
-        function_signitures: Vec<InternalFunctionSigniture>,
+        function_signitures: Vec<SpannedFunctionSigniture>,
         function_bodies: Vec<Vec<Statement>>,
         imports: Vec<Path>,
     ) -> Self {
@@ -63,7 +65,7 @@ impl Ast {
     pub fn add_function(
         &mut self,
         name: String,
-        signiture: InternalFunctionSigniture,
+        signiture: SpannedFunctionSigniture,
         body: Vec<Statement>,
     ) {
         let slot = self.function_signitures.len() as u32;
@@ -84,12 +86,12 @@ impl Ast {
         self.function_map.get(name).copied()
     }
 
-    pub fn get_function_signiture(&self, name: &str) -> Option<&InternalFunctionSigniture> {
+    pub fn get_function_signiture(&self, name: &str) -> Option<&SpannedFunctionSigniture> {
         let slot = *self.function_map.get(name)?;
         self.function_signitures.get(slot as usize)
     }
 
-    pub fn get_function_signiture_by_slot(&self, slot: u32) -> Option<&InternalFunctionSigniture> {
+    pub fn get_function_signiture_by_slot(&self, slot: u32) -> Option<&SpannedFunctionSigniture> {
         self.function_signitures.get(slot as usize)
     }
 
@@ -113,7 +115,7 @@ impl Ast {
         self,
     ) -> (
         HashMap<String, u32>,
-        Vec<InternalFunctionSigniture>,
+        Vec<SpannedFunctionSigniture>,
         Vec<Vec<Statement>>,
         Vec<Path>,
     ) {

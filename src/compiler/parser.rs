@@ -1,12 +1,10 @@
 use std::str::FromStr as _;
 
 use super::token::{Token, TokenKind};
-use super::DataType;
 use crate::ast::*;
 use crate::diagnostics::FileId;
 use crate::errors::CompileError;
 use crate::expect_token;
-use crate::function::InternalFunctionSigniture;
 use crate::value::Value;
 
 pub struct Parser<'a> {
@@ -97,7 +95,7 @@ impl<'a> Parser<'a> {
 
                     let params = self.parse_named_parameters()?;
 
-                    expect_token!(TokenKind::ParenR in self);
+                    expect_token!(TokenKind::ParenR, paren_r_span in self);
                     expect_token!(TokenKind::BraceL in self);
 
                     if BuiltinFunction::str_variants().contains(name.as_str()) {
@@ -105,7 +103,15 @@ impl<'a> Parser<'a> {
                     }
 
                     let body = self.parse_statements(TokenKind::BraceR)?;
-                    let signiture = InternalFunctionSigniture::new(return_type, params);
+
+                    expect_token!(TokenKind::BraceR in self);
+
+                    let signiture = SpannedFunctionSigniture::new(
+                        return_type,
+                        params,
+                        token.span.join(paren_r_span),
+                    );
+
                     self.ast.add_function(name, signiture, body);
                 }
 
@@ -125,16 +131,17 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_named_parameters(&mut self) -> Result<Vec<(String, DataType)>, CompileError> {
+    fn parse_named_parameters(&mut self) -> Result<Vec<SpannedParameter>, CompileError> {
         let mut params = vec![];
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::ParenR {
                 break;
             }
 
-            expect_token!(TokenKind::DataType(data_type) in self);
-            expect_token!(TokenKind::Ident(ident) in self);
-            params.push((ident, data_type));
+            expect_token!(TokenKind::DataType(data_type), data_type_span in self);
+            expect_token!(TokenKind::Ident(ident), ident_span in self);
+            let param = SpannedParameter::new(ident, data_type, data_type_span.join(ident_span));
+            params.push(param);
 
             if let Some(&TokenKind::Comma) = self.peek_kind() {
                 self.skip();
