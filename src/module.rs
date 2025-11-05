@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     bytecode::{read_fn_map_bytecode, write_fn_map_bytecode, BytecodeHeader, BytecodeSerializable},
     compiler::{tokenize, Compiler, Parser, TypeChecker},
-    errors::{CompileErrorKind, RuntimeError},
+    errors::{CompileError, CompileErrorKind, RuntimeError},
     function::{InternalFunctionSigniture, InternalFunctionSource},
     runtime::Runtime,
     value::Value,
@@ -82,7 +82,7 @@ impl Module {
     pub fn from_ast_and_dependencies(
         ast: crate::ast::Ast,
         dependencies: &HashMap<String, Module>,
-    ) -> Result<Self, CompileErrorKind> {
+    ) -> Result<Self, CompileError> {
         TypeChecker::new(&ast, dependencies).check()?;
         let module = Compiler::new(ast, dependencies).compile()?;
 

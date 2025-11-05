@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
-use crate::ast::{Ast, BinaryOp, BuiltinFunction, Expr, Stmt, UnaryOp};
+use crate::ast::{
+    Ast, BinaryOp, BuiltinFunction, Expr, ExprKind, Statement, StatementKind, UnaryOp,
+};
 use crate::bin_op_pat;
-use crate::errors::CompileErrorKind;
+use crate::errors::CompileError;
 use crate::module::Module;
 
 pub struct TypeChecker<'a> {
@@ -22,11 +24,11 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    pub fn check(mut self) -> Result<(), CompileErrorKind> {
+    pub fn check(mut self) -> Result<(), CompileError> {
         self.check_functions()
     }
 
-    fn check_functions(&mut self) -> Result<(), CompileErrorKind> {
+    fn check_functions(&mut self) -> Result<(), CompileError> {
         for slot in 0..self.ast.function_count() {
             self.scope.enter();
 
@@ -46,7 +48,7 @@ impl<'a> TypeChecker<'a> {
                 .unwrap()
                 .return_type;
 
-            self.check_stmts(statements, return_type)?;
+            self.check_statements(statements, return_type)?;
 
             self.scope.exit();
         }
@@ -54,94 +56,114 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_stmts(
+    fn check_statements(
         &mut self,
-        stmts: &[Stmt],
+        stmts: &[Statement],
         return_type: DataType,
-    ) -> Result<(), CompileErrorKind> {
+    ) -> Result<(), CompileError> {
         for s in stmts {
-            self.check_stmt(s, return_type)?;
+            self.check_statement(s, return_type)?;
         }
 
         Ok(())
     }
 
-    fn check_stmt(&mut self, stmt: &Stmt, return_type: DataType) -> Result<(), CompileErrorKind> {
-        match stmt {
-            Stmt::If(cond, stmts, else_stmts) => {
-                let cond = self.check_expr(cond)?;
+    fn check_statement(
+        &mut self,
+        statement: &Statement,
+        return_type: DataType,
+    ) -> Result<(), CompileError> {
+        match statement.kind {
+            StatementKind::If {
+                condition,
+                if_block,
+                else_block,
+            } => {
+                let cond = self.check_expr(&condition)?;
                 if !cond.is_bool() {
-                    return Err(CompileErrorKind::WrongType {
-                        expected: DataType::Bool,
-                        found: cond,
-                    });
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Bool,
+                        cond,
+                        statement.span,
+                    ));
                 }
 
-                self.check_stmts(stmts, return_type)?;
-                if let Some(else_stmts) = else_stmts {
-                    self.check_stmts(else_stmts, return_type)?;
+                self.check_statements(&if_block, return_type)?;
+                if let Some(else_stmts) = else_block {
+                    self.check_statements(&else_stmts, return_type)?;
                 }
             }
 
-            Stmt::VarDeclare(data_type, ident, expr) => {
+            StatementKind::VarDeclare {
+                data_type,
+                variable,
+                value,
+            } => {
                 // if the declaration has explicit type or not
                 // check the type if yes
                 // if no then do essentialy nothing
-                let expr_type = self.check_expr(expr)?;
+                let expr_type = self.check_expr(&value)?;
                 let data_type = if let Some(data_type) = data_type {
-                    if expr_type != *data_type {
-                        return Err(CompileErrorKind::WrongType {
-                            expected: *data_type,
-                            found: expr_type,
-                        });
+                    if expr_type != data_type {
+                        return Err(CompileError::wrong_type_at(
+                            data_type,
+                            expr_type,
+                            statement.span,
+                        ));
                     }
 
-                    *data_type
+                    data_type
                 } else {
                     expr_type
                 };
 
-                self.scope.insert_new(ident.clone(), data_type)?;
+                self.scope.insert_new(variable.clone(), data_type)?;
             }
 
-            Stmt::VarAssign(ident, expr) => {
-                let Some(&data_type) = self.scope.get(&ident) else {
-                    return Err(CompileErrorKind::VariableNotFound(ident.clone()));
+            StatementKind::VarAssign { variable, value } => {
+                let Some(&data_type) = self.scope.get(&variable) else {
+                    return Err(CompileError::variable_not_found_at(
+                        variable.clone(),
+                        statement.span,
+                    ));
                 };
 
-                let expr_type = self.check_expr(expr)?;
+                let value_type = self.check_expr(&value)?;
 
-                if expr_type != data_type {
-                    return Err(CompileErrorKind::WrongType {
-                        expected: data_type,
-                        found: expr_type,
-                    });
+                if value_type != data_type {
+                    return Err(CompileError::wrong_type_at(
+                        data_type,
+                        value_type,
+                        statement.span,
+                    ));
                 }
             }
 
-            Stmt::While(cond, stmts) => {
-                let cond = self.check_expr(cond)?;
+            StatementKind::While { condition, block } => {
+                let cond = self.check_expr(&condition)?;
                 if !cond.is_bool() {
-                    return Err(CompileErrorKind::WrongType {
-                        expected: DataType::Bool,
-                        found: cond,
-                    });
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Bool,
+                        cond,
+                        statement.span,
+                    ));
                 }
 
-                return self.check_stmts(stmts, return_type);
+                return self.check_statements(&block, return_type);
             }
 
-            Stmt::Expr(expr) => {
-                self.check_expr(expr)?;
+            StatementKind::Expr(expr) => {
+                self.check_expr(&expr)?;
             }
 
-            Stmt::Return(expr) => {
-                let expr_type = self.check_expr(expr)?;
+            StatementKind::Return(expr) => {
+                let expr_type = self.check_expr(&expr)?;
                 if expr_type != return_type {
-                    return Err(CompileErrorKind::WrongType {
-                        expected: return_type,
-                        found: expr_type,
-                    });
+                    return Err(CompileError::wrong_type_at(
+                        return_type,
+                        expr_type,
+                        statement.span,
+                    ));
                 }
             }
         }
@@ -149,58 +171,68 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_expr(&self, expr: &Expr) -> Result<DataType, CompileErrorKind> {
-        match expr {
-            Expr::Var(ident) => {
-                let Some(data_type) = self.scope.get(ident) else {
-                    return Err(CompileErrorKind::VariableNotFound(ident.clone()));
+    fn check_expr(&self, expr: &Expr) -> Result<DataType, CompileError> {
+        match expr.kind {
+            ExprKind::Var(ident) => {
+                let Some(data_type) = self.scope.get(&ident) else {
+                    return Err(CompileError::variable_not_found_at(
+                        ident.clone(),
+                        expr.span,
+                    ));
                 };
 
                 Ok(data_type.clone())
             }
-            Expr::Literal(lit) => Ok(lit.get_type()),
-            Expr::FunctionCall(name, args) => {
-                let Some(signiture) = self.ast.get_function_signiture(name) else {
-                    return Err(CompileErrorKind::FunctionNotFound(name.clone()));
+            ExprKind::Literal(lit) => Ok(lit.get_type()),
+            ExprKind::FunctionCall { func_name, args } => {
+                let Some(signiture) = self.ast.get_function_signiture(&func_name) else {
+                    return Err(CompileError::function_not_found_at(
+                        func_name.clone(),
+                        expr.span,
+                    ));
                 };
 
                 let arg_types: Vec<DataType> = args
                     .iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileErrorKind>>()?;
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
 
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
             }
 
-            Expr::ForeignFunctionCall {
+            ExprKind::ForeignFunctionCall {
                 module_name,
                 func_name,
                 args,
             } => {
                 let signiture = self
                     .dependencies
-                    .get(module_name)
-                    .ok_or_else(|| CompileErrorKind::ModuleNotFound(module_name.clone()))?
-                    .get_function_signiture(func_name)
-                    .ok_or_else(|| CompileErrorKind::FunctionNotFound(func_name.clone()))?;
+                    .get(&module_name)
+                    .ok_or_else(|| {
+                        CompileError::module_not_found_at(module_name.clone(), expr.span)
+                    })?
+                    .get_function_signiture(&func_name)
+                    .ok_or_else(|| {
+                        CompileError::function_not_found_at(func_name.clone(), expr.span)
+                    })?;
 
                 let arg_types: Vec<DataType> = args
                     .iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileErrorKind>>()?;
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
 
                 signiture.check_argument_types(&arg_types)?;
 
                 Ok(signiture.return_type)
             }
 
-            Expr::BuiltinFunctionCall { function, args } => {
+            ExprKind::BuiltinFunctionCall { function, args } => {
                 let arg_types: Vec<DataType> = args
                     .iter()
                     .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileErrorKind>>()?;
+                    .collect::<Result<Vec<DataType>, CompileError>>()?;
 
                 match function {
                     BuiltinFunction::Print => {
@@ -211,10 +243,11 @@ impl<'a> TypeChecker<'a> {
                         // Assert arguments must be bool
                         for arg_type in arg_types {
                             if arg_type != DataType::Bool {
-                                return Err(CompileErrorKind::WrongType {
-                                    expected: DataType::Bool,
-                                    found: arg_type,
-                                });
+                                return Err(CompileError::wrong_type_at(
+                                    DataType::Bool,
+                                    arg_type,
+                                    expr.span,
+                                ));
                             }
                         }
 
@@ -227,71 +260,63 @@ impl<'a> TypeChecker<'a> {
                 }
             }
 
-            Expr::BinaryOp(op, a, b) => {
-                let a = self.check_expr(a)?;
-                let b = self.check_expr(b)?;
+            ExprKind::BinaryOp(op, lhs, rhs) => {
+                let lhs_type = self.check_expr(&lhs)?;
+                let rhs_type = self.check_expr(&rhs)?;
                 match op {
-                    bin_op_pat!(NUMERIC) => match (a, b) {
+                    bin_op_pat!(NUMERIC) => match (lhs_type, rhs_type) {
                         (DataType::Int, DataType::Int) => Ok(DataType::Int),
                         (DataType::Float, DataType::Float) => Ok(DataType::Float),
                         (DataType::Int | DataType::Float, _) => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: a,
-                                found: b,
-                            })
+                            return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
                         }
                         (_, DataType::Int | DataType::Float) => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: b,
-                                found: a,
-                            })
+                            return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
                         }
                         _ => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: DataType::Int,
-                                found: a,
-                            })
+                            return Err(CompileError::wrong_type_at(
+                                DataType::Int,
+                                lhs_type,
+                                expr.span,
+                            ))
                         }
                     },
 
-                    bin_op_pat!(NUMERIC_COMPARISON) => match (a, b) {
+                    bin_op_pat!(NUMERIC_COMPARISON) => match (lhs_type, rhs_type) {
                         (DataType::Int, DataType::Int) => Ok(DataType::Bool),
                         (DataType::Float, DataType::Float) => Ok(DataType::Bool),
                         (DataType::Int | DataType::Float, _) => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: a,
-                                found: b,
-                            })
+                            return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
                         }
                         (_, DataType::Int | DataType::Float) => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: b,
-                                found: a,
-                            })
+                            return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
                         }
                         _ => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: DataType::Int,
-                                found: a,
-                            })
+                            return Err(CompileError::wrong_type_at(
+                                DataType::Int,
+                                lhs_type,
+                                expr.span,
+                            ))
                         }
                     },
 
                     bin_op_pat!(COMPARISON) => Ok(DataType::Bool),
 
                     bin_op_pat!(LOGICAL) => {
-                        if a != DataType::Bool {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: DataType::Bool,
-                                found: a,
-                            });
+                        if lhs_type != DataType::Bool {
+                            return Err(CompileError::wrong_type_at(
+                                DataType::Bool,
+                                lhs_type,
+                                expr.span,
+                            ));
                         }
 
-                        if b != DataType::Bool {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: DataType::Bool,
-                                found: b,
-                            });
+                        if rhs_type != DataType::Bool {
+                            return Err(CompileError::wrong_type_at(
+                                DataType::Bool,
+                                rhs_type,
+                                expr.span,
+                            ));
                         }
 
                         Ok(DataType::Bool)
@@ -299,28 +324,30 @@ impl<'a> TypeChecker<'a> {
                 }
             }
 
-            Expr::UnaryOp(op, a) => {
-                let a = self.check_expr(a)?;
+            ExprKind::UnaryOp(op, expr) => {
+                let expr_type = self.check_expr(&expr)?;
                 match op {
                     UnaryOp::Not => {
-                        if a != DataType::Bool {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: DataType::Bool,
-                                found: a,
-                            });
+                        if expr_type != DataType::Bool {
+                            return Err(CompileError::wrong_type_at(
+                                DataType::Bool,
+                                expr_type,
+                                expr.span,
+                            ));
                         }
 
                         Ok(DataType::Bool)
                     }
 
-                    UnaryOp::Negate => match a {
+                    UnaryOp::Negate => match expr_type {
                         DataType::Int => Ok(DataType::Int),
                         DataType::Float => Ok(DataType::Float),
                         _ => {
-                            return Err(CompileErrorKind::WrongType {
-                                expected: DataType::Int,
-                                found: a,
-                            })
+                            return Err(CompileError::wrong_type_at(
+                                DataType::Int,
+                                expr_type,
+                                expr.span,
+                            ))
                         }
                     },
                 }

@@ -194,11 +194,7 @@ fn consume_optional_double(
     let (_, first_ch) = chars.next().unwrap();
     match chars.peek() {
         None if require_double => {
-            return Err(CompileError::unexpected_end_of_file_at(Span::new(
-                file_id,
-                start_idx + first_ch.len_utf8(),
-                start_idx + first_ch.len_utf8(),
-            )));
+            return Err(CompileError::unexpected_end_of_file(file_id));
         }
         Some(&(_, ch2)) if ch2 != expected_second && require_double => {
             return Err(CompileError::unexpected_char_at(

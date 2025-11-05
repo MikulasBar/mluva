@@ -33,8 +33,8 @@ macro_rules! expect_token {
                             .map(|t| t.span)
                     })
                     .unwrap_or_else(|| crate::diagnostics::Span::new(0, 0, 0));
-                return Err(crate::errors::CompileError::unexpected_end_of_file_at(
-                    __span,
+                return Err(crate::errors::CompileError::unexpected_end_of_file(
+                    __span.file,
                 ));
             }
         };

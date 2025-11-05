@@ -9,9 +9,9 @@ use std::collections::HashMap;
 
 pub use binary_op::BinaryOp;
 pub use builtin_function::BuiltinFunction;
-pub use expr::Expr;
+pub use expr::{Expr, ExprKind};
 pub use path::Path;
-pub use statement::Statement;
+pub use statement::{Statement, StatementKind};
 pub use unary_op::UnaryOp;
 
 use crate::{

@@ -16,7 +16,7 @@ impl InternalFunctionSigniture {
         }
     }
 
-    pub fn check_argument_types(&self, arg_types: &[DataType]) -> Result<(), CompileErrorKind> {
+    pub fn check_argument_types(&self, arg_types: &[DataType]) -> Result<(), CompileError> {
         if self.params.len() != arg_types.len() {
             return Err(CompileErrorKind::WrongNumberOfArguments {
                 expected: self.params.len(),

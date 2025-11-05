@@ -10,7 +10,7 @@ use crate::{
         data_type::DataType,
         token::{Token, TokenKind},
     },
-    diagnostics::Span,
+    diagnostics::{FileId, Span},
 };
 
 /// CLI / top-level runner can convert this into a codespan_reporting Diagnostic
@@ -59,12 +59,12 @@ impl CompileError {
         .with_span(span)
     }
 
-    pub fn unexpected_end_of_file_at(span: Span) -> Self {
+    pub fn unexpected_end_of_file(file: FileId) -> Self {
         Self::new(
             CompileErrorKind::UnexpectedEndOfFile,
             "unexpected end of file",
         )
-        .with_span(span)
+        .with_span(Span::new(file, 0, 0))
     }
 
     pub fn reserved_function_name_at(name: impl Into<String> + Clone, span: Span) -> Self {
@@ -79,6 +79,46 @@ impl CompileError {
         Self::new(
             CompileErrorKind::UnexpectedToken(token_kind.clone()),
             format!("unexpected token: {:?}", token_kind),
+        )
+        .with_span(span)
+    }
+
+    pub fn wrong_type_at(expected: DataType, found: DataType, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::WrongType { expected, found },
+            format!("wrong type: expected {:?}, found {:?}", expected, found),
+        )
+        .with_span(span)
+    }
+
+    pub fn variable_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::VariableNotFound(name.clone().into()),
+            format!("variable not found: {}", name.into()),
+        )
+        .with_span(span)
+    }
+
+    pub fn function_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::FunctionNotFound(name.clone().into()),
+            format!("function not found: {}", name.into()),
+        )
+        .with_span(span)
+    }
+
+    pub fn module_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::ModuleNotFound(name.clone().into()),
+            format!("module not found: {}", name.into()),
+        )
+        .with_span(span)
+    }
+
+    pub fn variable_redeclaration_at(name: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::VarRedeclaration(name.clone().into()),
+            format!("variable redeclaration: {}", name.into()),
         )
         .with_span(span)
     }
@@ -126,7 +166,6 @@ pub enum CompileErrorKind {
     UnexpectedChar(char),
     UnexpectedToken(TokenKind),
     UnterminatedString,
-    InvalidNumber,
     UnexpectedEndOfFile,
     WrongType { expected: DataType, found: DataType },
     WrongNumberOfArguments { expected: usize, found: usize },

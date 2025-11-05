@@ -1,7 +1,7 @@
 use core::panic;
 use std::collections::HashMap;
 
-use crate::ast::{Ast, BinaryOp, Expr, Stmt, UnaryOp};
+use crate::ast::{Ast, BinaryOp, Expr, Statement, UnaryOp};
 use crate::errors::CompileErrorKind;
 use crate::function::{InternalFunctionSigniture, InternalFunctionSource};
 use crate::instruction::Instruction;
@@ -40,7 +40,7 @@ impl<'a> Compiler<'a> {
         Ok(module)
     }
 
-    fn compile_function(&mut self, slot: u32) -> Result<(), CompileErrorKind> {
+    fn compile_function(&mut self, slot: u32) -> Result<(), CompileError> {
         let function_map = self.ast.get_function_map();
         let signiture = self.ast.get_function_signiture_by_slot(slot).unwrap();
         let body = self.ast.get_function_body_by_slot(slot).unwrap();
@@ -57,7 +57,7 @@ impl<'a> Compiler<'a> {
 struct FunctionCompiler<'b> {
     dependencies: &'b HashMap<String, Module>,
     function_map: &'b HashMap<String, u32>,
-    body: &'b [Stmt],
+    body: &'b [Statement],
     signiture: &'b InternalFunctionSigniture,
 
     instructions: Vec<Instruction>,
@@ -69,7 +69,7 @@ impl<'b> FunctionCompiler<'b> {
     fn new(
         dependencies: &'b HashMap<String, Module>,
         function_map: &'b HashMap<String, u32>,
-        body: &'b [Stmt],
+        body: &'b [Statement],
         signiture: &'b InternalFunctionSigniture,
     ) -> Self {
         Self {
@@ -127,7 +127,7 @@ impl<'b> FunctionCompiler<'b> {
         }
     }
 
-    fn compile_stmts(&mut self, stmts: &[Stmt]) -> Result<(), CompileErrorKind> {
+    fn compile_stmts(&mut self, stmts: &[Statement]) -> Result<(), CompileError> {
         for stmt in stmts {
             self.compile_stmt(stmt)?;
         }
@@ -135,30 +135,30 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_stmt(&mut self, stmt: &Stmt) -> Result<(), CompileErrorKind> {
+    fn compile_stmt(&mut self, stmt: &Statement) -> Result<(), CompileError> {
         match stmt {
             // there is no difference between declaration and assignment at this point
-            Stmt::VarDeclare(_, name, expr) | Stmt::VarAssign(name, expr) => {
+            StatementKind::VarDeclare(_, name, expr) | StatementKind::VarAssign(name, expr) => {
                 self.compile_expr(expr)?;
                 let slot = self.get_slot(name) as u32;
                 self.push(Instruction::Store { slot });
             }
 
-            Stmt::Expr(expr) => {
+            StatementKind::Expr(expr) => {
                 self.compile_expr(expr)?;
                 // We need to pop the expression from stack since we don't use it anywhere.
                 self.push(Instruction::Pop);
             }
 
-            Stmt::If(cond, stmts, else_stmts) => {
+            StatementKind::If(cond, stmts, else_stmts) => {
                 self.compile_if_statement(cond, stmts, else_stmts.as_deref())?;
             }
 
-            Stmt::While(cond, stmts) => {
+            StatementKind::While(cond, stmts) => {
                 self.compile_while_statement(cond, stmts)?;
             }
 
-            Stmt::Return(expr) => {
+            StatementKind::Return(expr) => {
                 self.compile_expr(expr)?;
                 self.push(Instruction::Return);
             }
@@ -170,9 +170,9 @@ impl<'b> FunctionCompiler<'b> {
     fn compile_if_statement(
         &mut self,
         cond: &Expr,
-        stmts: &[Stmt],
-        else_stmts: Option<&[Stmt]>,
-    ) -> Result<(), CompileErrorKind> {
+        stmts: &[Statement],
+        else_stmts: Option<&[Statement]>,
+    ) -> Result<(), CompileError> {
         // Compile the condition expression
         self.compile_expr(cond)?;
 
@@ -218,8 +218,8 @@ impl<'b> FunctionCompiler<'b> {
     fn compile_while_statement(
         &mut self,
         cond: &Expr,
-        stmts: &[Stmt],
-    ) -> Result<(), CompileErrorKind> {
+        stmts: &[Statement],
+    ) -> Result<(), CompileError> {
         // Store the index of the start of the "while" block
         // this includes the condition evaluation and check
         // because every iteration we need to check the condition
@@ -244,7 +244,7 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
-    fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileErrorKind> {
+    fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
         match expr {
             Expr::Literal(v) => {
                 self.instructions.push(Instruction::Push(v.clone()));
@@ -350,18 +350,18 @@ fn un_op_to_instruction(op: &UnaryOp) -> Instruction {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::Stmt;
+    use crate::ast::Statement;
 
     #[test]
     fn compile_stmts() {
         let stmts = vec![
-            Stmt::VarDeclare(
+            StatementKind::VarDeclare(
                 Some(DataType::Int),
                 "a".to_string(),
                 Expr::Literal(Value::Int(10)),
             ),
-            Stmt::VarDeclare(None, "b".to_string(), Expr::Literal(Value::Int(20))),
-            Stmt::VarAssign(
+            StatementKind::VarDeclare(None, "b".to_string(), Expr::Literal(Value::Int(20))),
+            StatementKind::VarAssign(
                 "a".to_string(),
                 Expr::BinaryOp(
                     BinaryOp::Add,
@@ -369,23 +369,23 @@ mod test {
                     Box::new(Expr::Var("b".to_string())),
                 ),
             ),
-            Stmt::Expr(Expr::Var("a".to_string())),
-            Stmt::If(
+            StatementKind::Expr(Expr::Var("a".to_string())),
+            StatementKind::If(
                 Expr::BinaryOp(
                     BinaryOp::Greater,
                     Box::new(Expr::Var("a".to_string())),
                     Box::new(Expr::Literal(Value::Int(15))),
                 ),
-                vec![Stmt::Expr(Expr::Literal(Value::Int(1)))],
-                Some(vec![Stmt::Expr(Expr::Literal(Value::Int(0)))]),
+                vec![StatementKind::Expr(Expr::Literal(Value::Int(1)))],
+                Some(vec![StatementKind::Expr(Expr::Literal(Value::Int(0)))]),
             ),
-            Stmt::While(
+            StatementKind::While(
                 Expr::BinaryOp(
                     BinaryOp::Less,
                     Box::new(Expr::Var("a".to_string())),
                     Box::new(Expr::Literal(Value::Int(100))),
                 ),
-                vec![Stmt::VarAssign(
+                vec![StatementKind::VarAssign(
                     "a".to_string(),
                     Expr::BinaryOp(
                         BinaryOp::Add,

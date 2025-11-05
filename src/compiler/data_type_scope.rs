@@ -1,7 +1,10 @@
 use std::collections::HashMap;
 
 use super::data_type::DataType;
-use crate::errors::CompileErrorKind;
+use crate::{
+    diagnostics::Span,
+    errors::{CompileError, CompileErrorKind},
+};
 
 pub struct DataTypeScope {
     scopes: Vec<HashMap<String, DataType>>,
@@ -33,9 +36,10 @@ impl DataTypeScope {
         &mut self,
         name: String,
         data_type: DataType,
-    ) -> Result<(), CompileErrorKind> {
+        span: Span,
+    ) -> Result<(), CompileError> {
         if self.contains(&name) {
-            return Err(CompileErrorKind::VarRedeclaration(name));
+            return Err(CompileError::variable_redeclaration_at(name, span));
         }
 
         self.scopes
