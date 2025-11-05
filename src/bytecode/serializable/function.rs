@@ -1,11 +1,11 @@
 use crate::{
     bytecode::serializable::BytecodeSerializable,
     compiler::DataType,
-    function::{InternalFunctionSigniture, InternalFunctionSource},
+    function::{FunctionSigniture, FunctionSource, Parameter},
     instruction::Instruction,
 };
 
-impl BytecodeSerializable for InternalFunctionSigniture {
+impl BytecodeSerializable for FunctionSigniture {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
         let return_type = DataType::from_bytecode(bytes, cursor)?;
         let param_count = usize::from_bytecode(bytes, cursor)?;
@@ -14,10 +14,10 @@ impl BytecodeSerializable for InternalFunctionSigniture {
         for _ in 0..param_count {
             let name = String::from_bytecode(bytes, cursor)?;
             let datatype = DataType::from_bytecode(bytes, cursor)?;
-            params.push((name, datatype));
+            params.push(Parameter::new(name, datatype));
         }
 
-        Ok(InternalFunctionSigniture {
+        Ok(FunctionSigniture {
             return_type,
             params,
         })
@@ -27,14 +27,14 @@ impl BytecodeSerializable for InternalFunctionSigniture {
         self.return_type.write_bytecode(buffer);
         self.params.len().write_bytecode(buffer);
 
-        for (name, datatype) in &self.params {
+        for Parameter { name, data_type } in &self.params {
             name.write_bytecode(buffer);
-            datatype.write_bytecode(buffer);
+            data_type.write_bytecode(buffer);
         }
     }
 }
 
-impl BytecodeSerializable for InternalFunctionSource {
+impl BytecodeSerializable for FunctionSource {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
         let slot_count = usize::from_bytecode(bytes, cursor)?;
         let instr_count = usize::from_bytecode(bytes, cursor)?;
@@ -45,7 +45,7 @@ impl BytecodeSerializable for InternalFunctionSource {
             body.push(instruction);
         }
 
-        Ok(InternalFunctionSource { slot_count, body })
+        Ok(FunctionSource { slot_count, body })
     }
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
