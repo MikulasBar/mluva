@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::errors::RuntimeError;
-use crate::function::InternalFunctionSource;
+use crate::function::FunctionSource;
 use crate::instruction::Instruction;
 use crate::module::Module;
 use crate::value::Value;
@@ -41,19 +41,19 @@ impl<'a> Runtime<'a> {
 
 struct InternalFunctionRuntime<'a> {
     dependencies: &'a HashMap<String, Module>,
-    functions: &'a [InternalFunctionSource],
+    functions: &'a [FunctionSource],
     stack: &'a mut Vec<Value>,
     index: usize,
     slots: Vec<Value>,
-    source: &'a InternalFunctionSource,
+    source: &'a FunctionSource,
 }
 
 impl<'a> InternalFunctionRuntime<'a> {
     pub fn new(
         dependencies: &'a HashMap<String, Module>,
-        functions: &'a [InternalFunctionSource],
+        functions: &'a [FunctionSource],
         stack: &'a mut Vec<Value>,
-        source: &'a InternalFunctionSource,
+        source: &'a FunctionSource,
     ) -> Self {
         Self {
             dependencies,

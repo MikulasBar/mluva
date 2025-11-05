@@ -10,3 +10,4 @@ serde_yaml = "0.9.34"
 
 mluva = { path = ".." }
 base64 = "0.22.1"
+codespan-reporting = "0.13.1"

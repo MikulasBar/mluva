@@ -7,6 +7,22 @@ The format is based on https://keepachangelog.com/ and this project follows Sema
 
 ## [Unreleased]
 
+### Added
+- better error logging for compile time errors
+
+### Changed
+- Internal refactor of CLI
+- `build` and `run` commands now create `.mluva` directory, `init` command no longer creates it
+- Removed `uninit` command from CLI
+
+### Fixed
+- N/A
+
+### Security
+- N/A
+
+---
+
 ## [0.1.0] - 2025-11-01
 ### Added
 - Initial public release of Mluva.

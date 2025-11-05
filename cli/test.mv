@@ -1,0 +1,7 @@
+
+Void main() {
+    let n = 45
+    assert(n == 45)
+    let s = format('number ', n)
+    print('Hello ', s)
+}

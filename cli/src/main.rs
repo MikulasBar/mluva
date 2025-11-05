@@ -9,31 +9,13 @@ mod module_metadata;
 fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
-        Commands::Init => {
-            if let Err(e) = commands::init::command() {
-                eprintln!("Error during init: {}", e);
-            }
-        }
+    let result = match cli.command {
+        Commands::Init => commands::init::command(),
+        Commands::Run => commands::run::command(),
+        Commands::Build => commands::build::command().map(|_| ()),
+    };
 
-        Commands::Run => {
-            let res = commands::run::command();
-            if let Err(e) = res {
-                eprintln!("{}", e);
-            }
-        }
-
-        Commands::Uninit => {
-            if let Err(e) = commands::uninit::command() {
-                eprintln!("Error during uninit: {}", e);
-            }
-        }
-
-        Commands::Build => {
-            let res = commands::build::command();
-            if let Err(e) = res {
-                eprintln!("{}", e);
-            }
-        }
+    if result.is_err() {
+        std::process::exit(1);
     }
 }

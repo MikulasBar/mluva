@@ -1,59 +1,78 @@
 use std::{collections::HashMap, path::Path};
 
-use mluva::{ast::Ast, module::Module};
+use codespan_reporting::{
+    files::SimpleFiles,
+    term::{
+        Config as CodespanConfig, emit_to_io_write,
+        termcolor::{ColorChoice, StandardStream},
+    },
+};
+use mluva::{ast::Ast, errors::CompileError, module::Module};
 
 use crate::{
-    commands::{META_DIR, MODULES_META_FILE},
+    commands::create_meta_storage,
     config::Config,
-    module_metadata::ModuleMetadata,
+    module_metadata::{ModuleMetadata, ModuleMetadataStorage},
 };
 
-pub fn command() -> Result<(Config, HashMap<String, Module>), Box<dyn std::error::Error>> {
+pub fn command() -> Result<(Config, HashMap<String, Module>), ()> {
     println!("Building the Mluva project...");
 
-    let meta_dir = Path::new(META_DIR);
-
-    let config_path = Path::new(super::CONFIG_FILE);
-    if !config_path.exists() {
-        return Err("No mluva.yaml found. Run 'mluva init' first.".into());
+    let config = Config::load_from_file()?;
+    if !config.root_module_file_exists() {
+        eprintln!("Root module '{}' not found", config.root_module_file_path());
+        return Err(());
     }
 
-    let config = Config::load_from_file(config_path)?;
-    let root_module_path = Path::new(&config.root_module).with_extension("mv");
+    create_meta_storage()?;
 
-    if !root_module_path.exists() {
-        return Err(format!("Root module '{}' not found", root_module_path.display()).into());
-    }
-
-    let module_meta_file = meta_dir.join(MODULES_META_FILE);
-    let mut module_hashes = if module_meta_file.exists() {
-        ModuleMetadata::load_from_file(&module_meta_file)?
-    } else {
-        return Err("Module hashes file not found.".into());
-    };
-
+    let mut module_meta_storage = ModuleMetadataStorage::load_from_file()?;
     let mut compiled_modules: HashMap<String, Module> = HashMap::new();
     let mut parent_stack: Vec<String> = vec![];
+    let mut files = SimpleFiles::new();
 
-    compile_module(
+    let compile_result = compile_module(
         &config.root_module,
         &mut compiled_modules,
-        &mut module_hashes,
+        &mut module_meta_storage,
         &mut parent_stack,
-    )?;
+        &mut files,
+    );
 
-    module_hashes.save_to_file(&module_meta_file)?;
-    println!("Build completed!");
-
-    Ok((config, compiled_modules))
+    match compile_result {
+        Ok(_) => {
+            module_meta_storage.save_to_file()?;
+            println!("Build completed!");
+            Ok((config, compiled_modules))
+        }
+        Err(Some(e)) => {
+            let diag = e.to_diagnostic();
+            let writer = StandardStream::stderr(ColorChoice::Auto);
+            let Ok(_) = emit_to_io_write(
+                &mut writer.lock(),
+                &CodespanConfig::default(),
+                &files,
+                &diag,
+            ) else {
+                eprintln!("Failed to write diagnostics");
+                return Err(());
+            };
+            Err(())
+        }
+        Err(None) => {
+            // Error already reported
+            Err(())
+        }
+    }
 }
 
 fn compile_module(
     source_module: &str,
     compiled_modules: &mut HashMap<String, Module>,
-    module_metadata: &mut ModuleMetadata,
+    module_meta_storage: &mut ModuleMetadataStorage,
     parent_stack: &mut Vec<String>, // TODO: change to something that is not O(n) on search but has ordering
-) -> Result<(), Box<dyn std::error::Error>> {
+    files: &mut SimpleFiles<String, String>,
+) -> Result<(), Option<CompileError>> {
     let source_path = Path::new(source_module)
         .with_extension("mv")
         .to_string_lossy()
@@ -64,20 +83,28 @@ fn compile_module(
     }
 
     if parent_stack.iter().any(|p| p == source_module) {
-        return Err(format!(
+        eprintln!(
             "Cyclic dependency detected: {} -> {}",
             parent_stack.join(" -> "),
             source_module
-        )
-        .into());
+        );
+        return Err(None);
     }
 
     parent_stack.push(source_module.to_string());
 
-    let content = std::fs::read(&source_path)?;
-    let content_str = String::from_utf8(content.clone())?;
+    let Ok(content) = std::fs::read(&source_path) else {
+        eprintln!("Failed to read module file: {}", source_path);
+        return Err(None);
+    };
 
-    let ast = Ast::from_string(&content_str).map_err(|e| e.to_string())?;
+    let Ok(content_str) = String::from_utf8(content.clone()) else {
+        eprintln!("Module file is not valid UTF-8: {}", source_path);
+        return Err(None);
+    };
+
+    let file_id = files.add(source_path.clone(), content_str.clone());
+    let ast = Ast::from_string(&content_str, file_id)?;
 
     for import in ast.get_imports() {
         // TODO: resolve full path
@@ -85,45 +112,50 @@ fn compile_module(
         let import_path = Path::new(import_path_str).with_extension("mv");
 
         if !import_path.exists() {
-            return Err(format!(
+            eprintln!(
                 "Dependecy module {} of module {} not found",
                 import_path.display(),
                 source_path
-            )
-            .into());
+            );
+            return Err(None);
         }
 
         compile_module(
             import_path_str,
             compiled_modules,
-            module_metadata,
+            module_meta_storage,
             parent_stack,
+            files,
         )?;
     }
 
-    let modules_dir = Path::new(META_DIR).join("modules");
-
-    std::fs::create_dir_all(&modules_dir)?;
-
-    let bytecode_filename = ModuleMetadata::source_to_bytecode_filename(&source_path);
-    let bytecode_path = modules_dir.join(&bytecode_filename);
-
-    let needs_compilation = module_metadata.needs_recompilation(&source_path, &content);
+    let bytecode_path_str = ModuleMetadata::source_to_bytecode_path(&source_path);
+    let bytecode_path = Path::new(&bytecode_path_str);
+    let needs_compilation = module_meta_storage.needs_recompilation(&source_path, &content);
 
     if needs_compilation || !bytecode_path.exists() {
-        let module =
-            Module::from_ast_and_dependencies(ast, compiled_modules).map_err(|e| e.to_string())?;
-
+        let module = Module::from_ast_and_dependencies(ast, compiled_modules)?;
         let bytecode = module.to_bytecode();
 
-        std::fs::write(&bytecode_path, bytecode)?;
+        let Ok(_) = std::fs::write(&bytecode_path, bytecode) else {
+            eprintln!("Failed to write bytecode file for module {}", source_path);
+            return Err(None);
+        };
 
-        module_metadata.update_hash(&source_path, &content);
+        module_meta_storage.update_hash(&source_path, &content);
         compiled_modules.insert(source_module.to_string(), module);
     } else {
         // load from cached bytecode
-        let bytecode = std::fs::read(&bytecode_path)?;
-        let module = Module::from_bytecode_bytes(&bytecode).map_err(|e| e.to_string())?;
+        let Ok(bytecode) = std::fs::read(&bytecode_path) else {
+            eprintln!("Failed to read bytecode file for module {}", source_path);
+            return Err(None);
+        };
+
+        let module = Module::from_bytecode_bytes(&bytecode).map_err(|e| {
+            eprintln!("Failed to load module {} from bytecode: {}", source_path, e);
+            None
+        })?;
+
         compiled_modules.insert(source_module.to_string(), module);
     }
 
