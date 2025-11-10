@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::data_type::DataType;
+use crate::data_type::DataType;
 use crate::{diagnostics::Span, errors::CompileError};
 
 pub struct DataTypeScope {

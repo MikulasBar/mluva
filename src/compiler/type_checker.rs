@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use super::data_type::DataType;
 use super::data_type_scope::DataTypeScope;
 use crate::ast::{
     Ast, BinaryOp, BuiltinFunction, Expr, ExprKind, Statement, StatementKind, UnaryOp,
 };
 use crate::bin_op_pat;
+use crate::data_type::DataType;
 use crate::diagnostics::Span;
 use crate::errors::CompileError;
 use crate::module::Module;
@@ -188,173 +188,224 @@ impl<'a> TypeChecker<'a> {
             }
             ExprKind::Literal(lit) => Ok(lit.get_type()),
             ExprKind::FunctionCall { func_name, args } => {
-                let Some(signiture) = self.ast.get_function_signiture(&func_name) else {
-                    return Err(CompileError::function_not_found_at(
-                        func_name.clone(),
-                        expr.span,
-                    ));
-                };
-
-                let arg_types: Vec<(DataType, Span)> = args
-                    .iter()
-                    .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-                    .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
-
-                signiture.check_argument_types(&arg_types, expr.span)?;
-
-                Ok(signiture.return_type)
+                self.check_call_expr(expr, func_name, args)
             }
 
             ExprKind::ForeignFunctionCall {
                 module_name,
                 func_name,
                 args,
-            } => {
-                let signiture = self
-                    .dependencies
-                    .get(module_name)
-                    .ok_or_else(|| {
-                        CompileError::module_not_found_at(module_name.clone(), expr.span)
-                    })?
-                    .get_function_signiture(&func_name)
-                    .ok_or_else(|| {
-                        CompileError::function_not_found_at(func_name.clone(), expr.span)
-                    })?;
-
-                let arg_types: Vec<(DataType, Span)> = args
-                    .iter()
-                    .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-                    .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
-
-                signiture.check_argument_types(&arg_types, expr.span)?;
-
-                Ok(signiture.return_type)
-            }
+            } => self.check_foreign_call_expr(expr, module_name, func_name, args),
 
             ExprKind::BuiltinFunctionCall { function, args } => {
-                let arg_types: Vec<DataType> = args
-                    .iter()
-                    .map(|arg| self.check_expr(arg))
-                    .collect::<Result<Vec<DataType>, CompileError>>()?;
-
-                match function {
-                    BuiltinFunction::Print => {
-                        // Print can take any type of arguments
-                        Ok(DataType::Void)
-                    }
-                    BuiltinFunction::Assert => {
-                        // Assert arguments must be bool
-                        for arg_type in arg_types {
-                            if arg_type != DataType::Bool {
-                                return Err(CompileError::wrong_type_at(
-                                    DataType::Bool,
-                                    arg_type,
-                                    expr.span,
-                                ));
-                            }
-                        }
-
-                        Ok(DataType::Void)
-                    }
-                    BuiltinFunction::Format => {
-                        // Format can take any type of arguments
-                        Ok(DataType::String)
-                    }
-                }
+                self.check_builtin_call_expr(expr, function, args)
             }
 
-            ExprKind::BinaryOp(op, lhs, rhs) => {
-                let lhs_type = self.check_expr(&lhs)?;
-                let rhs_type = self.check_expr(&rhs)?;
-                match op {
-                    bin_op_pat!(NUMERIC) => match (lhs_type, rhs_type) {
-                        (DataType::Int, DataType::Int) => Ok(DataType::Int),
-                        (DataType::Float, DataType::Float) => Ok(DataType::Float),
-                        (DataType::Int | DataType::Float, _) => {
-                            return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
-                        }
-                        (_, DataType::Int | DataType::Float) => {
-                            return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
-                        }
-                        _ => {
-                            return Err(CompileError::wrong_type_at(
-                                DataType::Int,
-                                lhs_type,
-                                expr.span,
-                            ))
-                        }
-                    },
+            ExprKind::MethodCall {
+                callee,
+                method_name,
+                args,
+            } => self.check_method_call_expr(expr, callee, method_name, args),
 
-                    bin_op_pat!(NUMERIC_COMPARISON) => match (lhs_type, rhs_type) {
-                        (DataType::Int, DataType::Int) => Ok(DataType::Bool),
-                        (DataType::Float, DataType::Float) => Ok(DataType::Bool),
-                        (DataType::Int | DataType::Float, _) => {
-                            return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
-                        }
-                        (_, DataType::Int | DataType::Float) => {
-                            return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
-                        }
-                        _ => {
-                            return Err(CompileError::wrong_type_at(
-                                DataType::Int,
-                                lhs_type,
-                                expr.span,
-                            ))
-                        }
-                    },
+            ExprKind::BinaryOp(op, lhs, rhs) => self.check_binary_op_expr(expr, op, lhs, rhs),
+            ExprKind::UnaryOp(op, expr) => self.check_unary_op_expr(expr, op),
+        }
+    }
 
-                    bin_op_pat!(COMPARISON) => Ok(DataType::Bool),
+    fn check_call_expr(
+        &self,
+        expr: &Expr,
+        func_name: &str,
+        args: &[Expr],
+    ) -> Result<DataType, CompileError> {
+        let Some(signiture) = self.ast.get_function_signiture(&func_name) else {
+            return Err(CompileError::function_not_found_at(func_name, expr.span));
+        };
 
-                    bin_op_pat!(LOGICAL) => {
-                        if lhs_type != DataType::Bool {
-                            return Err(CompileError::wrong_type_at(
-                                DataType::Bool,
-                                lhs_type,
-                                expr.span,
-                            ));
-                        }
+        let arg_types: Vec<(DataType, Span)> = args
+            .iter()
+            .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
+            .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
 
-                        if rhs_type != DataType::Bool {
-                            return Err(CompileError::wrong_type_at(
-                                DataType::Bool,
-                                rhs_type,
-                                expr.span,
-                            ));
-                        }
+        signiture.check_argument_types(&arg_types, expr.span)?;
 
-                        Ok(DataType::Bool)
+        Ok(signiture.return_type)
+    }
+
+    fn check_foreign_call_expr(
+        &self,
+        expr: &Expr,
+        module_name: &str,
+        func_name: &str,
+        args: &[Expr],
+    ) -> Result<DataType, CompileError> {
+        let signiture = self
+            .dependencies
+            .get(module_name)
+            .ok_or_else(|| CompileError::module_not_found_at(module_name.clone(), expr.span))?
+            .get_function_signiture(&func_name)
+            .ok_or_else(|| CompileError::function_not_found_at(func_name.clone(), expr.span))?;
+
+        let arg_types: Vec<(DataType, Span)> = args
+            .iter()
+            .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
+            .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
+
+        signiture.check_argument_types(&arg_types, expr.span)?;
+
+        Ok(signiture.return_type)
+    }
+
+    fn check_builtin_call_expr(
+        &self,
+        expr: &Expr,
+        function: &BuiltinFunction,
+        args: &[Expr],
+    ) -> Result<DataType, CompileError> {
+        let arg_types: Vec<DataType> = args
+            .iter()
+            .map(|arg| self.check_expr(arg))
+            .collect::<Result<Vec<DataType>, CompileError>>()?;
+
+        match function {
+            BuiltinFunction::Print => {
+                // Print can take any type of arguments
+                Ok(DataType::Void)
+            }
+            BuiltinFunction::Assert => {
+                // Assert arguments must be bool
+                for arg_type in arg_types {
+                    if arg_type != DataType::Bool {
+                        return Err(CompileError::wrong_type_at(
+                            DataType::Bool,
+                            arg_type,
+                            expr.span,
+                        ));
                     }
                 }
+
+                Ok(DataType::Void)
             }
+            BuiltinFunction::Format => {
+                // Format can take any type of arguments
+                Ok(DataType::String)
+            }
+        }
+    }
 
-            ExprKind::UnaryOp(op, expr) => {
-                let expr_type = self.check_expr(&expr)?;
-                match op {
-                    UnaryOp::Not => {
-                        if expr_type != DataType::Bool {
-                            return Err(CompileError::wrong_type_at(
-                                DataType::Bool,
-                                expr_type,
-                                expr.span,
-                            ));
-                        }
+    fn check_method_call_expr(
+        &self,
+        expr: &Expr,
+        callee: &Expr,
+        method_name: &str,
+        args: &[Expr],
+    ) -> Result<DataType, CompileError> {
+        let callee_type = self.check_expr(callee)?;
 
-                        Ok(DataType::Bool)
-                    }
+        let arg_types: Vec<DataType> = args
+            .iter()
+            .map(|arg| self.check_expr(arg))
+            .collect::<Result<Vec<DataType>, CompileError>>()?;
 
-                    UnaryOp::Negate => match expr_type {
-                        DataType::Int => Ok(DataType::Int),
-                        DataType::Float => Ok(DataType::Float),
-                        _ => {
-                            return Err(CompileError::wrong_type_at(
-                                DataType::Int,
-                                expr_type,
-                                expr.span,
-                            ))
-                        }
-                    },
+        callee_type.check_method_call(method_name, expr.span, &arg_types)
+    }
+
+    fn check_binary_op_expr(
+        &self,
+        expr: &Expr,
+        op: &BinaryOp,
+        lhs: &Expr,
+        rhs: &Expr,
+    ) -> Result<DataType, CompileError> {
+        let lhs_type = self.check_expr(&lhs)?;
+        let rhs_type = self.check_expr(&rhs)?;
+        match op {
+            bin_op_pat!(NUMERIC) => match (lhs_type, rhs_type) {
+                (DataType::Int, DataType::Int) => Ok(DataType::Int),
+                (DataType::Float, DataType::Float) => Ok(DataType::Float),
+                (DataType::Int | DataType::Float, _) => {
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
                 }
+                (_, DataType::Int | DataType::Float) => {
+                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
+                }
+                _ => {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Int,
+                        lhs_type,
+                        expr.span,
+                    ))
+                }
+            },
+
+            bin_op_pat!(NUMERIC_COMPARISON) => match (lhs_type, rhs_type) {
+                (DataType::Int, DataType::Int) => Ok(DataType::Bool),
+                (DataType::Float, DataType::Float) => Ok(DataType::Bool),
+                (DataType::Int | DataType::Float, _) => {
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
+                }
+                (_, DataType::Int | DataType::Float) => {
+                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
+                }
+                _ => {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Int,
+                        lhs_type,
+                        expr.span,
+                    ))
+                }
+            },
+
+            bin_op_pat!(COMPARISON) => Ok(DataType::Bool),
+
+            bin_op_pat!(LOGICAL) => {
+                if lhs_type != DataType::Bool {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Bool,
+                        lhs_type,
+                        expr.span,
+                    ));
+                }
+
+                if rhs_type != DataType::Bool {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Bool,
+                        rhs_type,
+                        expr.span,
+                    ));
+                }
+
+                Ok(DataType::Bool)
             }
+        }
+    }
+
+    fn check_unary_op_expr(&self, expr: &Expr, op: &UnaryOp) -> Result<DataType, CompileError> {
+        let expr_type = self.check_expr(&expr)?;
+        match op {
+            UnaryOp::Not => {
+                if expr_type != DataType::Bool {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Bool,
+                        expr_type,
+                        expr.span,
+                    ));
+                }
+
+                Ok(DataType::Bool)
+            }
+
+            UnaryOp::Negate => match expr_type {
+                DataType::Int => Ok(DataType::Int),
+                DataType::Float => Ok(DataType::Float),
+                _ => {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Int,
+                        expr_type,
+                        expr.span,
+                    ))
+                }
+            },
         }
     }
 }

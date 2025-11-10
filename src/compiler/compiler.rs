@@ -12,7 +12,7 @@ use crate::instruction::Instruction;
 use crate::module::Module;
 use crate::value::Value;
 
-use super::DataType;
+use crate::data_type::DataType;
 
 pub struct Compiler<'a> {
     sources: Vec<FunctionSource>,
@@ -114,7 +114,7 @@ impl<'b> FunctionCompiler<'b> {
 
     fn compile(mut self) -> Result<FunctionSource, CompileError> {
         self.setup_parameters();
-        self.compile_stmts(&self.body)?;
+        self.compile_statements(&self.body)?;
 
         // implicit return at the end of Void functions
         if let DataType::Void = self.signiture.return_type {
@@ -132,15 +132,15 @@ impl<'b> FunctionCompiler<'b> {
         }
     }
 
-    fn compile_stmts(&mut self, stmts: &[Statement]) -> Result<(), CompileError> {
-        for stmt in stmts {
-            self.compile_stmt(stmt)?;
+    fn compile_statements(&mut self, statements: &[Statement]) -> Result<(), CompileError> {
+        for statement in statements {
+            self.compile_statement(statement)?;
         }
 
         Ok(())
     }
 
-    fn compile_stmt(&mut self, statement: &Statement) -> Result<(), CompileError> {
+    fn compile_statement(&mut self, statement: &Statement) -> Result<(), CompileError> {
         match &statement.kind {
             // there is no difference between declaration and assignment at this point
             StatementKind::VarDeclare {
@@ -193,7 +193,7 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions.push(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the statements in the "if" block
-        self.compile_stmts(stmts)?;
+        self.compile_statements(stmts)?;
 
         if let Some(else_stmts) = else_stmts {
             // Store the index of the jump instruction for the "else" block
@@ -210,7 +210,7 @@ impl<'b> FunctionCompiler<'b> {
             );
 
             // Compile the statements in the "else" block
-            self.compile_stmts(else_stmts)?;
+            self.compile_statements(else_stmts)?;
 
             // Update the jump instruction to skip over the "else" block
             let post_else_index = self.instructions.len();
@@ -242,7 +242,7 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions.push(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the instructions in the "while" block
-        self.compile_stmts(stmts)?;
+        self.compile_statements(stmts)?;
 
         // Jump back to the condition check
         self.push(Instruction::Jump(start_index as u32));
@@ -329,6 +329,23 @@ impl<'b> FunctionCompiler<'b> {
 
                 self.instructions.push(Instruction::BuiltinFunctionCall {
                     function: function.clone(),
+                    arg_count: args.len() as u32,
+                });
+            }
+
+            ExprKind::MethodCall {
+                callee,
+                method_name,
+                args,
+            } => {
+                for arg in args {
+                    self.compile_expr(arg)?;
+                }
+
+                self.compile_expr(callee)?;
+
+                self.instructions.push(Instruction::MethodCall {
+                    method_name: method_name.clone(),
                     arg_count: args.len() as u32,
                 });
             }

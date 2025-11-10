@@ -1,5 +1,5 @@
 use crate::{
-    ast::SpannedFunctionSigniture, compiler::DataType, diagnostics::Span, errors::CompileError,
+    ast::SpannedFunctionSigniture, data_type::DataType, diagnostics::Span, errors::CompileError,
     instruction::Instruction,
 };
 

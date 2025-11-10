@@ -1,8 +1,8 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use super::data_type::DataType;
 use super::token::{Token, TokenKind};
+use crate::data_type::DataType;
 use crate::diagnostics::Span;
 use crate::errors::CompileError;
 
@@ -64,9 +64,9 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
                 file_id,
                 start_idx,
                 '.',
-                TokenKind::EOF,
+                TokenKind::Dot,
                 TokenKind::DotDot,
-                true,
+                false,
             ),
 
             '!' => consume_optional_double(

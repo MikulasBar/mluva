@@ -32,6 +32,7 @@ impl InstructionId {
     const PUSH: u8 = 22;
     const FOREIGNCALL: u8 = 23;
     const BUILTINCALL: u8 = 24;
+    const METHODCALL: u8 = 25;
 }
 
 fn get_id(instruction: &Instruction) -> u8 {
@@ -61,6 +62,7 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Push(_) => InstructionId::PUSH,
         Instruction::ForeignCall { .. } => InstructionId::FOREIGNCALL,
         Instruction::BuiltinFunctionCall { .. } => InstructionId::BUILTINCALL,
+        Instruction::MethodCall { .. } => InstructionId::METHODCALL,
     }
 }
 
@@ -88,6 +90,14 @@ impl BytecodeSerializable for Instruction {
             } => {
                 let function_name = function.as_str().to_string();
                 function_name.write_bytecode(buffer);
+                arg_count.write_bytecode(buffer);
+            }
+
+            Instruction::MethodCall {
+                method_name,
+                arg_count,
+            } => {
+                method_name.write_bytecode(buffer);
                 arg_count.write_bytecode(buffer);
             }
 
@@ -155,6 +165,14 @@ impl BytecodeSerializable for Instruction {
                 let function = BuiltinFunction::from_str(&function_name)?;
                 Ok(Instruction::BuiltinFunctionCall {
                     function,
+                    arg_count,
+                })
+            }
+            InstructionId::METHODCALL => {
+                let method_name = String::from_bytecode(bytes, cursor)?;
+                let arg_count = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::MethodCall {
+                    method_name,
                     arg_count,
                 })
             }

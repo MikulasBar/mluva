@@ -134,13 +134,18 @@ impl<'a> InternalFunctionRuntime<'a> {
                     ref function,
                     arg_count,
                 } => {
-                    let mut args = Vec::with_capacity(arg_count as usize);
-                    for _ in 0..arg_count {
-                        args.push(self.pop()?);
-                    }
-                    args.reverse();
-
+                    let args = self.stack.split_off(self.stack.len() - arg_count as usize);
                     let result = function.execute(args)?;
+                    self.stack.push(result);
+                }
+
+                Instruction::MethodCall {
+                    ref method_name,
+                    arg_count,
+                } => {
+                    let instance = self.pop()?;
+                    let args = self.stack.split_off(self.stack.len() - arg_count as usize);
+                    let result = instance.method_call(method_name, args)?;
                     self.stack.push(result);
                 }
 

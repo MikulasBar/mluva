@@ -1,5 +1,5 @@
 use super::expr::Expr;
-use crate::{compiler::data_type::DataType, diagnostics::Span};
+use crate::{data_type::DataType, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Statement {

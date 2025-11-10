@@ -41,4 +41,8 @@ pub enum Instruction {
         function: crate::ast::BuiltinFunction,
         arg_count: u32,
     },
+    MethodCall {
+        method_name: String,
+        arg_count: u32,
+    },
 }

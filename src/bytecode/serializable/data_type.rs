@@ -1,4 +1,4 @@
-use crate::{bytecode::serializable::BytecodeSerializable, compiler::DataType};
+use crate::{bytecode::serializable::BytecodeSerializable, data_type::DataType};
 
 pub struct DataTypeId;
 
