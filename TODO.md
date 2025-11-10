@@ -1,6 +1,6 @@
 ## Core
 - [x] better error logging
-- [ ] Builtin methods for datatypes
+- [x] Builtin methods for datatypes
 - [ ] `Map`, `List` datatypes, indexing syntax,
 - [ ] add `for` range based loops
 - [ ] add pointers / references

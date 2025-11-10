@@ -9,6 +9,7 @@ The format is based on https://keepachangelog.com/ and this project follows Sema
 
 ### Added
 - better error logging for compile time errors
+- builtin methods for datatypes like `.length()`
 
 ### Changed
 - Internal refactor of CLI
