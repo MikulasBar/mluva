@@ -38,7 +38,7 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
 
             '\'' => tokenize_string(&mut chars, file_id, input),
 
-            ';' | '\n' => {
+            '\n' => {
                 // EOL token; avoid duplicate sequential EOLs
                 chars.next();
                 if let Some(last) = tokens.last() {

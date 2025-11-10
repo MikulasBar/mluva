@@ -13,15 +13,13 @@ pub fn command() -> Result<(), ()> {
         return Err(());
     };
 
-    println!("Running the Mluva project...");
+    println!("Running the Mluva project...\n");
 
     let runtime = Runtime::new(main_module, &modules);
     let result = runtime.execute();
 
     match result {
-        Ok(_) => {
-            println!("Program finished successfully.");
-        }
+        Ok(_) => (),
         Err(e) => {
             eprintln!("Runtime error: {}", e);
             return Err(());
