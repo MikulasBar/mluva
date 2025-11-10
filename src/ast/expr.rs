@@ -69,6 +69,17 @@ impl Expr {
             span,
         }
     }
+
+    pub fn method_call(callee: Self, method_name: String, args: Vec<Self>, span: Span) -> Self {
+        Self {
+            kind: ExprKind::MethodCall {
+                callee: Box::new(callee),
+                method_name,
+                args,
+            },
+            span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +99,11 @@ pub enum ExprKind {
     },
     BuiltinFunctionCall {
         function: BuiltinFunction,
+        args: Vec<Expr>,
+    },
+    MethodCall {
+        callee: Box<Expr>,
+        method_name: String,
         args: Vec<Expr>,
     },
 }

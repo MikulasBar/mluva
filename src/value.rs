@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use super::compiler::data_type::DataType;
+use super::data_type::DataType;
 use crate::errors::RuntimeError;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,6 +27,18 @@ impl Value {
         match self {
             Self::Bool(b) => Ok(!b),
             _ => Err(RuntimeError::TypeError),
+        }
+    }
+
+    pub fn method_call(&self, method_name: &str, args: Vec<Value>) -> Result<Value, RuntimeError> {
+        match (self, method_name, args.as_slice()) {
+            (Value::String(s), "length", &[]) => Ok(Value::Int(s.len() as i32)),
+
+            _ => Err(RuntimeError::Other(format!(
+                "Method '{}' not found for type '{}'",
+                method_name,
+                self.get_type()
+            ))),
         }
     }
 }

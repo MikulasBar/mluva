@@ -398,7 +398,7 @@ impl<'a> Parser<'a> {
             .ok_or(CompileError::unexpected_end_of_file(self.file_id))?;
 
         let Some(op) = token_to_unary_op(token) else {
-            return self.parse_atom_expr();
+            return self.parse_method_call_expr();
         };
 
         let token_span = token.span;
@@ -408,6 +408,22 @@ impl<'a> Parser<'a> {
         return Ok(Expr::unary_op(op, expr, token_span.join(expr_span)));
     }
 
+    fn parse_method_call_expr(&mut self) -> Result<Expr, CompileError> {
+        let base_expr = self.parse_atom_expr()?;
+        if let Some(TokenKind::Dot) = self.peek_kind() {
+            self.skip();
+            expect_token!(TokenKind::Ident(method_name) in self);
+            expect_token!(TokenKind::ParenL in self);
+            let args = self.parse_args()?;
+            expect_token!(TokenKind::ParenR, end_span in self);
+
+            let span = base_expr.span.join(end_span);
+
+            Ok(Expr::method_call(base_expr, method_name, args, span))
+        } else {
+            Ok(base_expr)
+        }
+    }
     /// Parse atom expr such as Ident, Num, Bool, not ops.
     fn parse_atom_expr(&mut self) -> Result<Expr, CompileError> {
         let Some(token) = self.peek() else {

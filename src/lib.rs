@@ -1,6 +1,7 @@
 pub mod ast;
 pub mod bytecode;
 pub mod compiler;
+mod data_type;
 mod diagnostics;
 pub mod errors;
 pub mod function;

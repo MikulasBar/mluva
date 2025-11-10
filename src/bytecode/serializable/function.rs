@@ -1,6 +1,6 @@
 use crate::{
     bytecode::serializable::BytecodeSerializable,
-    compiler::DataType,
+    data_type::DataType,
     function::{FunctionSigniture, FunctionSource, Parameter},
     instruction::Instruction,
 };

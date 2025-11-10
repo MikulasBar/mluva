@@ -3,7 +3,8 @@ use std::fmt;
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
 use crate::{
-    compiler::{data_type::DataType, token::TokenKind},
+    compiler::token::TokenKind,
+    data_type::DataType,
     diagnostics::{FileId, Span},
 };
 
@@ -147,6 +148,25 @@ impl CompileError {
         .with_span(span)
     }
 
+    pub fn method_not_found_at(
+        data_type: DataType,
+        method_name: impl Into<String> + Clone,
+        span: Span,
+    ) -> Self {
+        Self::new(
+            CompileErrorKind::MethodNotFound {
+                data_type,
+                method_name: method_name.clone().into(),
+            },
+            format!(
+                "method '{}' not found for type {}",
+                method_name.into(),
+                data_type
+            ),
+        )
+        .with_span(span)
+    }
+
     pub fn other_at(msg: impl Into<String>, span: Span) -> Self {
         Self::new(CompileErrorKind::Other, msg).with_span(span)
     }
@@ -191,14 +211,27 @@ pub enum CompileErrorKind {
     UnexpectedToken(TokenKind),
     UnterminatedString,
     UnexpectedEndOfFile,
-    WrongType { expected: DataType, found: DataType },
-    WrongNumberOfArguments { expected: usize, found: usize },
+    WrongType {
+        expected: DataType,
+        found: DataType,
+    },
+    WrongNumberOfArguments {
+        expected: usize,
+        found: usize,
+    },
     VariableNotFound(String),
     FunctionNotFound(String),
     FunctionAlreadyDefined(String),
     VarRedeclaration(String),
     ModuleNotFound(String),
-    UnknownForeignFunction { module: String, name: String },
+    UnknownForeignFunction {
+        module: String,
+        name: String,
+    },
     ReservedFunctionName(String),
+    MethodNotFound {
+        data_type: DataType,
+        method_name: String,
+    },
     Other,
 }

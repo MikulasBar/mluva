@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::diagnostics::Span;
 
-use super::data_type::DataType;
+use crate::data_type::DataType;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
@@ -51,6 +51,7 @@ pub enum TokenKind {
     BraceL,
     BraceR,
     Comma,
+    Dot,
     DotDot,
     Colon,
 
@@ -95,6 +96,7 @@ impl Display for TokenKind {
             TokenKind::BraceL => write!(f, "'{{'"),
             TokenKind::BraceR => write!(f, "'}}'"),
             TokenKind::Comma => write!(f, "','"),
+            TokenKind::Dot => write!(f, "'.'"),
             TokenKind::DotDot => write!(f, "'..'"),
             TokenKind::Colon => write!(f, "':'"),
             TokenKind::DataType(dt) => write!(f, "data type {}", dt),
