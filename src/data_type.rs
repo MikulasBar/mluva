@@ -2,13 +2,14 @@ use std::fmt::Display;
 
 use crate::{diagnostics::Span, errors::CompileError};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DataType {
     Void,
     Int,
     Float,
     Bool,
     String,
+    List { item_type: Box<DataType> },
 }
 
 impl DataType {
@@ -35,7 +36,11 @@ impl DataType {
                 Ok(DataType::Int)
             }
 
-            _ => Err(CompileError::method_not_found_at(*self, method_name, span)),
+            _ => Err(CompileError::method_not_found_at(
+                self.clone(),
+                method_name,
+                span,
+            )),
         }
     }
 }
@@ -48,6 +53,7 @@ impl Display for DataType {
             DataType::Float => write!(f, "float"),
             DataType::Bool => write!(f, "bool"),
             DataType::String => write!(f, "string"),
+            DataType::List { item_type } => write!(f, "list<{}>", item_type),
         }
     }
 }

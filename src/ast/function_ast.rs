@@ -30,12 +30,12 @@ impl SpannedFunctionSigniture {
         }
 
         for (i, param) in self.params.iter().enumerate() {
-            let (arg_type, arg_span) = args[i];
-            if arg_type != param.data_type {
+            let (arg_type, arg_span) = &args[i];
+            if *arg_type != param.data_type {
                 return Err(CompileError::wrong_type_at(
-                    param.data_type,
-                    arg_type,
-                    arg_span,
+                    param.data_type.clone(),
+                    arg_type.clone(),
+                    *arg_span,
                 ));
             }
         }

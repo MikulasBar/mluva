@@ -79,11 +79,8 @@ impl CompileError {
     }
 
     pub fn wrong_type_at(expected: DataType, found: DataType, span: Span) -> Self {
-        Self::new(
-            CompileErrorKind::WrongType { expected, found },
-            format!("wrong type: expected {}, found {}", expected, found),
-        )
-        .with_span(span)
+        let message = format!("wrong type: expected {}, found {}", expected, found);
+        Self::new(CompileErrorKind::WrongType { expected, found }, message).with_span(span)
     }
 
     pub fn variable_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
@@ -153,16 +150,18 @@ impl CompileError {
         method_name: impl Into<String> + Clone,
         span: Span,
     ) -> Self {
+        let message = format!(
+            "method '{}' not found for type {}",
+            method_name.clone().into(),
+            data_type
+        );
+
         Self::new(
             CompileErrorKind::MethodNotFound {
                 data_type,
                 method_name: method_name.clone().into(),
             },
-            format!(
-                "method '{}' not found for type {}",
-                method_name.into(),
-                data_type
-            ),
+            message,
         )
         .with_span(span)
     }

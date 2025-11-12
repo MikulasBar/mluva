@@ -8,6 +8,7 @@ impl DataTypeId {
     pub const INT: u8 = 2;
     pub const FLOAT: u8 = 3;
     pub const STRING: u8 = 4;
+    pub const LIST: u8 = 5;
 }
 
 fn get_id(data_type: &DataType) -> u8 {
@@ -17,6 +18,7 @@ fn get_id(data_type: &DataType) -> u8 {
         DataType::Int => DataTypeId::INT,
         DataType::Float => DataTypeId::FLOAT,
         DataType::String => DataTypeId::STRING,
+        DataType::List { .. } => DataTypeId::LIST,
     }
 }
 
@@ -29,6 +31,11 @@ impl BytecodeSerializable for DataType {
             DataTypeId::INT => Ok(DataType::Int),
             DataTypeId::FLOAT => Ok(DataType::Float),
             DataTypeId::STRING => Ok(DataType::String),
+            DataTypeId::LIST => {
+                let item_type = Box::new(DataType::from_bytecode(bytes, cursor)?);
+                Ok(DataType::List { item_type })
+            }
+
             _ => Err(format!("Unknown DataType id: {}", id)),
         }
     }

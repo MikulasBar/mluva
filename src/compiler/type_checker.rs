@@ -48,9 +48,10 @@ impl<'a> TypeChecker<'a> {
                 .ast
                 .get_function_signiture_by_slot(slot)
                 .unwrap()
-                .return_type;
+                .return_type
+                .clone();
 
-            self.check_statements(statements, return_type)?;
+            self.check_statements(statements, &return_type)?;
 
             self.scope.exit();
         }
@@ -60,11 +61,11 @@ impl<'a> TypeChecker<'a> {
 
     fn check_statements(
         &mut self,
-        stmts: &[Statement],
-        return_type: DataType,
+        statements: &[Statement],
+        return_type: &DataType,
     ) -> Result<(), CompileError> {
-        for s in stmts {
-            self.check_statement(s, return_type)?;
+        for statement in statements {
+            self.check_statement(statement, return_type)?;
         }
 
         Ok(())
@@ -73,7 +74,7 @@ impl<'a> TypeChecker<'a> {
     fn check_statement(
         &mut self,
         statement: &Statement,
-        return_type: DataType,
+        return_type: &DataType,
     ) -> Result<(), CompileError> {
         match &statement.kind {
             StatementKind::If {
@@ -108,13 +109,13 @@ impl<'a> TypeChecker<'a> {
                 let data_type = if let Some(data_type) = data_type {
                     if expr_type != *data_type {
                         return Err(CompileError::wrong_type_at(
-                            *data_type,
+                            data_type.clone(),
                             expr_type,
                             statement.span,
                         ));
                     }
 
-                    *data_type
+                    data_type.clone()
                 } else {
                     expr_type
                 };
@@ -124,7 +125,7 @@ impl<'a> TypeChecker<'a> {
             }
 
             StatementKind::VarAssign { variable, value } => {
-                let Some(&data_type) = self.scope.get(&variable) else {
+                let Some(data_type) = self.scope.get(&variable) else {
                     return Err(CompileError::variable_not_found_at(
                         variable.clone(),
                         statement.span,
@@ -133,9 +134,9 @@ impl<'a> TypeChecker<'a> {
 
                 let value_type = self.check_expr(&value)?;
 
-                if value_type != data_type {
+                if value_type != *data_type {
                     return Err(CompileError::wrong_type_at(
-                        data_type,
+                        data_type.clone(),
                         value_type,
                         statement.span,
                     ));
@@ -161,9 +162,9 @@ impl<'a> TypeChecker<'a> {
 
             StatementKind::Return(expr) => {
                 let expr_type = self.check_expr(&expr)?;
-                if expr_type != return_type {
+                if expr_type != *return_type {
                     return Err(CompileError::wrong_type_at(
-                        return_type,
+                        return_type.clone(),
                         expr_type,
                         statement.span,
                     ));
@@ -229,7 +230,7 @@ impl<'a> TypeChecker<'a> {
 
         signiture.check_argument_types(&arg_types, expr.span)?;
 
-        Ok(signiture.return_type)
+        Ok(signiture.return_type.clone())
     }
 
     fn check_foreign_call_expr(
@@ -253,7 +254,7 @@ impl<'a> TypeChecker<'a> {
 
         signiture.check_argument_types(&arg_types, expr.span)?;
 
-        Ok(signiture.return_type)
+        Ok(signiture.return_type.clone())
     }
 
     fn check_builtin_call_expr(
@@ -320,7 +321,7 @@ impl<'a> TypeChecker<'a> {
         let lhs_type = self.check_expr(&lhs)?;
         let rhs_type = self.check_expr(&rhs)?;
         match op {
-            bin_op_pat!(NUMERIC) => match (lhs_type, rhs_type) {
+            bin_op_pat!(NUMERIC) => match (&lhs_type, &rhs_type) {
                 (DataType::Int, DataType::Int) => Ok(DataType::Int),
                 (DataType::Float, DataType::Float) => Ok(DataType::Float),
                 (DataType::Int | DataType::Float, _) => {
@@ -338,7 +339,7 @@ impl<'a> TypeChecker<'a> {
                 }
             },
 
-            bin_op_pat!(NUMERIC_COMPARISON) => match (lhs_type, rhs_type) {
+            bin_op_pat!(NUMERIC_COMPARISON) => match (&lhs_type, &rhs_type) {
                 (DataType::Int, DataType::Int) => Ok(DataType::Bool),
                 (DataType::Float, DataType::Float) => Ok(DataType::Bool),
                 (DataType::Int | DataType::Float, _) => {
