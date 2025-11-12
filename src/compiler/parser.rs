@@ -2,7 +2,8 @@ use std::str::FromStr as _;
 
 use super::token::{Token, TokenKind};
 use crate::ast::*;
-use crate::diagnostics::FileId;
+use crate::data_type::DataType;
+use crate::diagnostics::{FileId, Span};
 use crate::errors::CompileError;
 use crate::expect_token;
 use crate::value::Value;
@@ -80,8 +81,8 @@ impl<'a> Parser<'a> {
                     continue;
                 }
 
-                TokenKind::DataType(_) => {
-                    expect_token!(TokenKind::DataType(return_type) in self);
+                TokenKind::Ident(_) => {
+                    let (return_type, _) = self.parse_data_type()?;
                     expect_token!(TokenKind::Ident(name), name_span in self);
                     expect_token!(TokenKind::ParenL in self);
 
@@ -135,7 +136,7 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            expect_token!(TokenKind::DataType(data_type), data_type_span in self);
+            let (data_type, data_type_span) = self.parse_data_type()?;
             expect_token!(TokenKind::Ident(ident), ident_span in self);
             let param = SpannedParameter::new(ident, data_type, data_type_span.join(ident_span));
             params.push(param);
@@ -186,20 +187,6 @@ impl<'a> Parser<'a> {
                     }
                 }
 
-                // var declaration with explicit type
-                TokenKind::DataType(_) => {
-                    expect_token!(TokenKind::DataType(data_type) in self);
-                    expect_token!(TokenKind::Ident(ident) in self);
-                    expect_token!(TokenKind::Assign in self);
-
-                    let expr = self.parse_expr()?;
-
-                    expect_token!(TokenKind::EOL in self);
-
-                    let expr_span = expr.span;
-                    Statement::var_declare(Some(data_type), ident, expr, token_span.join(expr_span))
-                }
-
                 TokenKind::Let => {
                     expect_token!(TokenKind::Let in self);
                     expect_token!(TokenKind::Ident(ident) in self);
@@ -213,20 +200,16 @@ impl<'a> Parser<'a> {
                     Statement::var_declare(None, ident, expr, token_span.join(expr_span))
                 }
 
-                // var assign / function call in expr stmt
+                // var assign / var declare / function call in expr stmt
                 TokenKind::Ident(_) => self.parse_ident_statement()?,
 
                 TokenKind::If => self.parse_if_statement()?,
 
                 TokenKind::While => {
                     expect_token!(TokenKind::While in self);
-
                     let cond = self.parse_expr()?;
-
                     expect_token!(TokenKind::BraceL in self);
-
                     let stmts = self.parse_statements(TokenKind::BraceR)?;
-
                     expect_token!(TokenKind::BraceR, brace_r_span in self);
 
                     Statement::while_statement(cond, stmts, token_span.join(brace_r_span))
@@ -247,8 +230,25 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_ident_statement(&mut self) -> Result<Statement, CompileError> {
-        expect_token!(TokenKind::Ident(ident) in self);
+        let saved_index = self.index;
 
+        if let Ok((data_type, data_type_span)) = self.parse_data_type() {
+            expect_token!(TokenKind::Ident(ident) in self);
+            expect_token!(TokenKind::Assign in self);
+            let expr = self.parse_expr()?;
+            expect_token!(TokenKind::EOL in self);
+            let expr_span = expr.span;
+            return Ok(Statement::var_declare(
+                Some(data_type),
+                ident,
+                expr,
+                data_type_span.join(expr_span),
+            ));
+        }
+
+        self.index = saved_index;
+
+        expect_token!(TokenKind::Ident(ident) in self);
         if let Some(TokenKind::Assign) = self.peek_kind() {
             expect_token!(TokenKind::Assign, assign_span in self);
 
@@ -414,7 +414,7 @@ impl<'a> Parser<'a> {
             self.skip();
             expect_token!(TokenKind::Ident(method_name) in self);
             expect_token!(TokenKind::ParenL in self);
-            let args = self.parse_args()?;
+            let args = self.parse_args(TokenKind::ParenR)?;
             expect_token!(TokenKind::ParenR, end_span in self);
 
             let span = base_expr.span.join(end_span);
@@ -462,6 +462,14 @@ impl<'a> Parser<'a> {
                 inner
             }
 
+            TokenKind::BracketL => {
+                expect_token!(TokenKind::BracketL in self);
+                let elements = self.parse_args(TokenKind::BracketR)?;
+                expect_token!(TokenKind::BracketR, end_span in self);
+
+                Ok(Expr::list_literal(elements, token_span.join(end_span)))
+            }
+
             _ => {
                 return Err(CompileError::unexpected_token_at(
                     self.next().unwrap().kind,
@@ -477,7 +485,7 @@ impl<'a> Parser<'a> {
         match self.peek_kind() {
             Some(TokenKind::ParenL) => {
                 expect_token!(TokenKind::ParenL in self);
-                let args = self.parse_args()?;
+                let args = self.parse_args(TokenKind::ParenR)?;
                 expect_token!(TokenKind::ParenR, end_span in self);
 
                 if let Ok(builtin_function) = BuiltinFunction::from_str(ident.as_str()) {
@@ -496,7 +504,7 @@ impl<'a> Parser<'a> {
                 expect_token!(TokenKind::Ident(func_name) in self);
 
                 expect_token!(TokenKind::ParenL in self);
-                let args = self.parse_args()?;
+                let args = self.parse_args(TokenKind::ParenR)?;
                 expect_token!(TokenKind::ParenR, end_span in self);
 
                 Ok(Expr::foreign_function_call(
@@ -511,11 +519,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_args(&mut self) -> Result<Vec<Expr>, CompileError> {
+    fn parse_args(&mut self, critical_kind: TokenKind) -> Result<Vec<Expr>, CompileError> {
         let mut args = vec![];
 
         while let Some(token) = self.peek() {
-            if token.kind == TokenKind::ParenR {
+            if token.kind == critical_kind {
                 break;
             }
 
@@ -529,6 +537,30 @@ impl<'a> Parser<'a> {
         }
 
         Ok(args)
+    }
+
+    fn parse_data_type(&mut self) -> Result<(DataType, Span), CompileError> {
+        expect_token!(TokenKind::Ident(ident), ident_span in self);
+        let mut span = ident_span;
+
+        let ty = match ident.as_str() {
+            "Int" => DataType::Int,
+            "Float" => DataType::Float,
+            "Bool" => DataType::Bool,
+            "String" => DataType::String,
+            "Void" => DataType::Void,
+            "List" => {
+                expect_token!(TokenKind::ArrowL in self);
+                let (item_type, _) = self.parse_data_type()?;
+                expect_token!(TokenKind::ArrowR, end_span in self);
+                span = span.join(end_span);
+                DataType::list_of(item_type)
+            }
+
+            _ => return Err(CompileError::unknown_type_at(ident, span)),
+        };
+
+        Ok((ty, span))
     }
 }
 
@@ -544,9 +576,9 @@ fn token_to_comp_op(token: &TokenKind) -> Option<BinaryOp> {
     match token {
         TokenKind::Equal => Some(BinaryOp::Equal),
         TokenKind::NotEqual => Some(BinaryOp::NotEqual),
-        TokenKind::Less => Some(BinaryOp::Less),
+        TokenKind::ArrowL => Some(BinaryOp::Less),
         TokenKind::LessEqual => Some(BinaryOp::LessEqual),
-        TokenKind::Greater => Some(BinaryOp::Greater),
+        TokenKind::ArrowR => Some(BinaryOp::Greater),
         TokenKind::GreaterEqual => Some(BinaryOp::GreaterEqual),
         _ => None,
     }
@@ -564,14 +596,14 @@ fn token_to_mul_op(token: &Token) -> Option<BinaryOp> {
     match &token.kind {
         TokenKind::Asterisk => Some(BinaryOp::Mul),
         TokenKind::Slash => Some(BinaryOp::Div),
-        TokenKind::Modulo => Some(BinaryOp::Modulo),
+        TokenKind::Percent => Some(BinaryOp::Modulo),
         _ => None,
     }
 }
 
 fn token_to_unary_op(token: &Token) -> Option<UnaryOp> {
     match &token.kind {
-        TokenKind::Not => Some(UnaryOp::Not),
+        TokenKind::Bang => Some(UnaryOp::Not),
         TokenKind::Minus => Some(UnaryOp::Negate),
         _ => None,
     }
@@ -674,7 +706,7 @@ mod test {
     #[test]
     fn parse_unary_operations() {
         let tokens = vec![
-            create_token(TokenKind::Not, 0, 3),
+            create_token(TokenKind::Bang, 0, 3),
             create_token(TokenKind::Bool(true), 4, 8),
         ];
 
@@ -771,7 +803,7 @@ mod test {
         let tokens = vec![create_token(TokenKind::ParenR, 0, 1)];
 
         let mut parser = create_parser(&tokens);
-        let args = parser.parse_args().unwrap();
+        let args = parser.parse_args(TokenKind::ParenR).unwrap();
         assert!(args.is_empty());
     }
 
@@ -787,7 +819,7 @@ mod test {
         ];
 
         let mut parser = create_parser(&tokens);
-        let args = parser.parse_args().unwrap();
+        let args = parser.parse_args(TokenKind::ParenR).unwrap();
         assert_eq!(args.len(), 3);
     }
 

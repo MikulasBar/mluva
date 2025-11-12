@@ -9,12 +9,36 @@ pub enum DataType {
     Float,
     Bool,
     String,
-    List { item_type: Box<DataType> },
+    List { item_type: Option<Box<DataType>> },
 }
 
 impl DataType {
+    pub fn unknow_list() -> Self {
+        Self::List { item_type: None }
+    }
+    pub fn list_of(item_type: DataType) -> Self {
+        Self::List {
+            item_type: Some(Box::new(item_type)),
+        }
+    }
+
     pub fn is_bool(&self) -> bool {
         matches!(self, Self::Bool)
+    }
+
+    pub fn matches_type(&self, other: &DataType) -> bool {
+        match (self, other) {
+            (DataType::List { item_type: None }, DataType::List { .. }) => true,
+            (
+                DataType::List {
+                    item_type: Some(t1),
+                },
+                DataType::List {
+                    item_type: Some(t2),
+                },
+            ) => t1.matches_type(t2),
+            _ => self == other,
+        }
     }
 
     pub fn check_method_call(
@@ -53,7 +77,16 @@ impl Display for DataType {
             DataType::Float => write!(f, "float"),
             DataType::Bool => write!(f, "bool"),
             DataType::String => write!(f, "string"),
-            DataType::List { item_type } => write!(f, "list<{}>", item_type),
+            DataType::List { item_type } => {
+                write!(
+                    f,
+                    "list<{}>",
+                    item_type
+                        .as_ref()
+                        .map(|t| t.to_string())
+                        .unwrap_or("unknown".to_string())
+                )
+            }
         }
     }
 }

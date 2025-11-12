@@ -32,8 +32,8 @@ impl BytecodeSerializable for DataType {
             DataTypeId::FLOAT => Ok(DataType::Float),
             DataTypeId::STRING => Ok(DataType::String),
             DataTypeId::LIST => {
-                let item_type = Box::new(DataType::from_bytecode(bytes, cursor)?);
-                Ok(DataType::List { item_type })
+                let item_type = DataType::from_bytecode(bytes, cursor)?;
+                Ok(DataType::list_of(item_type))
             }
 
             _ => Err(format!("Unknown DataType id: {}", id)),

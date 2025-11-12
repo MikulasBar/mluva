@@ -2,8 +2,6 @@ use std::fmt::Display;
 
 use crate::diagnostics::Span;
 
-use crate::data_type::DataType;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Token {
     pub kind: TokenKind,
@@ -27,23 +25,15 @@ pub enum TokenKind {
     Slash,
     Equal,
     NotEqual,
-    Modulo,
-    Less,
+    Percent,
+    ArrowL,
     LessEqual,
-    Greater,
+    ArrowR,
     GreaterEqual,
     Assign,
     And,
     Or,
-    Not,
-
-    If,
-    Else,
-    Let,
-    While,
-    Return,
-    Import,
-
+    Bang,
     ParenL,
     ParenR,
     BracketL,
@@ -55,7 +45,13 @@ pub enum TokenKind {
     DotDot,
     Colon,
 
-    DataType(DataType),
+    If,
+    Else,
+    Let,
+    While,
+    Return,
+    Import,
+
     Ident(String),
     StringLiteral(String),
     Int(i32),
@@ -74,15 +70,15 @@ impl Display for TokenKind {
             TokenKind::Slash => write!(f, "'/'"),
             TokenKind::Equal => write!(f, "'=='"),
             TokenKind::NotEqual => write!(f, "'!='"),
-            TokenKind::Modulo => write!(f, "'%'"),
-            TokenKind::Less => write!(f, "'<'"),
+            TokenKind::Percent => write!(f, "'%'"),
+            TokenKind::ArrowL => write!(f, "'<'"),
             TokenKind::LessEqual => write!(f, "'<='"),
-            TokenKind::Greater => write!(f, "'>'"),
+            TokenKind::ArrowR => write!(f, "'>'"),
             TokenKind::GreaterEqual => write!(f, "'>='"),
             TokenKind::Assign => write!(f, "'='"),
             TokenKind::And => write!(f, "'&&'"),
             TokenKind::Or => write!(f, "'||'"),
-            TokenKind::Not => write!(f, "'!'"),
+            TokenKind::Bang => write!(f, "'!'"),
             TokenKind::If => write!(f, "'if'"),
             TokenKind::Else => write!(f, "'else'"),
             TokenKind::Let => write!(f, "'let'"),
@@ -99,7 +95,6 @@ impl Display for TokenKind {
             TokenKind::Dot => write!(f, "'.'"),
             TokenKind::DotDot => write!(f, "'..'"),
             TokenKind::Colon => write!(f, "':'"),
-            TokenKind::DataType(dt) => write!(f, "data type {}", dt),
             TokenKind::Ident(name) => write!(f, "identifier '{}'", name),
             TokenKind::StringLiteral(s) => write!(f, "string literal \"{}\"", s),
             TokenKind::Int(i) => write!(f, "integer literal {}", i),

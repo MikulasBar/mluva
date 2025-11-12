@@ -10,6 +10,7 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
+    List(Vec<Value>),
 }
 
 impl Value {
@@ -20,6 +21,13 @@ impl Value {
             Self::Float(_) => DataType::Float,
             Self::Bool(_) => DataType::Bool,
             Self::String(_) => DataType::String,
+            Self::List(items) => {
+                if let Some(first_item) = items.first() {
+                    DataType::list_of(first_item.get_type())
+                } else {
+                    DataType::unknow_list()
+                }
+            }
         }
     }
 
@@ -212,6 +220,10 @@ impl Display for Value {
             Self::Float(num) => write!(f, "{}", num),
             Self::Bool(bool) => write!(f, "{}", bool),
             Self::String(string) => write!(f, "{}", string),
+            Self::List(items) => {
+                let items_str: Vec<String> = items.iter().map(|item| format!("{}", item)).collect();
+                write!(f, "[{}]", items_str.join(", "))
+            }
         }
     }
 }

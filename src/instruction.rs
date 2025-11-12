@@ -45,4 +45,7 @@ pub enum Instruction {
         method_name: String,
         arg_count: u32,
     },
+    CreateList {
+        item_count: u32,
+    },
 }

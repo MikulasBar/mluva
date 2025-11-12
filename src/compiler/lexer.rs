@@ -2,7 +2,6 @@ use std::iter::Peekable;
 use std::str::CharIndices;
 
 use super::token::{Token, TokenKind};
-use crate::data_type::DataType;
 use crate::diagnostics::Span;
 use crate::errors::CompileError;
 
@@ -74,7 +73,7 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
                 file_id,
                 start_idx,
                 '=',
-                TokenKind::Not,
+                TokenKind::Bang,
                 TokenKind::NotEqual,
                 false,
             ),
@@ -94,7 +93,7 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
                 file_id,
                 start_idx,
                 '=',
-                TokenKind::Less,
+                TokenKind::ArrowL,
                 TokenKind::LessEqual,
                 false,
             ),
@@ -104,7 +103,7 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
                 file_id,
                 start_idx,
                 '=',
-                TokenKind::Greater,
+                TokenKind::ArrowR,
                 TokenKind::GreaterEqual,
                 false,
             ),
@@ -164,7 +163,7 @@ fn get_single_char_token(chars: &mut Peekable<CharIndices<'_>>, file_id: usize) 
         '-' => TokenKind::Minus,
         '*' => TokenKind::Asterisk,
         '/' => TokenKind::Slash,
-        '%' => TokenKind::Modulo,
+        '%' => TokenKind::Percent,
         '(' => TokenKind::ParenL,
         ')' => TokenKind::ParenR,
         '[' => TokenKind::BracketL,
@@ -353,12 +352,6 @@ fn tokenize_ident(
 
 fn match_kw(ident: String) -> TokenKind {
     match ident.as_str() {
-        "Int" => TokenKind::DataType(DataType::Int),
-        "Float" => TokenKind::DataType(DataType::Float),
-        "Bool" => TokenKind::DataType(DataType::Bool),
-        "String" => TokenKind::DataType(DataType::String),
-        "Void" => TokenKind::DataType(DataType::Void),
-
         "true" => TokenKind::Bool(true),
         "false" => TokenKind::Bool(false),
 
@@ -367,7 +360,6 @@ fn match_kw(ident: String) -> TokenKind {
         "else" => TokenKind::Else,
         "while" => TokenKind::While,
         "return" => TokenKind::Return,
-        // "external" => Token::External,
         "import" => TokenKind::Import,
 
         _ => TokenKind::Ident(ident),
@@ -380,19 +372,19 @@ mod test {
 
     #[test]
     fn test_tokenize() {
-        let input = "let x: Int = 42;\nif x > 10 {\nreturn 'Hello';\n}";
+        let input = "let x: Int = 42\nif x > 10 {\nreturn 'Hello'\n}";
         let tokens = tokenize(input, 0).unwrap();
         let expected_tokens = vec![
             TokenKind::Let,
             TokenKind::Ident("x".to_string()),
             TokenKind::Colon,
-            TokenKind::DataType(DataType::Int),
+            TokenKind::Ident("Int".to_string()),
             TokenKind::Assign,
             TokenKind::Int(42),
             TokenKind::EOL,
             TokenKind::If,
             TokenKind::Ident("x".to_string()),
-            TokenKind::Greater,
+            TokenKind::ArrowR,
             TokenKind::Int(10),
             TokenKind::BraceL,
             TokenKind::EOL,

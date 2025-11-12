@@ -33,6 +33,7 @@ impl InstructionId {
     const FOREIGNCALL: u8 = 23;
     const BUILTINCALL: u8 = 24;
     const METHODCALL: u8 = 25;
+    const CREATELIST: u8 = 26;
 }
 
 fn get_id(instruction: &Instruction) -> u8 {
@@ -63,6 +64,7 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::ForeignCall { .. } => InstructionId::FOREIGNCALL,
         Instruction::BuiltinFunctionCall { .. } => InstructionId::BUILTINCALL,
         Instruction::MethodCall { .. } => InstructionId::METHODCALL,
+        Instruction::CreateList { .. } => InstructionId::CREATELIST,
     }
 }
 
@@ -99,6 +101,10 @@ impl BytecodeSerializable for Instruction {
             } => {
                 method_name.write_bytecode(buffer);
                 arg_count.write_bytecode(buffer);
+            }
+
+            Instruction::CreateList { item_count } => {
+                item_count.write_bytecode(buffer);
             }
 
             _ => (),
@@ -175,6 +181,10 @@ impl BytecodeSerializable for Instruction {
                     method_name,
                     arg_count,
                 })
+            }
+            InstructionId::CREATELIST => {
+                let item_count = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::CreateList { item_count })
             }
             _ => Err(format!("Unknown instruction ID: {}", id)),
         }

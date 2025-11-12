@@ -98,7 +98,7 @@ impl<'a> TypeChecker<'a> {
             }
 
             StatementKind::VarDeclare {
-                data_type,
+                data_type: var_type,
                 variable,
                 value,
             } => {
@@ -106,18 +106,24 @@ impl<'a> TypeChecker<'a> {
                 // check the type if yes
                 // if no then do essentialy nothing
                 let expr_type = self.check_expr(&value)?;
-                let data_type = if let Some(data_type) = data_type {
-                    if expr_type != *data_type {
+                let expr_span = value.span;
+
+                let data_type = match (var_type, expr_type) {
+                    (Some(var_type), expr_type) if !expr_type.matches_type(var_type) => {
                         return Err(CompileError::wrong_type_at(
-                            data_type.clone(),
+                            var_type.clone(),
                             expr_type,
-                            statement.span,
+                            expr_span,
                         ));
                     }
-
-                    data_type.clone()
-                } else {
-                    expr_type
+                    (None, DataType::List { item_type: None }) => {
+                        return Err(CompileError::cannot_infer_type_at(
+                            variable.clone(),
+                            expr_span,
+                        ));
+                    }
+                    (Some(var_type), _) => var_type.clone(),
+                    (None, expr_type) => expr_type,
                 };
 
                 self.scope
@@ -125,19 +131,19 @@ impl<'a> TypeChecker<'a> {
             }
 
             StatementKind::VarAssign { variable, value } => {
-                let Some(data_type) = self.scope.get(&variable) else {
+                let Some(var_type) = self.scope.get(&variable) else {
                     return Err(CompileError::variable_not_found_at(
                         variable.clone(),
                         statement.span,
                     ));
                 };
 
-                let value_type = self.check_expr(&value)?;
+                let expr_type = self.check_expr(&value)?;
 
-                if value_type != *data_type {
+                if !expr_type.matches_type(var_type) {
                     return Err(CompileError::wrong_type_at(
-                        data_type.clone(),
-                        value_type,
+                        var_type.clone(),
+                        expr_type,
                         statement.span,
                     ));
                 }
@@ -188,6 +194,25 @@ impl<'a> TypeChecker<'a> {
                 Ok(data_type.clone())
             }
             ExprKind::Literal(lit) => Ok(lit.get_type()),
+            ExprKind::ListLiteral(list) => {
+                if list.is_empty() {
+                    Ok(DataType::unknow_list())
+                } else {
+                    let first_type = self.check_expr(&list[0])?;
+                    for element in list.iter().skip(1) {
+                        let element_type = self.check_expr(element)?;
+                        if element_type != first_type {
+                            return Err(CompileError::wrong_type_at(
+                                first_type.clone(),
+                                element_type,
+                                expr.span,
+                            ));
+                        }
+                    }
+
+                    Ok(DataType::list_of(first_type))
+                }
+            }
             ExprKind::FunctionCall { func_name, args } => {
                 self.check_call_expr(expr, func_name, args)
             }

@@ -262,6 +262,16 @@ impl<'b> FunctionCompiler<'b> {
                 self.instructions.push(Instruction::Push(v.clone()));
             }
 
+            ExprKind::ListLiteral(list) => {
+                for element in list {
+                    self.compile_expr(element)?;
+                }
+
+                self.instructions.push(Instruction::CreateList {
+                    item_count: list.len() as u32,
+                });
+            }
+
             ExprKind::Var(name) => {
                 let slot = self.get_slot(name) as u32;
                 self.instructions.push(Instruction::Load { slot });

@@ -8,6 +8,7 @@ fn get_id(value: &Value) -> u8 {
         Value::Int(_) => DataTypeId::INT,
         Value::Float(_) => DataTypeId::FLOAT,
         Value::String(_) => DataTypeId::STRING,
+        Value::List { .. } => DataTypeId::LIST,
     }
 }
 
@@ -21,6 +22,12 @@ impl BytecodeSerializable for Value {
             Value::Int(x) => x.write_bytecode(buffer),
             Value::Float(x) => x.write_bytecode(buffer),
             Value::String(s) => s.write_bytecode(buffer),
+            Value::List(items) => {
+                items.len().write_bytecode(buffer);
+                for item in items {
+                    item.write_bytecode(buffer);
+                }
+            }
         }
     }
 
@@ -44,6 +51,15 @@ impl BytecodeSerializable for Value {
             DataTypeId::STRING => {
                 let s = String::from_bytecode(bytes, cursor)?;
                 Ok(Value::String(s))
+            }
+            DataTypeId::LIST => {
+                let length = usize::from_bytecode(bytes, cursor)?;
+                let mut items = Vec::with_capacity(length);
+                for _ in 0..length {
+                    let item = Value::from_bytecode(bytes, cursor)?;
+                    items.push(item);
+                }
+                Ok(Value::List(items))
             }
             _ => Err(format!("Unknown type identifier: {}", type_id)),
         }

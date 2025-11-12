@@ -12,6 +12,13 @@ impl Expr {
         Self { kind, span }
     }
 
+    pub fn list_literal(elements: Vec<Self>, span: Span) -> Self {
+        Self {
+            kind: ExprKind::ListLiteral(elements),
+            span,
+        }
+    }
+
     pub fn literal(value: Value, span: Span) -> Self {
         Self {
             kind: ExprKind::Literal(value),
@@ -88,6 +95,7 @@ pub enum ExprKind {
     Var(String),
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
+    ListLiteral(Vec<Expr>),
     FunctionCall {
         func_name: String,
         args: Vec<Expr>,

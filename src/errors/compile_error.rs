@@ -145,6 +145,14 @@ impl CompileError {
         .with_span(span)
     }
 
+    pub fn unknown_type_at(name: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::UnknownType(name.clone().into()),
+            format!("unknown type: {}", name.into()),
+        )
+        .with_span(span)
+    }
+
     pub fn method_not_found_at(
         data_type: DataType,
         method_name: impl Into<String> + Clone,
@@ -162,6 +170,14 @@ impl CompileError {
                 method_name: method_name.clone().into(),
             },
             message,
+        )
+        .with_span(span)
+    }
+
+    pub fn cannot_infer_type_at(variable: impl Into<String> + Clone, span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::CannotInferType,
+            format!("cannot infer type for variable '{}'", variable.into()),
         )
         .with_span(span)
     }
@@ -218,6 +234,7 @@ pub enum CompileErrorKind {
         expected: usize,
         found: usize,
     },
+    UnknownType(String),
     VariableNotFound(String),
     FunctionNotFound(String),
     FunctionAlreadyDefined(String),
@@ -232,5 +249,6 @@ pub enum CompileErrorKind {
         data_type: DataType,
         method_name: String,
     },
+    CannotInferType,
     Other,
 }

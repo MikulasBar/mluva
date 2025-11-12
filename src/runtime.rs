@@ -167,6 +167,11 @@ impl<'a> InternalFunctionRuntime<'a> {
                     }
                 }
 
+                Instruction::CreateList { item_count } => {
+                    let items = self.stack.split_off(self.stack.len() - item_count as usize);
+                    self.stack.push(Value::List(items));
+                }
+
                 Instruction::Add => self.apply_bin_op(Value::add)?,
                 Instruction::Sub => self.apply_bin_op(Value::sub)?,
                 Instruction::Mul => self.apply_bin_op(Value::mul)?,
