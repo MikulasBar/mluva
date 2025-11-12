@@ -293,30 +293,7 @@ impl<'a> TypeChecker<'a> {
             .map(|arg| self.check_expr(arg))
             .collect::<Result<Vec<DataType>, CompileError>>()?;
 
-        match function {
-            BuiltinFunction::Print => {
-                // Print can take any type of arguments
-                Ok(DataType::Void)
-            }
-            BuiltinFunction::Assert => {
-                // Assert arguments must be bool
-                for arg_type in arg_types {
-                    if arg_type != DataType::Bool {
-                        return Err(CompileError::wrong_type_at(
-                            DataType::Bool,
-                            arg_type,
-                            expr.span,
-                        ));
-                    }
-                }
-
-                Ok(DataType::Void)
-            }
-            BuiltinFunction::Format => {
-                // Format can take any type of arguments
-                Ok(DataType::String)
-            }
-        }
+        function.check_types(expr.span, &arg_types)
     }
 
     fn check_method_call_expr(

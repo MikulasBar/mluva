@@ -1,7 +1,7 @@
-use std::fmt::Display;
+use std::{fmt::Display, str::FromStr};
 
 use super::data_type::DataType;
-use crate::errors::RuntimeError;
+use crate::{ast::BuiltinFunction, errors::RuntimeError};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {

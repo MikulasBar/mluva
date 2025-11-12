@@ -1,6 +1,11 @@
-use std::{collections::HashSet, str::FromStr};
+use std::str::FromStr;
 
-use crate::{errors::RuntimeError, value::Value};
+use crate::{
+    data_type::DataType,
+    diagnostics::Span,
+    errors::{CompileError, RuntimeError},
+    value::Value,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BuiltinFunction {
@@ -12,40 +17,57 @@ pub enum BuiltinFunction {
 impl BuiltinFunction {
     pub fn as_str(&self) -> &'static str {
         match self {
-            BuiltinFunction::Print => "print",
-            BuiltinFunction::Assert => "assert",
-            BuiltinFunction::Format => "format",
+            Self::Print => "print",
+            Self::Assert => "assert",
+            Self::Format => "format",
         }
     }
 
-    pub fn str_variants() -> HashSet<&'static str> {
-        let mut set = HashSet::new();
-        for variant in ["print", "assert", "format"] {
-            set.insert(variant);
-        }
+    pub fn check_types(&self, span: Span, args: &[DataType]) -> Result<DataType, CompileError> {
+        match self {
+            Self::Print => Ok(DataType::Void),
+            Self::Assert => {
+                if args.len() != 1 {
+                    return Err(CompileError::wrong_number_of_arguments_at(
+                        1,
+                        args.len(),
+                        span,
+                    ));
+                }
 
-        set
+                if !args[0].is_bool() {
+                    return Err(CompileError::wrong_type_at(
+                        DataType::Bool,
+                        args[0].clone(),
+                        span,
+                    ));
+                }
+
+                Ok(DataType::Void)
+            }
+            Self::Format => Ok(DataType::String),
+        }
     }
 
     pub fn execute(&self, args: Vec<Value>) -> Result<Value, RuntimeError> {
         match self {
-            BuiltinFunction::Print => {
+            Self::Print => {
                 for arg in args {
                     print!("{}", arg);
                 }
                 println!();
                 Ok(Value::Void)
             }
-            BuiltinFunction::Assert => {
-                for arg in args {
-                    if arg.is_false()? {
-                        return Err(RuntimeError::AssertionFailed);
-                    }
+            Self::Assert => {
+                let arg = args.get(0).expect("Malformed arguments for assert");
+
+                if arg.is_false()? {
+                    return Err(RuntimeError::AssertionFailed);
                 }
 
                 Ok(Value::Void)
             }
-            BuiltinFunction::Format => {
+            Self::Format => {
                 let mut result = String::new();
                 for arg in args {
                     result.push_str(&arg.to_string());
@@ -61,9 +83,9 @@ impl FromStr for BuiltinFunction {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "print" => Ok(BuiltinFunction::Print),
-            "assert" => Ok(BuiltinFunction::Assert),
-            "format" => Ok(BuiltinFunction::Format),
+            "print" => Ok(Self::Print),
+            "assert" => Ok(Self::Assert),
+            "format" => Ok(Self::Format),
             _ => Err("Not a builtin function".to_string()),
         }
     }

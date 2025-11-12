@@ -91,7 +91,7 @@ impl<'a> Parser<'a> {
                     expect_token!(TokenKind::ParenR, paren_r_span in self);
                     expect_token!(TokenKind::BraceL in self);
 
-                    if BuiltinFunction::str_variants().contains(name.as_str()) {
+                    if BuiltinFunction::from_str(name.as_str()).is_ok() {
                         return Err(CompileError::reserved_function_name_at(name, name_span));
                     }
 
