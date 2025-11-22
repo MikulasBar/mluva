@@ -14,26 +14,32 @@ impl InstructionId {
     const DIV: u8 = 4;
     const MODULO: u8 = 5;
     const EQUAL: u8 = 6;
-    const NOTEQUAL: u8 = 7;
+    const NOT_EQUAL: u8 = 7;
     const LESS: u8 = 8;
-    const LESSEQUAL: u8 = 9;
+    const LESS_EQUAL: u8 = 9;
     const GREATER: u8 = 10;
-    const GREATEREQUAL: u8 = 11;
+    const GREATER_EQUAL: u8 = 11;
     const AND: u8 = 12;
     const OR: u8 = 13;
     const NOT: u8 = 14;
     const NEGATE: u8 = 15;
     const JUMP: u8 = 16;
-    const JUMPIFFALSE: u8 = 17;
+    const JUMP_IF_FALSE: u8 = 17;
     const CALL: u8 = 18;
-    const LOAD: u8 = 19;
+    const LOAD_COPY: u8 = 19;
     const STORE: u8 = 20;
     const POP: u8 = 21;
-    const PUSH: u8 = 22;
-    const FOREIGNCALL: u8 = 23;
-    const BUILTINCALL: u8 = 24;
-    const METHODCALL: u8 = 25;
-    const CREATELIST: u8 = 26;
+    const LOAD_CONST: u8 = 22;
+    const FOREIGN_CALL: u8 = 23;
+    const BUILTIN_CALL: u8 = 24;
+    const METHOD_CALL: u8 = 25;
+    const CREATE_LIST: u8 = 26;
+    const INDEX_COPY: u8 = 27;
+    const INDEX_REF: u8 = 28;
+    const DEREF_COPY: u8 = 29;
+    const LOAD_REF: u8 = 30;
+    const INDEX_STORE: u8 = 31;
+    const STORE_DEREF: u8 = 32;
 }
 
 fn get_id(instruction: &Instruction) -> u8 {
@@ -45,26 +51,32 @@ fn get_id(instruction: &Instruction) -> u8 {
         Instruction::Div => InstructionId::DIV,
         Instruction::Modulo => InstructionId::MODULO,
         Instruction::Equal => InstructionId::EQUAL,
-        Instruction::NotEqual => InstructionId::NOTEQUAL,
+        Instruction::NotEqual => InstructionId::NOT_EQUAL,
         Instruction::Less => InstructionId::LESS,
-        Instruction::LessEqual => InstructionId::LESSEQUAL,
+        Instruction::LessEqual => InstructionId::LESS_EQUAL,
         Instruction::Greater => InstructionId::GREATER,
-        Instruction::GreaterEqual => InstructionId::GREATEREQUAL,
+        Instruction::GreaterEqual => InstructionId::GREATER_EQUAL,
         Instruction::And => InstructionId::AND,
         Instruction::Or => InstructionId::OR,
         Instruction::Not => InstructionId::NOT,
         Instruction::Negate => InstructionId::NEGATE,
         Instruction::Jump(_) => InstructionId::JUMP,
-        Instruction::JumpIfFalse(_) => InstructionId::JUMPIFFALSE,
+        Instruction::JumpIfFalse(_) => InstructionId::JUMP_IF_FALSE,
         Instruction::Call { .. } => InstructionId::CALL,
-        Instruction::Load { .. } => InstructionId::LOAD,
+        Instruction::LoadCopy { .. } => InstructionId::LOAD_COPY,
         Instruction::Store { .. } => InstructionId::STORE,
         Instruction::Pop => InstructionId::POP,
-        Instruction::Push(_) => InstructionId::PUSH,
-        Instruction::ForeignCall { .. } => InstructionId::FOREIGNCALL,
-        Instruction::BuiltinFunctionCall { .. } => InstructionId::BUILTINCALL,
-        Instruction::MethodCall { .. } => InstructionId::METHODCALL,
-        Instruction::CreateList { .. } => InstructionId::CREATELIST,
+        Instruction::LoadConst(_) => InstructionId::LOAD_CONST,
+        Instruction::ForeignCall { .. } => InstructionId::FOREIGN_CALL,
+        Instruction::BuiltinFunctionCall { .. } => InstructionId::BUILTIN_CALL,
+        Instruction::MethodCall { .. } => InstructionId::METHOD_CALL,
+        Instruction::CreateList { .. } => InstructionId::CREATE_LIST,
+        Instruction::IndexCopy { .. } => InstructionId::INDEX_COPY,
+        Instruction::IndexRef { .. } => InstructionId::INDEX_REF,
+        Instruction::DerefCopy => InstructionId::DEREF_COPY,
+        Instruction::LoadRef { .. } => InstructionId::LOAD_REF,
+        Instruction::IndexStore { .. } => InstructionId::INDEX_STORE,
+        Instruction::StoreDeref => InstructionId::STORE_DEREF,
     }
 }
 
@@ -76,9 +88,9 @@ impl BytecodeSerializable for Instruction {
             Instruction::Jump(target) => target.write_bytecode(buffer),
             Instruction::JumpIfFalse(target) => target.write_bytecode(buffer),
             Instruction::Call { call_slot } => call_slot.write_bytecode(buffer),
-            Instruction::Load { slot } => slot.write_bytecode(buffer),
+            Instruction::LoadCopy { slot } => slot.write_bytecode(buffer),
             Instruction::Store { slot } => slot.write_bytecode(buffer),
-            Instruction::Push(value) => value.write_bytecode(buffer),
+            Instruction::LoadConst(value) => value.write_bytecode(buffer),
             Instruction::ForeignCall {
                 module_name,
                 call_slot,
@@ -107,6 +119,23 @@ impl BytecodeSerializable for Instruction {
                 item_count.write_bytecode(buffer);
             }
 
+            Instruction::IndexCopy { depth } => {
+                depth.write_bytecode(buffer);
+            }
+
+            Instruction::IndexRef { depth } => {
+                depth.write_bytecode(buffer);
+            }
+
+            Instruction::IndexStore { slot, depth } => {
+                slot.write_bytecode(buffer);
+                depth.write_bytecode(buffer);
+            }
+
+            Instruction::LoadRef { slot } => {
+                slot.write_bytecode(buffer);
+            }
+
             _ => (),
         }
     }
@@ -122,11 +151,11 @@ impl BytecodeSerializable for Instruction {
             InstructionId::DIV => Ok(Instruction::Div),
             InstructionId::MODULO => Ok(Instruction::Modulo),
             InstructionId::EQUAL => Ok(Instruction::Equal),
-            InstructionId::NOTEQUAL => Ok(Instruction::NotEqual),
+            InstructionId::NOT_EQUAL => Ok(Instruction::NotEqual),
             InstructionId::LESS => Ok(Instruction::Less),
-            InstructionId::LESSEQUAL => Ok(Instruction::LessEqual),
+            InstructionId::LESS_EQUAL => Ok(Instruction::LessEqual),
             InstructionId::GREATER => Ok(Instruction::Greater),
-            InstructionId::GREATEREQUAL => Ok(Instruction::GreaterEqual),
+            InstructionId::GREATER_EQUAL => Ok(Instruction::GreaterEqual),
             InstructionId::AND => Ok(Instruction::And),
             InstructionId::OR => Ok(Instruction::Or),
             InstructionId::NOT => Ok(Instruction::Not),
@@ -137,7 +166,7 @@ impl BytecodeSerializable for Instruction {
                 let target = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Jump(target))
             }
-            InstructionId::JUMPIFFALSE => {
+            InstructionId::JUMP_IF_FALSE => {
                 let target = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::JumpIfFalse(target))
             }
@@ -145,19 +174,19 @@ impl BytecodeSerializable for Instruction {
                 let call_slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Call { call_slot })
             }
-            InstructionId::LOAD => {
+            InstructionId::LOAD_COPY => {
                 let slot = u32::from_bytecode(bytes, cursor)?;
-                Ok(Instruction::Load { slot })
+                Ok(Instruction::LoadCopy { slot })
             }
             InstructionId::STORE => {
                 let slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::Store { slot })
             }
-            InstructionId::PUSH => {
+            InstructionId::LOAD_CONST => {
                 let value = Value::from_bytecode(bytes, cursor)?;
-                Ok(Instruction::Push(value))
+                Ok(Instruction::LoadConst(value))
             }
-            InstructionId::FOREIGNCALL => {
+            InstructionId::FOREIGN_CALL => {
                 let module_name = String::from_bytecode(bytes, cursor)?;
                 let call_slot = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::ForeignCall {
@@ -165,7 +194,7 @@ impl BytecodeSerializable for Instruction {
                     call_slot,
                 })
             }
-            InstructionId::BUILTINCALL => {
+            InstructionId::BUILTIN_CALL => {
                 let function_name = String::from_bytecode(bytes, cursor)?;
                 let arg_count = u32::from_bytecode(bytes, cursor)?;
                 let function = BuiltinFunction::from_str(&function_name)?;
@@ -174,7 +203,7 @@ impl BytecodeSerializable for Instruction {
                     arg_count,
                 })
             }
-            InstructionId::METHODCALL => {
+            InstructionId::METHOD_CALL => {
                 let method_name = String::from_bytecode(bytes, cursor)?;
                 let arg_count = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::MethodCall {
@@ -182,10 +211,29 @@ impl BytecodeSerializable for Instruction {
                     arg_count,
                 })
             }
-            InstructionId::CREATELIST => {
+            InstructionId::CREATE_LIST => {
                 let item_count = u32::from_bytecode(bytes, cursor)?;
                 Ok(Instruction::CreateList { item_count })
             }
+            InstructionId::INDEX_COPY => {
+                let depth = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::IndexCopy { depth })
+            }
+            InstructionId::INDEX_REF => {
+                let depth = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::IndexRef { depth })
+            }
+            InstructionId::INDEX_STORE => {
+                let slot = u32::from_bytecode(bytes, cursor)?;
+                let depth = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::IndexStore { slot, depth })
+            }
+            InstructionId::DEREF_COPY => Ok(Instruction::DerefCopy),
+            InstructionId::LOAD_REF => {
+                let slot = u32::from_bytecode(bytes, cursor)?;
+                Ok(Instruction::LoadRef { slot })
+            }
+            InstructionId::STORE_DEREF => Ok(Instruction::StoreDeref),
             _ => Err(format!("Unknown instruction ID: {}", id)),
         }
     }

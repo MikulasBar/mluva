@@ -2,17 +2,16 @@ use core::panic;
 use std::collections::HashMap;
 
 use crate::ast::{
-    Ast, BinaryOp, Expr, ExprKind, SpannedFunctionSigniture, SpannedParameter, Statement,
-    StatementKind, UnaryOp,
+    Ast, BinaryOp, Expr, ExprKind, Pattern, PatternKind, SpannedFunctionSigniture,
+    SpannedParameter, Statement, StatementKind, UnaryOp,
 };
+use crate::data_type::DataType;
 use crate::errors::CompileError;
 use crate::function::FunctionSource;
 use crate::instruction::Instruction;
 
 use crate::module::Module;
 use crate::value::Value;
-
-use crate::data_type::DataType;
 
 pub struct Compiler<'a> {
     sources: Vec<FunctionSource>,
@@ -118,7 +117,7 @@ impl<'b> FunctionCompiler<'b> {
 
         // implicit return at the end of Void functions
         if let DataType::Void = self.signiture.return_type {
-            self.instructions.push(Instruction::Push(Value::Void));
+            self.instructions.push(Instruction::LoadConst(Value::Void));
             self.instructions.push(Instruction::Return);
         }
 
@@ -144,12 +143,11 @@ impl<'b> FunctionCompiler<'b> {
         match &statement.kind {
             // there is no difference between declaration and assignment at this point
             StatementKind::VarDeclare {
-                variable, value, ..
+                assignee, value, ..
             }
-            | StatementKind::VarAssign { variable, value } => {
+            | StatementKind::VarAssign { assignee, value } => {
                 self.compile_expr(&value)?;
-                let slot = self.get_slot(&variable) as u32;
-                self.push(Instruction::Store { slot });
+                self.compile_pattern(&assignee)?;
             }
 
             StatementKind::Expr(expr) => {
@@ -256,10 +254,49 @@ impl<'b> FunctionCompiler<'b> {
         Ok(())
     }
 
+    fn compile_pattern(&mut self, pattern: &Pattern) -> Result<(), CompileError> {
+        match &pattern.kind {
+            PatternKind::Variable(var) => {
+                let slot = self.get_slot(&var) as u32;
+                self.instructions.push(Instruction::Store { slot });
+            }
+            PatternKind::Index { callee, index } => {
+                self.compile_expr(&*index)?;
+                self.compile_pattern(&*callee);
+
+                match self.instructions.last() {
+                    Some(&Instruction::IndexStore { slot, depth }) => {
+                        self.instructions.pop();
+                        self.instructions.push(Instruction::IndexStore {
+                            slot: slot,
+                            depth: depth + 1,
+                        });
+                    }
+
+                    Some(&Instruction::Store { slot }) => {
+                        self.instructions.pop();
+                        self.instructions.push(Instruction::IndexStore {
+                            slot: slot,
+                            depth: 1,
+                        });
+                    }
+
+                    _ => {
+                        return Err(CompileError::internal_compiler_error(
+                            "Invalid state in pattern compilation",
+                        ));
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
         match &expr.kind {
             ExprKind::Literal(v) => {
-                self.instructions.push(Instruction::Push(v.clone()));
+                self.instructions.push(Instruction::LoadConst(v.clone()));
             }
 
             ExprKind::ListLiteral(list) => {
@@ -274,7 +311,7 @@ impl<'b> FunctionCompiler<'b> {
 
             ExprKind::Var(name) => {
                 let slot = self.get_slot(name) as u32;
-                self.instructions.push(Instruction::Load { slot });
+                self.instructions.push(Instruction::LoadCopy { slot });
             }
 
             ExprKind::BinaryOp(op, lhs, rhs) => {
@@ -288,6 +325,25 @@ impl<'b> FunctionCompiler<'b> {
                 self.compile_expr(expr)?;
                 let op_instruction = un_op_to_instruction(op);
                 self.instructions.push(op_instruction);
+            }
+
+            ExprKind::IndexGet { callee, index } => {
+                self.compile_expr(callee)?;
+
+                if let ExprKind::Var(var) = &callee.kind {
+                    let slot = self.get_slot(&var) as u32;
+                    self.instructions
+                        .last_mut()
+                        .map(|instr| *instr = Instruction::LoadRef { slot });
+                }
+
+                if let Some(&Instruction::IndexCopy { depth }) = self.instructions.last() {
+                    self.instructions.pop();
+                    self.compile_expr(index)?;
+
+                    self.instructions
+                        .push(Instruction::IndexCopy { depth: depth + 1 });
+                }
             }
 
             ExprKind::FunctionCall { func_name, args } => {
@@ -363,6 +419,21 @@ impl<'b> FunctionCompiler<'b> {
 
         Ok(())
     }
+
+    // fn compile_index_store(
+    //     &mut self,
+    //     callee: &Expr,
+    //     index: &Expr,
+    //     value: &Expr,
+    // ) -> Result<(), CompileError> {
+    //     self.compile_expr(callee)?;
+    //     self.compile_expr(index)?;
+    //     self.compile_expr(value)?;
+    //     self.instructions.push(Instruction::IndexS {
+    //         // slot to be filled
+    //     });
+    //     Ok(())
+    // }
 }
 
 fn bin_op_to_instruction(op: &BinaryOp) -> Instruction {

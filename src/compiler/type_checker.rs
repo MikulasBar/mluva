@@ -39,8 +39,11 @@ impl<'a> TypeChecker<'a> {
                 .params
                 .iter()
                 .try_for_each(|param| {
-                    self.scope
-                        .insert_new(param.name.clone(), param.data_type.clone(), param.span)
+                    self.scope.insert_new_var(
+                        param.name.clone(),
+                        param.data_type.clone(),
+                        param.span,
+                    )
                 })?;
 
             let statements = self.ast.get_function_body_by_slot(slot).unwrap();
@@ -99,12 +102,13 @@ impl<'a> TypeChecker<'a> {
 
             StatementKind::VarDeclare {
                 data_type: var_type,
-                variable,
+                assignee,
                 value,
             } => {
-                // if the declaration has explicit type or not
-                // check the type if yes
-                // if no then do essentialy nothing
+                if !assignee.is_declarable() {
+                    return Err(CompileError::invalid_pattern_at(assignee.span));
+                }
+
                 let expr_type = self.check_expr(&value)?;
                 let expr_span = value.span;
 
@@ -117,32 +121,23 @@ impl<'a> TypeChecker<'a> {
                         ));
                     }
                     (None, DataType::List { item_type: None }) => {
-                        return Err(CompileError::cannot_infer_type_at(
-                            variable.clone(),
-                            expr_span,
-                        ));
+                        return Err(CompileError::cannot_infer_type_at(expr_span));
                     }
                     (Some(var_type), _) => var_type.clone(),
                     (None, expr_type) => expr_type,
                 };
 
                 self.scope
-                    .insert_new(variable.clone(), data_type, statement.span)?;
+                    .insert_new_pattern(assignee.clone(), data_type, statement.span)?;
             }
 
-            StatementKind::VarAssign { variable, value } => {
-                let Some(var_type) = self.scope.get(&variable) else {
-                    return Err(CompileError::variable_not_found_at(
-                        variable.clone(),
-                        statement.span,
-                    ));
-                };
-
+            StatementKind::VarAssign { assignee, value } => {
                 let expr_type = self.check_expr(&value)?;
+                let assignee_type = self.scope.get_pattern(assignee)?;
 
-                if !expr_type.matches_type(var_type) {
+                if !expr_type.matches_type(&assignee_type) {
                     return Err(CompileError::wrong_type_at(
-                        var_type.clone(),
+                        assignee_type,
                         expr_type,
                         statement.span,
                     ));
@@ -193,10 +188,13 @@ impl<'a> TypeChecker<'a> {
 
                 Ok(data_type.clone())
             }
-            ExprKind::Literal(lit) => Ok(lit.get_type()),
+            ExprKind::Literal(lit) => {
+                let expr_span = expr.span;
+                lit.get_type_of_literal(expr_span)
+            }
             ExprKind::ListLiteral(list) => {
                 if list.is_empty() {
-                    Ok(DataType::unknow_list())
+                    Ok(DataType::unknown_list())
                 } else {
                     let first_type = self.check_expr(&list[0])?;
                     for element in list.iter().skip(1) {
@@ -213,6 +211,26 @@ impl<'a> TypeChecker<'a> {
                     Ok(DataType::list_of(first_type))
                 }
             }
+
+            ExprKind::IndexGet { callee, index } => {
+                let callee_type = self.check_expr(callee)?;
+                let index_type = self.check_expr(index)?;
+
+                match (&callee_type, &index_type) {
+                    (
+                        DataType::List {
+                            item_type: Some(item_ty),
+                        },
+                        DataType::Int,
+                    ) => Ok(item_ty.as_ref().clone()),
+                    _ => Err(CompileError::wrong_type_at(
+                        DataType::unknown_list(),
+                        callee_type,
+                        expr.span,
+                    )),
+                }
+            }
+
             ExprKind::FunctionCall { func_name, args } => {
                 self.check_call_expr(expr, func_name, args)
             }

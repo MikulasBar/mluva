@@ -140,3 +140,14 @@ impl BytecodeSerializable for f64 {
         buffer.extend_from_slice(&self.to_le_bytes());
     }
 }
+
+impl<T: BytecodeSerializable> BytecodeSerializable for Box<T> {
+    fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        let value = T::from_bytecode(bytes, cursor)?;
+        Ok(Box::new(value))
+    }
+
+    fn write_bytecode(&self, buffer: &mut Vec<u8>) {
+        (**self).write_bytecode(buffer);
+    }
+}

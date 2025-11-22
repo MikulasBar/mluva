@@ -1,7 +1,10 @@
 use std::fmt::Display;
 
+use crate::runtime::Runtime;
+
 #[derive(Debug, Clone)]
 pub enum RuntimeError {
+    InvalidHeapHandle,
     ValueStackUnderflow,
     DivisionByZero,
     Unknown,
@@ -12,7 +15,17 @@ pub enum RuntimeError {
     TypeError,
     FunctionDidNotReturn,
     AssertionFailed,
+    IndexOutOfBounds {
+        index: i32,
+        size: u32,
+    },
     Other(String),
+}
+
+impl RuntimeError {
+    pub fn index_out_of_bounds(index: i32, size: u32) -> Self {
+        RuntimeError::IndexOutOfBounds { index, size }
+    }
 }
 
 impl Display for RuntimeError {
@@ -24,6 +37,14 @@ impl Display for RuntimeError {
             RuntimeError::TypeError => write!(f, "Type error"),
             RuntimeError::FunctionDidNotReturn => write!(f, "Function did not return a value"),
             RuntimeError::AssertionFailed => write!(f, "Assertion failed"),
+            RuntimeError::IndexOutOfBounds { index, size } => {
+                write!(
+                    f,
+                    "Index out of bounds: the len is {} but the index is {}",
+                    size, index
+                )
+            }
+            RuntimeError::InvalidHeapHandle => write!(f, "Invalid heap handle"),
             RuntimeError::Other(msg) => write!(f, "{}", msg),
         }
     }

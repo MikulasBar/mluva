@@ -1,7 +1,9 @@
-use std::{fmt::Display, str::FromStr};
-
 use super::data_type::DataType;
-use crate::{ast::BuiltinFunction, errors::RuntimeError};
+use crate::{
+    arena::HeapHandle,
+    diagnostics::Span,
+    errors::{CompileError, RuntimeError},
+};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -10,10 +12,21 @@ pub enum Value {
     Float(f64),
     Bool(bool),
     String(String),
-    List(Vec<Value>),
+    HeapHandle(HeapHandle),
 }
 
 impl Value {
+    pub fn get_type_of_literal(&self, span: Span) -> Result<DataType, CompileError> {
+        match self {
+            Self::Void => Ok(DataType::Void),
+            Self::Int(_) => Ok(DataType::Int),
+            Self::Float(_) => Ok(DataType::Float),
+            Self::Bool(_) => Ok(DataType::Bool),
+            Self::String(_) => Ok(DataType::String),
+            _ => Err(CompileError::invalid_literal_at(span)),
+        }
+    }
+
     pub fn get_type(&self) -> DataType {
         match self {
             Self::Void => DataType::Void,
@@ -21,13 +34,16 @@ impl Value {
             Self::Float(_) => DataType::Float,
             Self::Bool(_) => DataType::Bool,
             Self::String(_) => DataType::String,
-            Self::List(items) => {
-                if let Some(first_item) = items.first() {
-                    DataType::list_of(first_item.get_type())
+            Self::List(list) => {
+                if list.is_empty() {
+                    DataType::unknown_list()
                 } else {
-                    DataType::unknow_list()
+                    let first_type = list[0].get_type();
+                    DataType::list_of(first_type)
                 }
             }
+            Self::FsRef(_) => DataType::unknown_reference(),
+            Self::RcRef(rf) => DataType::reference_of(rf.borrow().get_type()),
         }
     }
 
@@ -208,22 +224,6 @@ mod froms {
     impl From<String> for Value {
         fn from(value: String) -> Self {
             Self::String(value)
-        }
-    }
-}
-
-impl Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Void => write!(f, "void"),
-            Self::Int(num) => write!(f, "{}", num),
-            Self::Float(num) => write!(f, "{}", num),
-            Self::Bool(bool) => write!(f, "{}", bool),
-            Self::String(string) => write!(f, "{}", string),
-            Self::List(items) => {
-                let items_str: Vec<String> = items.iter().map(|item| format!("{}", item)).collect();
-                write!(f, "[{}]", items_str.join(", "))
-            }
         }
     }
 }

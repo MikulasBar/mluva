@@ -1,0 +1,201 @@
+use std::{
+    alloc::{self, Layout},
+    ptr::NonNull,
+};
+
+use crate::{
+    errors::RuntimeError,
+    vm::Vm,
+    vtable::{Method, VTable, PRIMITIVES_VTABLE_COUNT},
+    word::Word,
+};
+
+pub struct Arena {
+    slots: Vec<Slot>,
+    free_head: Option<u32>,
+}
+
+impl Arena {
+    pub fn new() -> Self {
+        Self {
+            slots: Vec::new(),
+            free_head: None,
+        }
+    }
+
+    pub fn get<T>(&self, handle: &HeapHandle) -> Result<&T, RuntimeError> {
+        if let Some(Slot {
+            gen,
+            slot_data: SlotData::Occupied { object, .. },
+        }) = self.slots.get(handle.index as usize)
+        {
+            if *gen == handle.gen {
+                let ptr = object.as_ptr() as *const T;
+                return Ok(unsafe { &*ptr });
+            }
+        }
+        Err(RuntimeError::InvalidHeapHandle)
+    }
+
+    pub fn get_mut<T>(&mut self, handle: &HeapHandle) -> Result<&mut T, RuntimeError> {
+        if let Some(Slot {
+            gen,
+            slot_data: SlotData::Occupied { object, .. },
+        }) = self.slots.get_mut(handle.index as usize)
+        {
+            if *gen == handle.gen {
+                let ptr = object.as_ptr() as *mut T;
+                return Ok(unsafe { &mut *ptr });
+            }
+        }
+        Err(RuntimeError::InvalidHeapHandle)
+    }
+
+    pub fn alloc<T>(&mut self, type_id: u32, object: T) -> HeapHandle {
+        let layout = Layout::new::<T>();
+        let object = NonNull::new(Box::into_raw(Box::new(object)) as *mut u8).unwrap();
+
+        let index = if let Some(idx) = self.free_head {
+            let slot = &mut self.slots[idx as usize];
+            if let Slot {
+                gen,
+                slot_data: SlotData::Free { next },
+            } = slot
+            {
+                self.free_head = *next;
+                *slot = Slot::new_occupied(*gen + 1, type_id, layout, object);
+            }
+            idx
+        } else {
+            let idx = self.slots.len() as u32;
+            self.slots
+                .push(Slot::new_occupied(0, type_id, layout, object));
+            idx
+        };
+        HeapHandle::new(index, 0)
+    }
+}
+
+struct Slot {
+    gen: u32,
+    slot_data: SlotData,
+}
+
+impl Slot {
+    pub fn new_occupied(gen: u32, type_id: u32, layout: Layout, object: NonNull<u8>) -> Self {
+        Self {
+            gen,
+            slot_data: SlotData::new_occupied(type_id, layout, object),
+        }
+    }
+
+    pub fn next_free(&self) -> Option<u32> {
+        if let SlotData::Free { next } = &self.slot_data {
+            *next
+        } else {
+            None
+        }
+    }
+}
+
+enum SlotData {
+    Free {
+        next: Option<u32>,
+    },
+    Occupied {
+        refcount: u32,
+        type_id: u32,
+        layout: Layout,
+        object: NonNull<u8>,
+    },
+}
+
+impl SlotData {
+    pub fn new_occupied(type_id: u32, layout: Layout, object: NonNull<u8>) -> Self {
+        Self::Occupied {
+            refcount: 1,
+            type_id,
+            layout,
+            object,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HeapHandle {
+    index: u32,
+    gen: u32,
+}
+
+impl HeapHandle {
+    pub fn new(index: u32, gen: u32) -> Self {
+        Self { index, gen }
+    }
+
+    pub fn rc_inc(&self, arena: &mut Arena) -> Result<(), ()> {
+        if let Some(Slot {
+            gen,
+            slot_data: SlotData::Occupied { refcount, .. },
+        }) = arena.slots.get_mut(self.index as usize)
+        {
+            if *gen == self.gen {
+                *refcount += 1;
+                return Ok(());
+            }
+        }
+        Err(())
+    }
+
+    pub fn rc_dec(&self, vm: &mut Vm) -> Result<(), RuntimeError> {
+        if let Some(Slot {
+            gen,
+            slot_data:
+                SlotData::Occupied {
+                    refcount,
+                    type_id,
+                    layout,
+                    object,
+                },
+        }) = vm.arena.slots.get_mut(self.index as usize)
+        {
+            let layout = *layout;
+            let object = *object;
+            if *gen == self.gen {
+                if *refcount == 0 {
+                    return Err(RuntimeError::InvalidHeapHandle);
+                }
+                *refcount -= 1;
+
+                if *refcount != 0 {
+                    return Ok(());
+                }
+
+                if *type_id >= PRIMITIVES_VTABLE_COUNT {
+                    let vtable = &vm.vtables[*type_id as usize];
+                    if let Some(Method::Native { func: destr }) =
+                        vtable.methods.get(VTable::DESTRUCTOR_SLOT)
+                    {
+                        destr(object, vm);
+                        unsafe {
+                            alloc::dealloc(object.as_ptr(), layout);
+                        }
+
+                        let slot = &mut vm.arena.slots[self.index as usize];
+                        let next_free = vm.arena.free_head;
+                        slot.gen += 1;
+                        slot.slot_data = SlotData::Free { next: next_free };
+                        vm.arena.free_head = Some(self.index);
+                    }
+                }
+
+                return Ok(());
+            }
+        }
+
+        Err(RuntimeError::InvalidHeapHandle)
+    }
+
+    pub fn to_word(&self) -> Word {
+        Word::combine(self.index, self.gen)
+    }
+}

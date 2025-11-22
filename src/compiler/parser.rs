@@ -189,18 +189,15 @@ impl<'a> Parser<'a> {
 
                 TokenKind::Let => {
                     expect_token!(TokenKind::Let in self);
-                    expect_token!(TokenKind::Ident(ident) in self);
+                    let pattern = self.parse_pattern()?;
                     expect_token!(TokenKind::Assign in self);
-
                     let expr = self.parse_expr()?;
-
                     expect_token!(TokenKind::EOL in self);
 
                     let expr_span = expr.span;
-                    Statement::var_declare(None, ident, expr, token_span.join(expr_span))
+                    Statement::var_declare(None, pattern, expr, token_span.join(expr_span))
                 }
 
-                // var assign / var declare / function call in expr stmt
                 TokenKind::Ident(_) => self.parse_ident_statement()?,
 
                 TokenKind::If => self.parse_if_statement()?,
@@ -231,48 +228,87 @@ impl<'a> Parser<'a> {
 
     fn parse_ident_statement(&mut self) -> Result<Statement, CompileError> {
         let saved_index = self.index;
+        let mut var_type = None;
+        let mut start_span = None;
+        let mut pattern = None;
 
+        // Try to parse as typed variable declaration first
         if let Ok((data_type, data_type_span)) = self.parse_data_type() {
-            expect_token!(TokenKind::Ident(ident) in self);
-            expect_token!(TokenKind::Assign in self);
-            let expr = self.parse_expr()?;
-            expect_token!(TokenKind::EOL in self);
-            let expr_span = expr.span;
-            return Ok(Statement::var_declare(
-                Some(data_type),
-                ident,
-                expr,
-                data_type_span.join(expr_span),
-            ));
+            if let Ok(decl_pattern) = self.parse_pattern() {
+                pattern = Some(decl_pattern);
+                var_type = Some(data_type);
+                start_span = Some(data_type_span);
+            }
         }
 
-        self.index = saved_index;
+        if pattern.is_none() {
+            self.index = saved_index;
+            pattern = Some(self.parse_pattern()?);
+        }
 
-        expect_token!(TokenKind::Ident(ident) in self);
-        if let Some(TokenKind::Assign) = self.peek_kind() {
-            expect_token!(TokenKind::Assign, assign_span in self);
+        let pattern = pattern.unwrap();
+        let start_span = start_span.unwrap_or(pattern.span);
 
-            let expr = self.parse_expr()?;
+        expect_token!(TokenKind::Assign in self);
+        let expr = self.parse_expr()?;
+        expect_token!(TokenKind::EOL, end_span in self);
 
-            expect_token!(TokenKind::EOL in self);
-
-            let expr_span = expr.span;
-            Ok(Statement::var_assign(
-                ident,
+        if var_type.is_some() {
+            Ok(Statement::var_declare(
+                var_type,
+                pattern,
                 expr,
-                assign_span.join(expr_span),
+                start_span.join(end_span),
             ))
         } else {
-            // if the next token is not an assign, it must be a function call
-            // so we need to backtrack the ident token
-            // and parse it as function call
-            self.back();
-            let expr = self.parse_expr()?;
-            expect_token!(TokenKind::EOL in self);
+            Ok(Statement::var_assign(
+                pattern,
+                expr,
+                start_span.join(end_span),
+            ))
+        }
+    }
 
-            let expr_span = expr.span;
+    fn parse_pattern(&mut self) -> Result<Pattern, CompileError> {
+        self.parse_postfix_pattern()
+    }
 
-            Ok(Statement::expr_statement(expr, expr_span))
+    fn parse_postfix_pattern(&mut self) -> Result<Pattern, CompileError> {
+        let mut pattern = self.parse_atom_pattern()?;
+
+        loop {
+            match self.peek_kind() {
+                Some(TokenKind::BracketL) => {
+                    expect_token!(TokenKind::BracketL in self);
+                    let index_expr = self.parse_expr()?;
+                    expect_token!(TokenKind::BracketR, end_span in self);
+                    let span = pattern.span.join(end_span);
+                    pattern = Pattern::index(pattern, index_expr, span);
+                }
+
+                _ => break,
+            }
+        }
+
+        Ok(pattern)
+    }
+
+    fn parse_atom_pattern(&mut self) -> Result<Pattern, CompileError> {
+        let Some(token) = self.peek() else {
+            return Err(CompileError::unexpected_end_of_file(self.file_id));
+        };
+
+        let token_span = token.span;
+
+        match token.kind {
+            TokenKind::Ident(_) => self.parse_pattern(),
+
+            _ => {
+                return Err(CompileError::unexpected_token_at(
+                    self.next().unwrap().kind,
+                    token_span,
+                ));
+            }
         }
     }
 
@@ -398,7 +434,7 @@ impl<'a> Parser<'a> {
             .ok_or(CompileError::unexpected_end_of_file(self.file_id))?;
 
         let Some(op) = token_to_unary_op(token) else {
-            return self.parse_method_call_expr();
+            return self.parse_postfix_expr();
         };
 
         let token_span = token.span;
@@ -408,21 +444,34 @@ impl<'a> Parser<'a> {
         return Ok(Expr::unary_op(op, expr, token_span.join(expr_span)));
     }
 
-    fn parse_method_call_expr(&mut self) -> Result<Expr, CompileError> {
-        let base_expr = self.parse_atom_expr()?;
-        if let Some(TokenKind::Dot) = self.peek_kind() {
-            self.skip();
-            expect_token!(TokenKind::Ident(method_name) in self);
-            expect_token!(TokenKind::ParenL in self);
-            let args = self.parse_args(TokenKind::ParenR)?;
-            expect_token!(TokenKind::ParenR, end_span in self);
+    fn parse_postfix_expr(&mut self) -> Result<Expr, CompileError> {
+        let mut expr = self.parse_atom_expr()?;
 
-            let span = base_expr.span.join(end_span);
+        loop {
+            match self.peek_kind() {
+                Some(TokenKind::Dot) => {
+                    self.skip();
+                    expect_token!(TokenKind::Ident(method_name) in self);
+                    expect_token!(TokenKind::ParenL in self);
+                    let args = self.parse_args(TokenKind::ParenR)?;
+                    expect_token!(TokenKind::ParenR, end_span in self);
+                    let span = expr.span.join(end_span);
+                    expr = Expr::method_call(expr, method_name, args, span);
+                }
 
-            Ok(Expr::method_call(base_expr, method_name, args, span))
-        } else {
-            Ok(base_expr)
+                Some(TokenKind::BracketL) => {
+                    self.skip();
+                    let index = self.parse_expr()?;
+                    expect_token!(TokenKind::BracketR, end_span in self);
+                    let span = expr.span.join(end_span);
+                    expr = Expr::index_get(expr, index, span);
+                }
+
+                _ => break,
+            }
         }
+
+        Ok(expr)
     }
     /// Parse atom expr such as Ident, Num, Bool, not ops.
     fn parse_atom_expr(&mut self) -> Result<Expr, CompileError> {

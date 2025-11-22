@@ -9,6 +9,7 @@ impl DataTypeId {
     pub const FLOAT: u8 = 3;
     pub const STRING: u8 = 4;
     pub const LIST: u8 = 5;
+    pub const REF: u8 = 6;
 }
 
 fn get_id(data_type: &DataType) -> u8 {
@@ -19,6 +20,7 @@ fn get_id(data_type: &DataType) -> u8 {
         DataType::Float => DataTypeId::FLOAT,
         DataType::String => DataTypeId::STRING,
         DataType::List { .. } => DataTypeId::LIST,
+        DataType::Ref(_) => DataTypeId::REF,
     }
 }
 
@@ -35,6 +37,10 @@ impl BytecodeSerializable for DataType {
                 let item_type = DataType::from_bytecode(bytes, cursor)?;
                 Ok(DataType::list_of(item_type))
             }
+            DataTypeId::REF => {
+                let inner = DataType::from_bytecode(bytes, cursor)?;
+                Ok(DataType::reference_of(inner))
+            }
 
             _ => Err(format!("Unknown DataType id: {}", id)),
         }
@@ -42,5 +48,15 @@ impl BytecodeSerializable for DataType {
 
     fn write_bytecode(&self, buffer: &mut Vec<u8>) {
         get_id(self).write_bytecode(buffer);
+
+        match self {
+            DataType::List { item_type } => {
+                item_type.write_bytecode(buffer);
+            }
+            DataType::Ref(inner) => {
+                inner.write_bytecode(buffer);
+            }
+            _ => (),
+        }
     }
 }

@@ -174,12 +174,40 @@ impl CompileError {
         .with_span(span)
     }
 
-    pub fn cannot_infer_type_at(variable: impl Into<String> + Clone, span: Span) -> Self {
+    pub fn cannot_infer_type_at(span: Span) -> Self {
         Self::new(
             CompileErrorKind::CannotInferType,
-            format!("cannot infer type for variable '{}'", variable.into()),
+            format!("cannot infer type"),
         )
         .with_span(span)
+    }
+
+    pub fn invalid_pattern_at(span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::InvalidPattern,
+            "invalid pattern".to_string(),
+        )
+        .with_span(span)
+    }
+
+    pub fn invalid_indexing_at(span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::InvalidIndexing,
+            "invalid indexing operation".to_string(),
+        )
+        .with_span(span)
+    }
+
+    pub fn invalid_literal_at(span: Span) -> Self {
+        Self::new(
+            CompileErrorKind::InvalidLiteral,
+            "invalid literal".to_string(),
+        )
+        .with_span(span)
+    }
+
+    pub fn internal_compiler_error(message: impl Into<String>) -> Self {
+        Self::new(CompileErrorKind::InternalCompilerError, message.into())
     }
 
     pub fn other_at(msg: impl Into<String>, span: Span) -> Self {
@@ -250,5 +278,9 @@ pub enum CompileErrorKind {
         method_name: String,
     },
     CannotInferType,
+    InvalidPattern,
+    InvalidIndexing,
+    InvalidLiteral,
+    InternalCompilerError,
     Other,
 }

@@ -35,14 +35,14 @@ impl Expr {
 
     pub fn binary_op(op: BinaryOp, lhs: Self, rhs: Self, span: Span) -> Self {
         Self {
-            kind: ExprKind::new_binary_op(op, lhs, rhs),
+            kind: ExprKind::BinaryOp(op, Box::new(lhs), Box::new(rhs)),
             span,
         }
     }
 
     pub fn unary_op(op: UnaryOp, expr: Self, span: Span) -> Self {
         Self {
-            kind: ExprKind::new_unary_op(op, expr),
+            kind: ExprKind::UnaryOp(op, Box::new(expr)),
             span,
         }
     }
@@ -87,6 +87,16 @@ impl Expr {
             span,
         }
     }
+
+    pub fn index_get(callee: Self, index: Self, span: Span) -> Self {
+        Self {
+            kind: ExprKind::IndexGet {
+                callee: Box::new(callee),
+                index: Box::new(index),
+            },
+            span,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -114,14 +124,8 @@ pub enum ExprKind {
         method_name: String,
         args: Vec<Expr>,
     },
-}
-
-impl ExprKind {
-    pub fn new_binary_op(op: BinaryOp, lhs: Expr, rhs: Expr) -> Self {
-        Self::BinaryOp(op, Box::new(lhs), Box::new(rhs))
-    }
-
-    pub fn new_unary_op(op: UnaryOp, expr: Expr) -> Self {
-        Self::UnaryOp(op, Box::new(expr))
-    }
+    IndexGet {
+        callee: Box<Expr>,
+        index: Box<Expr>,
+    },
 }

@@ -10,16 +10,26 @@ pub enum DataType {
     Bool,
     String,
     List { item_type: Option<Box<DataType>> },
+    Ref(Option<Box<DataType>>),
 }
 
 impl DataType {
-    pub fn unknow_list() -> Self {
+    pub fn unknown_list() -> Self {
         Self::List { item_type: None }
     }
+
     pub fn list_of(item_type: DataType) -> Self {
         Self::List {
             item_type: Some(Box::new(item_type)),
         }
+    }
+
+    pub fn unknown_reference() -> Self {
+        Self::Ref(None)
+    }
+
+    pub fn reference_of(inner: DataType) -> Self {
+        Self::Ref(Some(Box::new(inner)))
     }
 
     pub fn is_bool(&self) -> bool {
@@ -67,6 +77,19 @@ impl DataType {
             )),
         }
     }
+
+    pub fn get_index_type(&self) -> Option<DataType> {
+        match self {
+            DataType::List { item_type } => {
+                if let Some(item_type) = item_type {
+                    Some(*item_type.clone())
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
 }
 
 impl Display for DataType {
@@ -82,6 +105,16 @@ impl Display for DataType {
                     f,
                     "list<{}>",
                     item_type
+                        .as_ref()
+                        .map(|t| t.to_string())
+                        .unwrap_or("unknown".to_string())
+                )
+            }
+            DataType::Ref(inner) => {
+                write!(
+                    f,
+                    "&{}",
+                    inner
                         .as_ref()
                         .map(|t| t.to_string())
                         .unwrap_or("unknown".to_string())

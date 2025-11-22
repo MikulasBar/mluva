@@ -3,6 +3,7 @@ mod builtin_function;
 mod expr;
 mod function_ast;
 mod path;
+mod pattern;
 mod statement;
 mod unary_op;
 
@@ -13,6 +14,7 @@ pub use builtin_function::BuiltinFunction;
 pub use expr::{Expr, ExprKind};
 pub use function_ast::{SpannedFunctionSigniture, SpannedParameter};
 pub use path::Path;
+pub use pattern::{Pattern, PatternKind};
 pub use statement::{Statement, StatementKind};
 pub use unary_op::UnaryOp;
 

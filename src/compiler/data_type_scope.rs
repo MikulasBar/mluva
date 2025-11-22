@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::ast::{Pattern, PatternKind};
 use crate::data_type::DataType;
 use crate::{diagnostics::Span, errors::CompileError};
 
@@ -29,7 +30,21 @@ impl DataTypeScope {
             .any(|scope| scope.contains_key(name))
     }
 
-    pub fn insert_new(
+    pub fn insert_new_pattern(
+        &mut self,
+        assignee: Pattern,
+        data_type: DataType,
+        span: Span,
+    ) -> Result<(), CompileError> {
+        match assignee.kind {
+            PatternKind::Index { .. } => {
+                return Err(CompileError::invalid_pattern_at(assignee.span));
+            }
+            PatternKind::Variable(var) => self.insert_new_var(var, data_type, span),
+        }
+    }
+
+    pub fn insert_new_var(
         &mut self,
         name: String,
         data_type: DataType,
@@ -45,6 +60,21 @@ impl DataTypeScope {
             .insert(name, data_type);
 
         Ok(())
+    }
+
+    pub fn get_pattern(&self, pattern: &Pattern) -> Result<DataType, CompileError> {
+        match &pattern.kind {
+            PatternKind::Variable(name) => self
+                .get(name)
+                .cloned()
+                .ok_or_else(|| CompileError::variable_not_found_at(name.clone(), pattern.span)),
+            PatternKind::Index { callee, index } => {
+                let callee_type = self.get_pattern(callee)?;
+                callee_type
+                    .get_index_type()
+                    .ok_or_else(|| CompileError::invalid_indexing_at(index.span))
+            }
+        }
     }
 
     pub fn get(&self, key: &str) -> Option<&DataType> {

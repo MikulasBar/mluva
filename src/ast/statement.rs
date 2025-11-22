@@ -1,5 +1,5 @@
 use super::expr::Expr;
-use crate::{data_type::DataType, diagnostics::Span};
+use crate::{ast::pattern::Pattern, data_type::DataType, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Statement {
@@ -12,23 +12,23 @@ impl Statement {
         Self { kind, span }
     }
 
-    pub fn var_assign(variable: String, value: Expr, span: Span) -> Self {
+    pub fn var_assign(assignee: Pattern, value: Expr, span: Span) -> Self {
         Self {
-            kind: StatementKind::VarAssign { variable, value },
+            kind: StatementKind::VarAssign { assignee, value },
             span,
         }
     }
 
     pub fn var_declare(
         data_type: Option<DataType>,
-        variable: String,
+        assignee: Pattern,
         value: Expr,
         span: Span,
     ) -> Self {
         Self {
             kind: StatementKind::VarDeclare {
                 data_type,
-                variable,
+                assignee,
                 value,
             },
             span,
@@ -76,15 +76,14 @@ impl Statement {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatementKind {
     VarAssign {
-        variable: String,
+        assignee: Pattern,
         value: Expr,
     },
     VarDeclare {
         data_type: Option<DataType>,
-        variable: String,
+        assignee: Pattern,
         value: Expr,
     },
-
     If {
         condition: Expr,
         if_block: Vec<Statement>,

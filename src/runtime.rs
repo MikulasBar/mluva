@@ -4,6 +4,7 @@ use crate::errors::RuntimeError;
 use crate::function::FunctionSource;
 use crate::instruction::Instruction;
 use crate::module::Module;
+use crate::reference::Element;
 use crate::value::Value;
 
 pub struct Runtime<'a> {
@@ -73,7 +74,7 @@ impl<'a> InternalFunctionRuntime<'a> {
         while self.index < self.source.body.len() {
             let instruction = &self.source.body[self.index];
             match *instruction {
-                Instruction::Push(ref value) => {
+                Instruction::LoadConst(ref value) => {
                     self.stack.push(value.clone());
                 }
 
@@ -85,7 +86,7 @@ impl<'a> InternalFunctionRuntime<'a> {
                     self.slots[slot as usize] = self.pop()?;
                 }
 
-                Instruction::Load { slot } => {
+                Instruction::LoadCopy { slot } => {
                     self.stack.push(self.slots[slot as usize].clone());
                 }
 
@@ -168,8 +169,30 @@ impl<'a> InternalFunctionRuntime<'a> {
                 }
 
                 Instruction::CreateList { item_count } => {
-                    let items = self.stack.split_off(self.stack.len() - item_count as usize);
+                    let items = self
+                        .stack
+                        .split_off(self.stack.len() - item_count as usize)
+                        .into_iter()
+                        .map(|val| Element::Value(val))
+                        .collect();
+
                     self.stack.push(Value::List(items));
+                }
+
+                Instruction::IndexCopy { depth } => {
+                    let depth = depth as usize;
+                    let list = self
+                        .stack
+                        .get_mut(self.stack.len() - depth - 1)
+                        .ok_or(RuntimeError::ValueStackUnderflow)?;
+                    let indexes = self.stack.split_off(self.stack.len() - depth);
+
+                    let mut accessor = list.index_access(indexes[0])?;
+                    for index in indexes.into_iter().skip(1) {
+                        accessor = accessor.index_access(index)?;
+                    }
+
+                    let element = accessor.
                 }
 
                 Instruction::Add => self.apply_bin_op(Value::add)?,
