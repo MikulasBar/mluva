@@ -5,7 +5,6 @@ use std::{
 
 use crate::{
     errors::RuntimeError,
-    vm::Vm,
     vtable::{Method, VTable, PRIMITIVES_VTABLE_COUNT},
     word::Word,
 };
@@ -74,6 +73,73 @@ impl Arena {
         };
         HeapHandle::new(index, 0)
     }
+
+    pub fn increment_rc(&mut self, handle: &HeapHandle) -> Result<(), ()> {
+        if let Some(Slot {
+            gen,
+            slot_data: SlotData::Occupied { refcount, .. },
+        }) = self.slots.get_mut(handle.index as usize)
+        {
+            if *gen == handle.gen {
+                *refcount += 1;
+                return Ok(());
+            }
+        }
+        Err(())
+    }
+
+    pub fn decrement_rc(
+        &mut self,
+        handle: &HeapHandle,
+        vtables: &Vec<VTable>,
+    ) -> Result<(), RuntimeError> {
+        if let Some(Slot {
+            gen,
+            slot_data:
+                SlotData::Occupied {
+                    refcount,
+                    type_id,
+                    layout,
+                    object,
+                },
+        }) = self.slots.get_mut(handle.index as usize)
+        {
+            let layout = *layout;
+            let object = *object;
+            if *gen == handle.gen {
+                if *refcount == 0 {
+                    return Err(RuntimeError::InvalidHeapHandle);
+                }
+                *refcount -= 1;
+
+                if *refcount != 0 {
+                    return Ok(());
+                }
+
+                if *type_id >= PRIMITIVES_VTABLE_COUNT {
+                    let vtable = &vtables[*type_id as usize];
+                    if let Some(Method::Native { func: destr }) =
+                        vtable.methods.get(VTable::DESTRUCTOR_SLOT)
+                    {
+                        destr(object, vtables, self);
+                        unsafe {
+                            alloc::dealloc(object.as_ptr(), layout);
+                        }
+
+                        let slot = &mut self.slots[handle.index as usize];
+                        let next_free = self.free_head;
+                        slot.gen += 1;
+                        slot.slot_data = SlotData::Free { next: next_free };
+                        self.free_head = Some(handle.index);
+                    }
+                }
+
+                return Ok(());
+            }
+        }
+
+        Err(RuntimeError::InvalidHeapHandle)
+    }
 }
 
 struct Slot {
@@ -130,69 +196,6 @@ pub struct HeapHandle {
 impl HeapHandle {
     pub fn new(index: u32, gen: u32) -> Self {
         Self { index, gen }
-    }
-
-    pub fn rc_inc(&self, arena: &mut Arena) -> Result<(), ()> {
-        if let Some(Slot {
-            gen,
-            slot_data: SlotData::Occupied { refcount, .. },
-        }) = arena.slots.get_mut(self.index as usize)
-        {
-            if *gen == self.gen {
-                *refcount += 1;
-                return Ok(());
-            }
-        }
-        Err(())
-    }
-
-    pub fn rc_dec(&self, vm: &mut Vm) -> Result<(), RuntimeError> {
-        if let Some(Slot {
-            gen,
-            slot_data:
-                SlotData::Occupied {
-                    refcount,
-                    type_id,
-                    layout,
-                    object,
-                },
-        }) = vm.arena.slots.get_mut(self.index as usize)
-        {
-            let layout = *layout;
-            let object = *object;
-            if *gen == self.gen {
-                if *refcount == 0 {
-                    return Err(RuntimeError::InvalidHeapHandle);
-                }
-                *refcount -= 1;
-
-                if *refcount != 0 {
-                    return Ok(());
-                }
-
-                if *type_id >= PRIMITIVES_VTABLE_COUNT {
-                    let vtable = &vm.vtables[*type_id as usize];
-                    if let Some(Method::Native { func: destr }) =
-                        vtable.methods.get(VTable::DESTRUCTOR_SLOT)
-                    {
-                        destr(object, vm);
-                        unsafe {
-                            alloc::dealloc(object.as_ptr(), layout);
-                        }
-
-                        let slot = &mut vm.arena.slots[self.index as usize];
-                        let next_free = vm.arena.free_head;
-                        slot.gen += 1;
-                        slot.slot_data = SlotData::Free { next: next_free };
-                        vm.arena.free_head = Some(self.index);
-                    }
-                }
-
-                return Ok(());
-            }
-        }
-
-        Err(RuntimeError::InvalidHeapHandle)
     }
 
     pub fn to_word(&self) -> Word {

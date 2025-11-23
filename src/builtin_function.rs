@@ -1,17 +1,28 @@
-use crate::{errors::RuntimeError, string_object::StringObject, vm::Vm};
+use crate::{
+    arena::Arena, errors::RuntimeError, string_object::StringObject, value_stack::ValueStack,
+};
 
 pub struct BuiltinFunction;
 
 impl BuiltinFunction {
-    pub fn execute(slot: u32, argc: u32, vm: &mut Vm) -> Result<(), RuntimeError> {
+    pub fn execute(
+        slot: u32,
+        argc: u32,
+        value_stack: &mut ValueStack,
+        arena: &mut Arena,
+    ) -> Result<(), RuntimeError> {
         match slot {
-            0 => execute_print(argc, vm),
+            0 => execute_print(argc, value_stack, arena),
             _ => Err(RuntimeError::Unknown),
         }
     }
 }
 
-fn execute_print(argc: u32, vm: &mut Vm) -> Result<(), RuntimeError> {
+fn execute_print(
+    argc: u32,
+    value_stack: &mut ValueStack,
+    arena: &mut Arena,
+) -> Result<(), RuntimeError> {
     if argc != 1 {
         return Err(RuntimeError::Other(format!(
             "print expects 1 argument, got {}",
@@ -19,8 +30,8 @@ fn execute_print(argc: u32, vm: &mut Vm) -> Result<(), RuntimeError> {
         )));
     }
 
-    let handle = vm.pop()?.as_hhandle();
-    let string = vm.arena.get::<StringObject>(&handle)?;
+    let handle = value_stack.pop()?.as_hhandle();
+    let string = arena.get::<StringObject>(&handle)?;
 
     print!("{}", string.as_str());
 

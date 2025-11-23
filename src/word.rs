@@ -1,7 +1,7 @@
 use crate::{
     arena::{Arena, HeapHandle},
     errors::RuntimeError,
-    vm::Vm,
+    vtable::VTable,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -30,13 +30,17 @@ impl Word {
 
     pub fn hhandle_rc_inc(&self, arena: &mut Arena) -> Result<(), RuntimeError> {
         let handle = self.as_hhandle();
-        handle.rc_inc(arena);
+        arena.increment_rc(&handle);
         Ok(())
     }
 
-    pub fn hhandle_rc_dec(&self, vm: &mut Vm) -> Result<(), RuntimeError> {
+    pub fn hhandle_rc_dec(
+        &self,
+        arena: &mut Arena,
+        vtables: &Vec<VTable>,
+    ) -> Result<(), RuntimeError> {
         let handle = self.as_hhandle();
-        handle.rc_dec(vm);
+        arena.decrement_rc(&handle, vtables);
         Ok(())
     }
 

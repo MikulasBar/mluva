@@ -1,6 +1,6 @@
 use std::ptr::NonNull;
 
-use crate::vm::Vm;
+use crate::{arena::Arena, value_stack::ValueStack, vm::Vm};
 
 pub const PRIMITIVES_VTABLE_COUNT: u32 = 3;
 pub const I32_TYPE_ID: u32 = 0;
@@ -22,11 +22,13 @@ impl VTable {
 
 #[derive(Debug, Clone)]
 pub enum Method {
-    Native { func: fn(NonNull<u8>, &mut Vm) },
+    Native {
+        func: fn(NonNull<u8>, &Vec<VTable>, &mut Arena),
+    },
 }
 
 impl Method {
-    pub fn execute(&self, vm: &mut Vm) {
+    pub fn execute(&self, vtables: &Vec<VTable>, arena: &mut Arena) {
         panic!("Methods are not implemented");
     }
 }

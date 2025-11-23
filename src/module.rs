@@ -45,6 +45,10 @@ impl Module {
         self.main_slot.is_some()
     }
 
+    pub fn get_main_slot(&self) -> Option<u32> {
+        self.main_slot
+    }
+
     pub fn get_main_source(&self) -> Option<&FunctionSource> {
         let slot = self.main_slot?;
         self.function_sources.get(slot as usize)

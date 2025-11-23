@@ -9,12 +9,13 @@ use crate::{
     instruction::Instruction,
     list_object::ListObject,
     module::Module,
+    value_stack::ValueStack,
     vtable::{VTable, LIST_TYPE_ID},
     word::Word,
 };
 
 pub struct Vm {
-    pub value_stack: Vec<Word>,
+    pub value_stack: ValueStack,
     pub arena: Arena,
     pub vtables: Vec<VTable>,
     pub call_stack: Vec<CallFrame>,
@@ -23,30 +24,73 @@ pub struct Vm {
 }
 
 impl Vm {
-    pub fn execute(&mut self) {}
+    pub fn execute(&mut self) -> Result<(), RuntimeError> {
+        let main_source = self
+            .main_module
+            .get_main_source()
+            .ok_or(RuntimeError::Other("Main function not found".to_string()))?;
+
+        self.call_stack
+            .push(CallFrame::new(main_source.slot_count as u32));
+
+        let callframe = self.call_stack.last_mut().ok_or(RuntimeError::Unknown)?;
+
+        FunctionInterpreter::new(
+            &mut self.modules,
+            &mut self.arena,
+            &mut self.value_stack,
+            &mut self.vtables,
+            main_source,
+            callframe,
+        )
+        .execute()
+    }
+}
+
+struct FunctionInterpreter<'a> {
+    modules: &'a HashMap<String, Module>,
+    arena: &'a mut Arena,
+    value_stack: &'a mut ValueStack,
+    vtables: &'a Vec<VTable>,
+    source: &'a FunctionSource,
+    callframe: &'a mut CallFrame,
+    ip: usize,
+}
+
+impl<'a> FunctionInterpreter<'a> {
+    pub fn new(
+        modules: &'a HashMap<String, Module>,
+        arena: &'a mut Arena,
+        value_stack: &'a mut ValueStack,
+        vtables: &'a Vec<VTable>,
+        source: &'a FunctionSource,
+        callframe: &'a mut CallFrame,
+    ) -> Self {
+        Self {
+            modules,
+            arena,
+            value_stack,
+            vtables,
+            source,
+            callframe,
+            ip: 0,
+        }
+    }
 
     fn push(&mut self, value: Word) {
         self.value_stack.push(value);
     }
 
     pub fn pop(&mut self) -> Result<Word, RuntimeError> {
-        self.value_stack
-            .pop()
-            .ok_or(RuntimeError::ValueStackUnderflow)
+        self.value_stack.pop()
     }
 
     fn last_mut(&mut self) -> Result<&mut Word, RuntimeError> {
-        self.value_stack
-            .last_mut()
-            .ok_or(RuntimeError::ValueStackUnderflow)
-    }
-
-    fn last_frame_mut(&mut self) -> Result<&mut CallFrame, RuntimeError> {
-        self.call_stack.last_mut().ok_or(RuntimeError::Unknown)
+        self.value_stack.last_mut()
     }
 
     fn local_get(&mut self, slot: u32) -> Result<Word, RuntimeError> {
-        self.last_frame_mut()?
+        self.callframe
             .locals
             .get(slot as usize)
             .copied()
@@ -54,7 +98,7 @@ impl Vm {
     }
 
     fn local_set(&mut self, slot: u32, value: Word) -> Result<(), RuntimeError> {
-        if let Some(local) = self.last_frame_mut()?.locals.get_mut(slot as usize) {
+        if let Some(local) = self.callframe.locals.get_mut(slot as usize) {
             *local = value;
             Ok(())
         } else {
@@ -62,14 +106,9 @@ impl Vm {
         }
     }
 
-    pub fn execute_function(
-        &mut self,
-        source: &FunctionSource,
-        current_module: &Module,
-    ) -> Result<(), RuntimeError> {
-        let mut ip = 0;
-        while ip < source.body.len() {
-            let instr = &source.body[ip];
+    pub fn execute(&mut self) -> Result<(), RuntimeError> {
+        while self.ip < self.source.body.len() {
+            let instr = &self.source.body[self.ip];
             match instr {
                 Instruction::Store { slot } => {
                     let w = self.pop()?;
@@ -89,13 +128,13 @@ impl Vm {
                     return Ok(());
                 }
                 Instruction::Jump(target) => {
-                    ip = *target as usize;
+                    self.ip = *target as usize;
                     continue;
                 }
                 Instruction::JumpIfFalse(target) => {
                     let condition = self.pop()?;
                     if !condition.as_bool() {
-                        ip = *target as usize;
+                        self.ip = *target as usize;
                         continue;
                     }
                 }
@@ -196,6 +235,9 @@ impl Vm {
                     let rhs = self.pop()?;
                     self.last_mut()?.cmp_assign_not_equal(rhs);
                 }
+                Instruction::CreateString { pool_slot } => {
+                    todo!("CreateString not implemented yet");
+                }
                 Instruction::CreateList {
                     item_count,
                     type_id,
@@ -207,13 +249,13 @@ impl Vm {
                     self.push(handle.to_word());
                 }
                 Instruction::RcInc => {
-                    self.pop()?.hhandle_rc_inc(&mut self.arena)?;
+                    self.pop()?.hhandle_rc_inc(self.arena)?;
                 }
                 Instruction::RcDec => {
-                    self.pop()?.hhandle_rc_dec(self)?;
+                    self.pop()?.hhandle_rc_dec(self.arena, self.vtables)?;
                 }
                 Instruction::BuiltinFunctionCall { slot, argc } => {
-                    BuiltinFunction::execute(*slot, *argc, self)?;
+                    BuiltinFunction::execute(*slot, *argc, self.value_stack, self.arena)?;
                 }
                 Instruction::LocalCall { slot } => {
                     let func = current_module
@@ -232,7 +274,14 @@ impl Vm {
                         .get_function_source_by_slot(*call_slot)
                         .ok_or(RuntimeError::Unknown)?;
 
-                    self.execute_function(func, module)?;
+                    FunctionInterpreter::new(
+                        self.modules,
+                        self.arena,
+                        self.value_stack,
+                        self.vtables,
+                        func,
+                        &mut CallFrame::new(func.slot_count as u32),
+                    )
                 }
                 Instruction::MethodCall {
                     type_id,
@@ -244,7 +293,7 @@ impl Vm {
                         .get(*slot as usize)
                         .ok_or(RuntimeError::Unknown)?;
 
-                    method.execute(self);
+                    method.execute(self.vtables, self.arena);
                 }
                 Instruction::ListGet => {
                     let index = self.pop()?.as_u32();
@@ -262,7 +311,7 @@ impl Vm {
                     list_object.set_item(index, value)?;
                 }
             }
-            ip += 1;
+            self.ip += 1;
         }
 
         Err(RuntimeError::FunctionDidNotReturn)
