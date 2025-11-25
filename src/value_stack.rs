@@ -23,6 +23,13 @@ impl ValueStack {
             .ok_or(RuntimeError::ValueStackUnderflow)
     }
 
+    pub fn copy_last(&self) -> Result<Word, RuntimeError> {
+        self.stack
+            .last()
+            .copied()
+            .ok_or(RuntimeError::ValueStackUnderflow)
+    }
+
     pub fn split_off(&mut self, at: usize) -> Vec<Word> {
         self.stack.split_off(at)
     }

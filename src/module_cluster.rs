@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::module::Module;
 
 pub struct ModuleCluster {
+    main_slot: Option<usize>,
     modules: Vec<Module>,
     slot_map: HashMap<String, usize>,
 }
@@ -10,6 +11,7 @@ pub struct ModuleCluster {
 impl ModuleCluster {
     pub fn new() -> Self {
         Self {
+            main_slot: None,
             modules: Vec::new(),
             slot_map: HashMap::new(),
         }
@@ -28,5 +30,21 @@ impl ModuleCluster {
 
     pub fn get_slot(&self, name: &str) -> Option<usize> {
         self.slot_map.get(name).copied()
+    }
+
+    pub fn set_main_slot(&mut self, slot: usize) {
+        self.main_slot = Some(slot);
+    }
+
+    pub fn get_main_module_slot(&self) -> Option<usize> {
+        self.main_slot
+    }
+
+    pub fn get_main_module(&self) -> Option<&Module> {
+        if let Some(slot) = self.main_slot {
+            self.modules.get(slot)
+        } else {
+            None
+        }
     }
 }

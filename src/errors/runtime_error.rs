@@ -26,6 +26,10 @@ impl RuntimeError {
     pub fn index_out_of_bounds(index: i32, size: u32) -> Self {
         RuntimeError::IndexOutOfBounds { index, size }
     }
+
+    pub fn other(msg: impl Into<String>) -> Self {
+        RuntimeError::Other(msg.into())
+    }
 }
 
 impl Display for RuntimeError {

@@ -1,8 +1,4 @@
-use crate::{
-    arena::{Arena, HeapHandle},
-    errors::RuntimeError,
-    vtable::VTable,
-};
+use crate::arena::HeapHandle;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Word {
@@ -26,22 +22,6 @@ impl Word {
         Self {
             data: (lhs as u64) | ((rhs as u64) << 32),
         }
-    }
-
-    pub fn hhandle_rc_inc(&self, arena: &mut Arena) -> Result<(), RuntimeError> {
-        let handle = self.as_hhandle();
-        arena.increment_rc(&handle);
-        Ok(())
-    }
-
-    pub fn hhandle_rc_dec(
-        &self,
-        arena: &mut Arena,
-        vtables: &Vec<VTable>,
-    ) -> Result<(), RuntimeError> {
-        let handle = self.as_hhandle();
-        arena.decrement_rc(&handle, vtables);
-        Ok(())
     }
 
     #[inline(always)]

@@ -5,6 +5,7 @@ use std::{
 
 use crate::{
     errors::RuntimeError,
+    value_stack::ValueStack,
     vtable::{Method, VTable, PRIMITIVES_VTABLE_COUNT},
     word::Word,
 };
@@ -74,7 +75,7 @@ impl Arena {
         HeapHandle::new(index, 0)
     }
 
-    pub fn increment_rc(&mut self, handle: &HeapHandle) -> Result<(), ()> {
+    pub fn increment_rc(&mut self, handle: &HeapHandle) -> Result<(), RuntimeError> {
         if let Some(Slot {
             gen,
             slot_data: SlotData::Occupied { refcount, .. },
@@ -85,13 +86,14 @@ impl Arena {
                 return Ok(());
             }
         }
-        Err(())
+        Err(RuntimeError::InvalidHeapHandle)
     }
 
     pub fn decrement_rc(
         &mut self,
         handle: &HeapHandle,
-        vtables: &Vec<VTable>,
+        value_stack: &mut ValueStack,
+        vtables: &[VTable],
     ) -> Result<(), RuntimeError> {
         if let Some(Slot {
             gen,
@@ -121,7 +123,7 @@ impl Arena {
                     if let Some(Method::Native { func: destr }) =
                         vtable.methods.get(VTable::DESTRUCTOR_SLOT)
                     {
-                        destr(object, vtables, self);
+                        destr(handle.as_word(), value_stack, self, vtables);
                         unsafe {
                             alloc::dealloc(object.as_ptr(), layout);
                         }
@@ -198,7 +200,7 @@ impl HeapHandle {
         Self { index, gen }
     }
 
-    pub fn to_word(&self) -> Word {
+    pub fn as_word(&self) -> Word {
         Word::combine(self.index, self.gen)
     }
 }

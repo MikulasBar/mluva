@@ -12,17 +12,13 @@ impl BuiltinFunction {
         arena: &mut Arena,
     ) -> Result<(), RuntimeError> {
         match slot {
-            0 => execute_print(argc, value_stack, arena),
+            0 => print(argc, value_stack, arena),
             _ => Err(RuntimeError::Unknown),
         }
     }
 }
 
-fn execute_print(
-    argc: u32,
-    value_stack: &mut ValueStack,
-    arena: &mut Arena,
-) -> Result<(), RuntimeError> {
+fn print(argc: u32, value_stack: &mut ValueStack, arena: &mut Arena) -> Result<(), RuntimeError> {
     if argc != 1 {
         return Err(RuntimeError::Other(format!(
             "print expects 1 argument, got {}",

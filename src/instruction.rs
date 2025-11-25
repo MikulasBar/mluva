@@ -106,7 +106,7 @@ pub enum Instruction {
     ForeignCall { module_name: String, call_slot: u32 },
     Return,
     BuiltinFunctionCall { slot: u32, argc: u32 },
-    MethodCall { type_id: u32, slot: u32, argc: u32 },
+    MethodCall { type_id: u32, slot: u32 },
     CreateString { pool_slot: u32 },
     CreateList { item_count: u32, type_id: u32 },
     ListGet,

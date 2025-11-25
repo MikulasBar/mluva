@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{
     arena::Arena,
     builtin_function::BuiltinFunction,
@@ -8,9 +6,9 @@ use crate::{
     function::FunctionSource,
     instruction::Instruction,
     list_object::ListObject,
-    module::Module,
+    module_cluster::ModuleCluster,
     value_stack::ValueStack,
-    vtable::{VTable, LIST_TYPE_ID},
+    vtable::{VTable, LIST_TYPE_ID, STRING_TYPE_ID},
     word::Word,
 };
 
@@ -18,63 +16,75 @@ pub struct Vm {
     pub value_stack: ValueStack,
     pub arena: Arena,
     pub vtables: Vec<VTable>,
-    pub call_stack: Vec<CallFrame>,
-    pub modules: HashMap<String, Module>,
-    pub main_module: Module,
+    pub callstack: Vec<CallFrame>,
+    pub modules: ModuleCluster,
 }
 
 impl Vm {
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
+        let main_module_slot = self
+            .modules
+            .get_main_module_slot()
+            .ok_or(RuntimeError::other("main module not found"))?;
+
         let main_source = self
-            .main_module
+            .modules
+            .get_by_slot(main_module_slot)
+            .ok_or(RuntimeError::other("main module not found"))?
             .get_main_source()
-            .ok_or(RuntimeError::Other("Main function not found".to_string()))?;
-
-        self.call_stack
-            .push(CallFrame::new(main_source.slot_count as u32));
-
-        let callframe = self.call_stack.last_mut().ok_or(RuntimeError::Unknown)?;
+            .ok_or(RuntimeError::other("Main function not found"))?;
 
         FunctionInterpreter::new(
-            &mut self.modules,
+            &self.modules,
             &mut self.arena,
             &mut self.value_stack,
             &mut self.vtables,
             main_source,
-            callframe,
+            &mut self.callstack,
+            main_module_slot,
         )
         .execute()
     }
 }
 
 struct FunctionInterpreter<'a> {
-    modules: &'a HashMap<String, Module>,
+    modules: &'a ModuleCluster,
     arena: &'a mut Arena,
     value_stack: &'a mut ValueStack,
     vtables: &'a Vec<VTable>,
     source: &'a FunctionSource,
-    callframe: &'a mut CallFrame,
+    callstack: &'a mut Vec<CallFrame>,
+    current_module_slot: usize,
     ip: usize,
 }
 
 impl<'a> FunctionInterpreter<'a> {
     pub fn new(
-        modules: &'a HashMap<String, Module>,
+        modules: &'a ModuleCluster,
         arena: &'a mut Arena,
         value_stack: &'a mut ValueStack,
         vtables: &'a Vec<VTable>,
         source: &'a FunctionSource,
-        callframe: &'a mut CallFrame,
+        callstack: &'a mut Vec<CallFrame>,
+        current_module_slot: usize,
     ) -> Self {
+        let callframe = CallFrame::new(source.slot_count as u32);
+        callstack.push(callframe);
+
         Self {
             modules,
             arena,
             value_stack,
             vtables,
             source,
-            callframe,
+            callstack,
+            current_module_slot,
             ip: 0,
         }
+    }
+
+    fn locals_mut(&mut self) -> &mut Vec<Word> {
+        &mut self.callstack.last_mut().unwrap().locals
     }
 
     fn push(&mut self, value: Word) {
@@ -89,16 +99,19 @@ impl<'a> FunctionInterpreter<'a> {
         self.value_stack.last_mut()
     }
 
+    fn copy_last(&mut self) -> Result<Word, RuntimeError> {
+        self.value_stack.copy_last()
+    }
+
     fn local_get(&mut self, slot: u32) -> Result<Word, RuntimeError> {
-        self.callframe
-            .locals
+        self.locals_mut()
             .get(slot as usize)
             .copied()
             .ok_or(RuntimeError::Unknown)
     }
 
     fn local_set(&mut self, slot: u32, value: Word) -> Result<(), RuntimeError> {
-        if let Some(local) = self.callframe.locals.get_mut(slot as usize) {
+        if let Some(local) = self.locals_mut().get_mut(slot as usize) {
             *local = value;
             Ok(())
         } else {
@@ -125,6 +138,7 @@ impl<'a> FunctionInterpreter<'a> {
                     self.value_stack.push(value);
                 }
                 Instruction::Return => {
+                    self.callstack.pop();
                     return Ok(());
                 }
                 Instruction::Jump(target) => {
@@ -137,6 +151,101 @@ impl<'a> FunctionInterpreter<'a> {
                         self.ip = *target as usize;
                         continue;
                     }
+                }
+                Instruction::CreateString { pool_slot } => {
+                    todo!("CreateString not implemented yet");
+                }
+                Instruction::CreateList {
+                    item_count,
+                    type_id,
+                } => {
+                    let count = *item_count as usize;
+                    let items = self.value_stack.split_off(self.value_stack.len() - count);
+                    let list_object = ListObject::from_values(*type_id, items);
+                    let handle = self.arena.alloc(LIST_TYPE_ID, list_object);
+                    self.push(handle.as_word());
+                }
+                Instruction::RcInc => {
+                    let handle = self.copy_last()?.as_hhandle();
+                    self.arena.increment_rc(&handle)?;
+                }
+                Instruction::RcDec => {
+                    let handle = self.pop()?.as_hhandle();
+                    self.arena
+                        .decrement_rc(&handle, self.value_stack, &self.vtables)?;
+                }
+                Instruction::BuiltinFunctionCall { slot, argc } => {
+                    BuiltinFunction::execute(*slot, *argc, self.value_stack, self.arena)?;
+                }
+                Instruction::LocalCall { slot } => {
+                    let func = self
+                        .modules
+                        .get_by_slot(self.current_module_slot)
+                        .ok_or(RuntimeError::other("Module not found"))?
+                        .get_function_source_by_slot(*slot)
+                        .ok_or(RuntimeError::Unknown)?;
+
+                    FunctionInterpreter::new(
+                        self.modules,
+                        self.arena,
+                        self.value_stack,
+                        self.vtables,
+                        func,
+                        self.callstack,
+                        self.current_module_slot,
+                    )
+                    .execute()?;
+                }
+                Instruction::ForeignCall {
+                    ref module_name,
+                    call_slot,
+                } => {
+                    let module_slot = self
+                        .modules
+                        .get_slot(module_name)
+                        .ok_or(RuntimeError::other("Module doesn't exists"))?;
+
+                    let func = self
+                        .modules
+                        .get_by_slot(module_slot)
+                        .ok_or(RuntimeError::other("Module not found"))?
+                        .get_function_source_by_slot(*call_slot)
+                        .ok_or(RuntimeError::Unknown)?;
+
+                    FunctionInterpreter::new(
+                        self.modules,
+                        self.arena,
+                        self.value_stack,
+                        self.vtables,
+                        func,
+                        self.callstack,
+                        module_slot,
+                    )
+                    .execute()?;
+                }
+                Instruction::MethodCall { type_id, slot } => {
+                    let callee = self.pop()?;
+                    let method = self.vtables[*type_id as usize]
+                        .methods
+                        .get(*slot as usize)
+                        .ok_or(RuntimeError::Unknown)?;
+
+                    method.execute(callee, self.value_stack, self.arena, self.vtables);
+                }
+                Instruction::ListGet => {
+                    let index = self.pop()?.as_u32();
+                    let list_handle = self.pop()?.as_hhandle();
+                    let list = self.arena.get_mut::<ListObject>(&list_handle)?;
+                    let item = list.get_item(index)?;
+                    self.push(item);
+                }
+                Instruction::ListSet => {
+                    let value = self.pop()?;
+                    let index = self.pop()?.as_u32();
+                    let list_handle = self.pop()?.as_hhandle();
+                    let list = self.arena.get_mut::<ListObject>(&list_handle)?;
+
+                    list.set_item(index, value)?;
                 }
                 Instruction::BoolAnd => {
                     let rhs = self.pop()?;
@@ -234,81 +343,6 @@ impl<'a> FunctionInterpreter<'a> {
                 Instruction::NotEqual => {
                     let rhs = self.pop()?;
                     self.last_mut()?.cmp_assign_not_equal(rhs);
-                }
-                Instruction::CreateString { pool_slot } => {
-                    todo!("CreateString not implemented yet");
-                }
-                Instruction::CreateList {
-                    item_count,
-                    type_id,
-                } => {
-                    let count = *item_count as usize;
-                    let items = self.value_stack.split_off(self.value_stack.len() - count);
-                    let list_object = ListObject::from_values(*type_id, items);
-                    let handle = self.arena.alloc(LIST_TYPE_ID, list_object);
-                    self.push(handle.to_word());
-                }
-                Instruction::RcInc => {
-                    self.pop()?.hhandle_rc_inc(self.arena)?;
-                }
-                Instruction::RcDec => {
-                    self.pop()?.hhandle_rc_dec(self.arena, self.vtables)?;
-                }
-                Instruction::BuiltinFunctionCall { slot, argc } => {
-                    BuiltinFunction::execute(*slot, *argc, self.value_stack, self.arena)?;
-                }
-                Instruction::LocalCall { slot } => {
-                    let func = current_module
-                        .get_function_source_by_slot(*slot)
-                        .ok_or(RuntimeError::Unknown)?;
-
-                    self.execute_function(func, current_module)?;
-                }
-                Instruction::ForeignCall {
-                    ref module_name,
-                    call_slot,
-                } => {
-                    let module = self.modules.get(module_name).ok_or(RuntimeError::Unknown)?;
-
-                    let func = module
-                        .get_function_source_by_slot(*call_slot)
-                        .ok_or(RuntimeError::Unknown)?;
-
-                    FunctionInterpreter::new(
-                        self.modules,
-                        self.arena,
-                        self.value_stack,
-                        self.vtables,
-                        func,
-                        &mut CallFrame::new(func.slot_count as u32),
-                    )
-                }
-                Instruction::MethodCall {
-                    type_id,
-                    slot,
-                    argc,
-                } => {
-                    let method = self.vtables[*type_id as usize]
-                        .methods
-                        .get(*slot as usize)
-                        .ok_or(RuntimeError::Unknown)?;
-
-                    method.execute(self.vtables, self.arena);
-                }
-                Instruction::ListGet => {
-                    let index = self.pop()?.as_u32();
-                    let list_handle = self.pop()?.as_hhandle();
-                    let list_object = self.arena.get_mut::<ListObject>(&list_handle)?;
-                    let item = list_object.get_item(index)?;
-                    self.push(item);
-                }
-                Instruction::ListSet => {
-                    let value = self.pop()?;
-                    let index = self.pop()?.as_u32();
-                    let list_handle = self.pop()?.as_hhandle();
-                    let list_object = self.arena.get_mut::<ListObject>(&list_handle)?;
-
-                    list_object.set_item(index, value)?;
                 }
             }
             self.ip += 1;
