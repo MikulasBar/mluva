@@ -1,13 +1,21 @@
 [package]
 name = "cli"
-version = "0.1.0"
-edition = "2024"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
 clap = { version = "4.5.48", features = ["derive"] }
 serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
-
-mluva = { path = ".." }
 base64 = "0.22.1"
 codespan-reporting = "0.13.1"
+
+mluva = { path = ".." }
+
+
+[profile.release]
+lto = true
+opt-level = 3
+debug = false
+panic = "abort"

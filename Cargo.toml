@@ -1,23 +1,26 @@
-[package]
-name = "mluva"
+[workspace.package]
 authors = ["Mikuláš Bartáček"]
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+
+[package]
+name = "mluva"
+authors.workspace = true
+version.workspace = true
+edition.workspace = true
+
+# This is a virtual manifest
+# No source code in this crate
+[lib]
+path = ""
 
 [workspace]
 members = [
     "cli",
+    "common",
+    "compiler",
+    "frontend",
+    "serialization",
+    "typechecker",
+    "vm",
 ]
-
-[dependencies]
-codespan-reporting = "0.13.1"
-
-
-[profile.dev]
-
-
-[profile.release]
-lto = true
-opt-level = 3
-debug = false
-panic = "abort"

@@ -4,9 +4,9 @@ use std::{
 };
 
 use crate::{
-    errors::RuntimeError,
+    runtime_error::RuntimeError,
     value_stack::ValueStack,
-    vtable::{Method, VTable, PRIMITIVES_VTABLE_COUNT},
+    vtable::{Method, PRIMITIVES_VTABLE_COUNT, VTable},
     word::Word,
 };
 
@@ -25,11 +25,11 @@ impl Arena {
 
     pub fn get<T>(&self, handle: &HeapHandle) -> Result<&T, RuntimeError> {
         if let Some(Slot {
-            gen,
+            generation,
             slot_data: SlotData::Occupied { object, .. },
         }) = self.slots.get(handle.index as usize)
         {
-            if *gen == handle.gen {
+            if *generation == handle.generation {
                 let ptr = object.as_ptr() as *const T;
                 return Ok(unsafe { &*ptr });
             }
@@ -39,11 +39,11 @@ impl Arena {
 
     pub fn get_mut<T>(&mut self, handle: &HeapHandle) -> Result<&mut T, RuntimeError> {
         if let Some(Slot {
-            gen,
+            generation,
             slot_data: SlotData::Occupied { object, .. },
         }) = self.slots.get_mut(handle.index as usize)
         {
-            if *gen == handle.gen {
+            if *generation == handle.generation {
                 let ptr = object.as_ptr() as *mut T;
                 return Ok(unsafe { &mut *ptr });
             }
@@ -58,12 +58,12 @@ impl Arena {
         let index = if let Some(idx) = self.free_head {
             let slot = &mut self.slots[idx as usize];
             if let Slot {
-                gen,
+                generation,
                 slot_data: SlotData::Free { next },
             } = slot
             {
                 self.free_head = *next;
-                *slot = Slot::new_occupied(*gen + 1, type_id, layout, object);
+                *slot = Slot::new_occupied(*generation + 1, type_id, layout, object);
             }
             idx
         } else {
@@ -77,11 +77,11 @@ impl Arena {
 
     pub fn increment_rc(&mut self, handle: &HeapHandle) -> Result<(), RuntimeError> {
         if let Some(Slot {
-            gen,
+            generation,
             slot_data: SlotData::Occupied { refcount, .. },
         }) = self.slots.get_mut(handle.index as usize)
         {
-            if *gen == handle.gen {
+            if *generation == handle.generation {
                 *refcount += 1;
                 return Ok(());
             }
@@ -96,7 +96,7 @@ impl Arena {
         vtables: &[VTable],
     ) -> Result<(), RuntimeError> {
         if let Some(Slot {
-            gen,
+            generation,
             slot_data:
                 SlotData::Occupied {
                     refcount,
@@ -108,7 +108,7 @@ impl Arena {
         {
             let layout = *layout;
             let object = *object;
-            if *gen == handle.gen {
+            if *generation == handle.generation {
                 if *refcount == 0 {
                     return Err(RuntimeError::InvalidHeapHandle);
                 }
@@ -130,7 +130,7 @@ impl Arena {
 
                         let slot = &mut self.slots[handle.index as usize];
                         let next_free = self.free_head;
-                        slot.gen += 1;
+                        slot.generation += 1;
                         slot.slot_data = SlotData::Free { next: next_free };
                         self.free_head = Some(handle.index);
                     }
@@ -145,14 +145,19 @@ impl Arena {
 }
 
 struct Slot {
-    gen: u32,
+    generation: u32,
     slot_data: SlotData,
 }
 
 impl Slot {
-    pub fn new_occupied(gen: u32, type_id: u32, layout: Layout, object: NonNull<u8>) -> Self {
+    pub fn new_occupied(
+        generation: u32,
+        type_id: u32,
+        layout: Layout,
+        object: NonNull<u8>,
+    ) -> Self {
         Self {
-            gen,
+            generation,
             slot_data: SlotData::new_occupied(type_id, layout, object),
         }
     }
@@ -192,15 +197,15 @@ impl SlotData {
 #[derive(Debug, PartialEq)]
 pub struct HeapHandle {
     index: u32,
-    gen: u32,
+    generation: u32,
 }
 
 impl HeapHandle {
-    pub fn new(index: u32, gen: u32) -> Self {
-        Self { index, gen }
+    pub fn new(index: u32, generation: u32) -> Self {
+        Self { index, generation }
     }
 
     pub fn as_word(&self) -> Word {
-        Word::combine(self.index, self.gen)
+        Word::combine(self.index, self.generation)
     }
 }

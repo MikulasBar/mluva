@@ -1,4 +1,4 @@
-use crate::bytecode::serializable::BytecodeSerializable;
+use crate::serializable::BytecodeSerializable;
 
 const MAGIC: &[u8] = &[0x00, 0x08, b'm', b'v', 0x00, b'b', 0x08];
 

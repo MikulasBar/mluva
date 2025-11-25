@@ -1,7 +1,5 @@
 use std::fmt::Display;
 
-use crate::runtime::Runtime;
-
 #[derive(Debug, Clone)]
 pub enum RuntimeError {
     InvalidHeapHandle,

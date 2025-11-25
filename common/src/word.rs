@@ -46,8 +46,8 @@ impl Word {
 
     #[inline(always)]
     pub fn as_hhandle(&self) -> HeapHandle {
-        let (index, gen) = self.split();
-        HeapHandle::new(index, gen)
+        let (index, generation) = self.split();
+        HeapHandle::new(index, generation)
     }
 
     #[inline(always)]

@@ -2,13 +2,13 @@ use crate::{
     arena::Arena,
     builtin_function::BuiltinFunction,
     callframe::CallFrame,
-    errors::RuntimeError,
     function::FunctionSource,
     instruction::Instruction,
     list_object::ListObject,
     module_cluster::ModuleCluster,
+    runtime_error::RuntimeError,
     value_stack::ValueStack,
-    vtable::{VTable, LIST_TYPE_ID, STRING_TYPE_ID},
+    vtable::{LIST_TYPE_ID, STRING_TYPE_ID, VTable},
     word::Word,
 };
 
