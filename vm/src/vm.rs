@@ -1,14 +1,13 @@
 use crate::{
-    arena::Arena,
-    builtin_function::BuiltinFunction,
-    callframe::CallFrame,
+    arena::Arena, callframe::CallFrame, list_object::ListObject, runtime_error::RuntimeError,
+    string_object::StringObject, value_stack::ValueStack, vtable::VTable,
+};
+
+use common::{
     function::FunctionSource,
     instruction::Instruction,
-    list_object::ListObject,
-    module_cluster::ModuleCluster,
-    runtime_error::RuntimeError,
-    value_stack::ValueStack,
-    vtable::{LIST_TYPE_ID, STRING_TYPE_ID, VTable},
+    module::module_cluster::ModuleCluster,
+    type_map::{LIST_TYPE_ID, STRING_TYPE_ID},
     word::Word,
 };
 
@@ -24,7 +23,7 @@ impl Vm {
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
         let main_module_slot = self
             .modules
-            .get_main_module_slot()
+            .get_main_source_slot()
             .ok_or(RuntimeError::other("main module not found"))?;
 
         let main_source = self
@@ -131,7 +130,7 @@ impl<'a> FunctionInterpreter<'a> {
                     self.value_stack.push(*word);
                 }
                 Instruction::Pop => {
-                    self.pop();
+                    self.pop()?;
                 }
                 Instruction::LoadLocal { slot } => {
                     let value = self.local_get(*slot)?;
@@ -153,7 +152,15 @@ impl<'a> FunctionInterpreter<'a> {
                     }
                 }
                 Instruction::CreateString { pool_slot } => {
-                    todo!("CreateString not implemented yet");
+                    let str = self
+                        .modules
+                        .get_string_from_pool(self.current_module_slot, *pool_slot as usize)
+                        .ok_or(RuntimeError::Unknown)?;
+
+                    let string_object = StringObject::new(str);
+                    let handle = self.arena.alloc(STRING_TYPE_ID, string_object);
+
+                    self.push(handle.as_word());
                 }
                 Instruction::CreateList {
                     item_count,
@@ -173,9 +180,6 @@ impl<'a> FunctionInterpreter<'a> {
                     let handle = self.pop()?.as_hhandle();
                     self.arena
                         .decrement_rc(&handle, self.value_stack, &self.vtables)?;
-                }
-                Instruction::BuiltinFunctionCall { slot, argc } => {
-                    BuiltinFunction::execute(*slot, *argc, self.value_stack, self.arena)?;
                 }
                 Instruction::LocalCall { slot } => {
                     let func = self
@@ -197,7 +201,7 @@ impl<'a> FunctionInterpreter<'a> {
                     .execute()?;
                 }
                 Instruction::ForeignCall {
-                    ref module_name,
+                    module_name,
                     call_slot,
                 } => {
                     let module_slot = self
@@ -247,6 +251,11 @@ impl<'a> FunctionInterpreter<'a> {
 
                     list.set_item(index, value)?;
                 }
+                Instruction::IntrinsicPrint => {
+                    let handle = self.pop()?.as_hhandle();
+                    let string = self.arena.get::<StringObject>(&handle)?;
+                    print!("{}", string.as_str());
+                }
                 Instruction::BoolAnd => {
                     let rhs = self.pop()?;
                     self.last_mut()?.bool_assign_and(rhs);
@@ -274,7 +283,7 @@ impl<'a> FunctionInterpreter<'a> {
                     let rhs = self.pop()?;
                     self.last_mut()?.i32_assign_div(rhs);
                 }
-                Instruction::I32Modulo => {
+                Instruction::I32Mod => {
                     let rhs = self.pop()?;
                     self.last_mut()?.i32_assign_modulo(rhs);
                 }
@@ -313,7 +322,7 @@ impl<'a> FunctionInterpreter<'a> {
                     let rhs = self.pop()?;
                     self.last_mut()?.f32_assign_div(rhs);
                 }
-                Instruction::F32Modulo => {
+                Instruction::F32Mod => {
                     let rhs = self.pop()?;
                     self.last_mut()?.f32_assign_modulo(rhs);
                 }
@@ -336,11 +345,11 @@ impl<'a> FunctionInterpreter<'a> {
                     let rhs = self.pop()?;
                     self.last_mut()?.f32_assign_less_equal(rhs);
                 }
-                Instruction::Equal => {
+                Instruction::WordEqual => {
                     let rhs = self.pop()?;
                     self.last_mut()?.cmp_assign_equal(rhs);
                 }
-                Instruction::NotEqual => {
+                Instruction::WordNotEqual => {
                     let rhs = self.pop()?;
                     self.last_mut()?.cmp_assign_not_equal(rhs);
                 }

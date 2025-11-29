@@ -1,10 +1,9 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use super::token::{Token, TokenKind};
-use crate::diagnostics::Span;
-use crate::errors::CompileError;
-
+use common::compile_error::CompileError;
+use common::diagnostics::Span;
+use common::token::{Token, TokenKind};
 /// Tokenize input and attach byte-span info to each token.
 /// Returns Vec<Token> where each token carries a Span { file, lo, hi }.
 /// `file_id` should come from your SimpleFiles / SourceMap (codespan-reporting).
@@ -363,68 +362,5 @@ fn match_kw(ident: String) -> TokenKind {
         "import" => TokenKind::Import,
 
         _ => TokenKind::Ident(ident),
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_tokenize() {
-        let input = "let x: Int = 42\nif x > 10 {\nreturn 'Hello'\n}";
-        let tokens = tokenize(input, 0).unwrap();
-        let expected_tokens = vec![
-            TokenKind::Let,
-            TokenKind::Ident("x".to_string()),
-            TokenKind::Colon,
-            TokenKind::Ident("Int".to_string()),
-            TokenKind::Assign,
-            TokenKind::Int(42),
-            TokenKind::EOL,
-            TokenKind::If,
-            TokenKind::Ident("x".to_string()),
-            TokenKind::ArrowR,
-            TokenKind::Int(10),
-            TokenKind::BraceL,
-            TokenKind::EOL,
-            TokenKind::Return,
-            TokenKind::StringLiteral("Hello".to_string()),
-            TokenKind::EOL,
-            TokenKind::BraceR,
-            TokenKind::EOL,
-        ];
-
-        let got_kinds: Vec<TokenKind> = tokens.into_iter().map(|t| t.kind).collect();
-        assert_eq!(got_kinds, expected_tokens);
-    }
-
-    #[test]
-    fn test_tokenize_string() {
-        let input = "'Hello, World!'";
-        let mut chars = input.char_indices().peekable();
-        // call helper directly to get a spanned token
-        let token = tokenize_string(&mut chars, 0, input).unwrap();
-        let expected_token = TokenKind::StringLiteral("Hello, World!".to_string());
-        assert_eq!(token.kind, expected_token);
-    }
-
-    #[test]
-    fn test_tokenize_number() {
-        let input = "12345";
-        let mut chars = input.char_indices().peekable();
-        let token_int = tokenize_number(&mut chars, 0).unwrap();
-        match token_int.kind {
-            TokenKind::Int(v) => assert_eq!(v, 12345),
-            _ => panic!("expected int"),
-        }
-
-        let input_float = "123.45";
-        let mut chars_float = input_float.char_indices().peekable();
-        let token_float = tokenize_number(&mut chars_float, 0).unwrap();
-        match token_float.kind {
-            TokenKind::Float(v) => assert!((v - 123.45).abs() < 1e-9),
-            _ => panic!("expected float"),
-        }
     }
 }

@@ -1,3 +1,8 @@
+mod data_type_scope;
+mod typechecker;
+
+pub use typechecker::TypeChecker;
+
 #[macro_export]
 macro_rules! bin_op_pat {
     (COMPARISON) => {

@@ -1,4 +1,4 @@
-use crate::arena::HeapHandle;
+use crate::heap_handle::HeapHandle;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Word {

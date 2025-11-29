@@ -2,8 +2,8 @@ use std::fmt;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
+use crate::token::TokenKind;
 use crate::{
-    compiler::token::TokenKind,
     data_type::DataType,
     diagnostics::{FileId, Span},
 };

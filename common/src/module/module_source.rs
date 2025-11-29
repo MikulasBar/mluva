@@ -48,4 +48,8 @@ impl ModuleSource {
     pub fn get_slot(&self, name: &str) -> Option<u32> {
         self.function_map.get(name).copied()
     }
+
+    pub fn get_string_from_pool(&self, slot: usize) -> Option<&str> {
+        self.string_pool.get(slot).map(|s| s.as_str())
+    }
 }

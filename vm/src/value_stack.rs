@@ -1,4 +1,5 @@
-use crate::{runtime_error::RuntimeError, word::Word};
+use crate::runtime_error::RuntimeError;
+use common::word::Word;
 
 pub struct ValueStack {
     stack: Vec<Word>,

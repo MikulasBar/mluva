@@ -1,5 +1,5 @@
-use super::{binary_op::BinaryOp, UnaryOp};
-use crate::{ast::BuiltinFunction, diagnostics::Span, value::Value};
+use super::{UnaryOp, binary_op::BinaryOp};
+use crate::diagnostics::Span;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
@@ -12,16 +12,44 @@ impl Expr {
         Self { kind, span }
     }
 
-    pub fn list_literal(elements: Vec<Self>, span: Span) -> Self {
+    pub fn void_literal(span: Span) -> Self {
         Self {
-            kind: ExprKind::ListLiteral(elements),
+            kind: ExprKind::VoidLiteral,
             span,
         }
     }
 
-    pub fn literal(value: Value, span: Span) -> Self {
+    pub fn int_literal(value: i32, span: Span) -> Self {
         Self {
-            kind: ExprKind::Literal(value),
+            kind: ExprKind::IntLiteral(value),
+            span,
+        }
+    }
+
+    pub fn float_literal(value: f32, span: Span) -> Self {
+        Self {
+            kind: ExprKind::FloatLiteral(value),
+            span,
+        }
+    }
+
+    pub fn bool_literal(value: bool, span: Span) -> Self {
+        Self {
+            kind: ExprKind::BoolLiteral(value),
+            span,
+        }
+    }
+
+    pub fn string_literal(value: String, span: Span) -> Self {
+        Self {
+            kind: ExprKind::StringLiteral(value),
+            span,
+        }
+    }
+
+    pub fn list_literal(elements: Vec<Self>, span: Span) -> Self {
+        Self {
+            kind: ExprKind::ListLiteral(elements),
             span,
         }
     }
@@ -70,13 +98,6 @@ impl Expr {
         }
     }
 
-    pub fn builtin_function_call(function: BuiltinFunction, args: Vec<Self>, span: Span) -> Self {
-        Self {
-            kind: ExprKind::BuiltinFunctionCall { function, args },
-            span,
-        }
-    }
-
     pub fn method_call(callee: Self, method_name: String, args: Vec<Self>, span: Span) -> Self {
         Self {
             kind: ExprKind::MethodCall {
@@ -101,11 +122,15 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
-    Literal(Value),
+    VoidLiteral,
+    IntLiteral(i32),
+    FloatLiteral(f32),
+    BoolLiteral(bool),
+    StringLiteral(String),
+    ListLiteral(Vec<Expr>),
     Var(String),
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
-    ListLiteral(Vec<Expr>),
     FunctionCall {
         func_name: String,
         args: Vec<Expr>,
@@ -113,10 +138,6 @@ pub enum ExprKind {
     ForeignFunctionCall {
         module_name: String,
         func_name: String,
-        args: Vec<Expr>,
-    },
-    BuiltinFunctionCall {
-        function: BuiltinFunction,
         args: Vec<Expr>,
     },
     MethodCall {

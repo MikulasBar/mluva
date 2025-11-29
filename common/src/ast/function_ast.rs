@@ -1,4 +1,4 @@
-use crate::{data_type::DataType, diagnostics::Span, errors::CompileError};
+use crate::{compile_error::CompileError, data_type::DataType, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SpannedFunctionSigniture {

@@ -1,7 +1,6 @@
 mod data_type;
 mod function;
 mod instruction;
-mod value;
 
 pub trait BytecodeSerializable: Sized {
     fn write_bytecode(&self, buffer: &mut Vec<u8>);
@@ -54,6 +53,21 @@ impl BytecodeSerializable for u32 {
         }
         let value = u32::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
         *cursor += 4;
+        Ok(value)
+    }
+
+    fn write_bytecode(&self, buffer: &mut Vec<u8>) {
+        buffer.extend_from_slice(&self.to_le_bytes());
+    }
+}
+
+impl BytecodeSerializable for u64 {
+    fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {
+        if *cursor + 8 > bytes.len() {
+            return Err("Unexpected end of bytecode".to_string());
+        }
+        let value = u64::from_le_bytes(bytes[*cursor..*cursor + 4].try_into().unwrap());
+        *cursor += 8;
         Ok(value)
     }
 

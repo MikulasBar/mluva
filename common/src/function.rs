@@ -1,6 +1,6 @@
 use crate::{
-    ast::SpannedFunctionSigniture, data_type::DataType, diagnostics::Span, errors::CompileError,
-    instruction::Instruction,
+    ast::SpannedFunctionSigniture, compile_error::CompileError, data_type::DataType,
+    diagnostics::Span, instruction::Instruction,
 };
 
 /// Signiture of an in-language function without name

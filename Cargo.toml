@@ -24,3 +24,11 @@ members = [
     "typechecker",
     "vm",
 ]
+
+[workspace.dependencies]
+codespan-reporting = "0.13.1"
+
+common = { path = "common" }
+compiler = { path = "compiler" }
+vm = { path = "vm" }
+serialization = { path = "serialization" }

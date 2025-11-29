@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::{diagnostics::Span, errors::CompileError};
+use crate::{compile_error::CompileError, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum DataType {

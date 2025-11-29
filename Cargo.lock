@@ -130,10 +130,16 @@ checksum = "b05b61dc5112cbb17e4b6cd61790d9845d13888356391624cbe7e41efeac1e75"
 [[package]]
 name = "common"
 version = "0.1.0"
+dependencies = [
+ "codespan-reporting",
+]
 
 [[package]]
 name = "compiler"
 version = "0.1.0"
+dependencies = [
+ "common",
+]
 
 [[package]]
 name = "equivalent"
@@ -144,6 +150,9 @@ checksum = "877a4ace8713b0bcf2a4e7eec82529c029f1d0619886d18145fea96c3ffe5c0f"
 [[package]]
 name = "frontend"
 version = "0.1.0"
+dependencies = [
+ "common",
+]
 
 [[package]]
 name = "hashbrown"
@@ -259,6 +268,9 @@ dependencies = [
 [[package]]
 name = "serialization"
 version = "0.1.0"
+dependencies = [
+ "common",
+]
 
 [[package]]
 name = "strsim"
@@ -289,6 +301,9 @@ dependencies = [
 [[package]]
 name = "typechecker"
 version = "0.1.0"
+dependencies = [
+ "common",
+]
 
 [[package]]
 name = "unicode-ident"
@@ -317,6 +332,9 @@ checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
 [[package]]
 name = "vm"
 version = "0.1.0"
+dependencies = [
+ "common",
+]
 
 [[package]]
 name = "winapi-util"

@@ -6,9 +6,10 @@ use std::{
 use crate::{
     runtime_error::RuntimeError,
     value_stack::ValueStack,
-    vtable::{Method, PRIMITIVES_VTABLE_COUNT, VTable},
-    word::Word,
+    vtable::{Method, VTable},
 };
+
+use common::{heap_handle::HeapHandle, type_map::PRIMITIVE_TYPES_COUNT};
 
 pub struct Arena {
     slots: Vec<Slot>,
@@ -118,7 +119,7 @@ impl Arena {
                     return Ok(());
                 }
 
-                if *type_id >= PRIMITIVES_VTABLE_COUNT {
+                if *type_id >= PRIMITIVE_TYPES_COUNT {
                     let vtable = &vtables[*type_id as usize];
                     if let Some(Method::Native { func: destr }) =
                         vtable.methods.get(VTable::DESTRUCTOR_SLOT)
@@ -191,21 +192,5 @@ impl SlotData {
             layout,
             object,
         }
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub struct HeapHandle {
-    index: u32,
-    generation: u32,
-}
-
-impl HeapHandle {
-    pub fn new(index: u32, generation: u32) -> Self {
-        Self { index, generation }
-    }
-
-    pub fn as_word(&self) -> Word {
-        Word::combine(self.index, self.generation)
     }
 }

@@ -1,3 +1,6 @@
+pub mod lexer;
+pub mod parser;
+
 #[macro_export]
 macro_rules! expect_token {
     ($pattern:pat $(,$span:pat)? in $parser:expr) => {
@@ -13,8 +16,8 @@ macro_rules! expect_token {
                             .get($parser.index.saturating_sub(1))
                             .map(|t| t.span)
                     })
-                    .unwrap_or_else(|| crate::diagnostics::Span::new(0, 0, 0));
-                return Err(crate::errors::CompileError::unexpected_end_of_file(
+                    .unwrap_or_else(|| common::diagnostics::Span::new(0, 0, 0));
+                return Err(common::compile_error::CompileError::unexpected_end_of_file(
                     __span.file,
                 ));
             }
@@ -26,7 +29,7 @@ macro_rules! expect_token {
         } = __token;
 
         let $pattern = __kind else {
-            return Err(crate::errors::CompileError::unexpected_token_at(
+            return Err(common::compile_error::CompileError::unexpected_token_at(
                 __kind, __span,
             ));
         };

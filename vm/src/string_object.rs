@@ -3,7 +3,7 @@ pub struct StringObject {
 }
 
 impl StringObject {
-    pub fn from_str(s: &str) -> Self {
+    pub fn new(s: &str) -> Self {
         Self {
             bytes: s.as_bytes().into(),
         }

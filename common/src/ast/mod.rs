@@ -1,5 +1,4 @@
 mod binary_op;
-mod builtin_function;
 mod expr;
 mod function_ast;
 mod path;
@@ -10,19 +9,12 @@ mod unary_op;
 use std::collections::HashMap;
 
 pub use binary_op::BinaryOp;
-pub use builtin_function::BuiltinFunction;
 pub use expr::{Expr, ExprKind};
 pub use function_ast::{SpannedFunctionSigniture, SpannedParameter};
 pub use path::Path;
 pub use pattern::{Pattern, PatternKind};
 pub use statement::{Statement, StatementKind};
 pub use unary_op::UnaryOp;
-
-use crate::{
-    compiler::{tokenize, Parser},
-    diagnostics::FileId,
-    errors::CompileError,
-};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Ast {
@@ -45,13 +37,6 @@ impl Ast {
             function_bodies,
             imports,
         }
-    }
-
-    pub fn from_string(source: &str, file_id: FileId) -> Result<Self, CompileError> {
-        let tokens = tokenize(source, file_id)?;
-        let ast = Parser::new(&tokens, file_id).parse()?;
-
-        Ok(ast)
     }
 
     pub fn empty() -> Self {
@@ -110,8 +95,6 @@ impl Ast {
         &self.imports
     }
 
-    // we need to deconstruct these
-    #[allow(clippy::type_complexity)]
     pub fn deconstruct(
         self,
     ) -> (

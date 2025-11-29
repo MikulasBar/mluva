@@ -1,9 +1,5 @@
-use crate::{
-    bytecode::serializable::BytecodeSerializable,
-    data_type::DataType,
-    function::{FunctionSigniture, FunctionSource, Parameter},
-    instruction::Instruction,
-};
+use crate::BytecodeSerializable;
+use common::{data_type::DataType, function::*, instruction::Instruction};
 
 impl BytecodeSerializable for FunctionSigniture {
     fn from_bytecode(bytes: &[u8], cursor: &mut usize) -> Result<Self, String> {

@@ -1,23 +1,21 @@
 use std::collections::HashMap;
 
 use super::data_type_scope::DataTypeScope;
-use crate::ast::{
-    Ast, BinaryOp, BuiltinFunction, Expr, ExprKind, Statement, StatementKind, UnaryOp,
-};
 use crate::bin_op_pat;
-use crate::data_type::DataType;
-use crate::diagnostics::Span;
-use crate::errors::CompileError;
-use crate::module::Module;
+use common::ast::{Ast, BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
+use common::compile_error::CompileError;
+use common::data_type::DataType;
+use common::diagnostics::Span;
+use common::module::module_signiture::ModuleSigniture;
 
 pub struct TypeChecker<'a> {
     ast: &'a Ast,
-    dependencies: &'a HashMap<String, Module>,
+    dependencies: &'a HashMap<String, ModuleSigniture>,
     scope: DataTypeScope,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(ast: &'a Ast, dependencies: &'a HashMap<String, Module>) -> Self {
+    pub fn new(ast: &'a Ast, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
         Self {
             ast,
             dependencies,
@@ -188,10 +186,11 @@ impl<'a> TypeChecker<'a> {
 
                 Ok(data_type.clone())
             }
-            ExprKind::Literal(lit) => {
-                let expr_span = expr.span;
-                lit.get_type_of_literal(expr_span)
-            }
+            ExprKind::VoidLiteral => Ok(DataType::Void),
+            ExprKind::IntLiteral(_) => Ok(DataType::Int),
+            ExprKind::FloatLiteral(_) => Ok(DataType::Float),
+            ExprKind::BoolLiteral(_) => Ok(DataType::Bool),
+            ExprKind::StringLiteral(_) => Ok(DataType::String),
             ExprKind::ListLiteral(list) => {
                 if list.is_empty() {
                     Ok(DataType::unknown_list())
@@ -240,10 +239,6 @@ impl<'a> TypeChecker<'a> {
                 func_name,
                 args,
             } => self.check_foreign_call_expr(expr, module_name, func_name, args),
-
-            ExprKind::BuiltinFunctionCall { function, args } => {
-                self.check_builtin_call_expr(expr, function, args)
-            }
 
             ExprKind::MethodCall {
                 callee,
@@ -300,20 +295,6 @@ impl<'a> TypeChecker<'a> {
         Ok(signiture.return_type.clone())
     }
 
-    fn check_builtin_call_expr(
-        &self,
-        expr: &Expr,
-        function: &BuiltinFunction,
-        args: &[Expr],
-    ) -> Result<DataType, CompileError> {
-        let arg_types: Vec<DataType> = args
-            .iter()
-            .map(|arg| self.check_expr(arg))
-            .collect::<Result<Vec<DataType>, CompileError>>()?;
-
-        function.check_types(expr.span, &arg_types)
-    }
-
     fn check_method_call_expr(
         &self,
         expr: &Expr,
@@ -345,17 +326,17 @@ impl<'a> TypeChecker<'a> {
                 (DataType::Int, DataType::Int) => Ok(DataType::Int),
                 (DataType::Float, DataType::Float) => Ok(DataType::Float),
                 (DataType::Int | DataType::Float, _) => {
-                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span));
                 }
                 (_, DataType::Int | DataType::Float) => {
-                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
+                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span));
                 }
                 _ => {
                     return Err(CompileError::wrong_type_at(
                         DataType::Int,
                         lhs_type,
                         expr.span,
-                    ))
+                    ));
                 }
             },
 
@@ -363,17 +344,17 @@ impl<'a> TypeChecker<'a> {
                 (DataType::Int, DataType::Int) => Ok(DataType::Bool),
                 (DataType::Float, DataType::Float) => Ok(DataType::Bool),
                 (DataType::Int | DataType::Float, _) => {
-                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span))
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span));
                 }
                 (_, DataType::Int | DataType::Float) => {
-                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span))
+                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span));
                 }
                 _ => {
                     return Err(CompileError::wrong_type_at(
                         DataType::Int,
                         lhs_type,
                         expr.span,
-                    ))
+                    ));
                 }
             },
 
@@ -424,7 +405,7 @@ impl<'a> TypeChecker<'a> {
                         DataType::Int,
                         expr_type,
                         expr.span,
-                    ))
+                    ));
                 }
             },
         }

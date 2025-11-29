@@ -1,11 +1,6 @@
-use crate::{arena::Arena, value_stack::ValueStack, word::Word};
+use common::word::Word;
 
-pub const PRIMITIVES_VTABLE_COUNT: u32 = 3;
-pub const I32_TYPE_ID: u32 = 0;
-pub const F32_TYPE_ID: u32 = 1;
-pub const BOOL_TYPE_ID: u32 = 2;
-pub const STRING_TYPE_ID: u32 = 4;
-pub const LIST_TYPE_ID: u32 = 5;
+use crate::{arena::Arena, value_stack::ValueStack};
 
 pub struct VTable {
     pub methods: Vec<Method>,
@@ -13,8 +8,6 @@ pub struct VTable {
 
 impl VTable {
     pub const DESTRUCTOR_SLOT: usize = 0;
-    pub const INDEX_SLOT: usize = 1;
-    pub const TO_STRING_SLOT: usize = 2;
 }
 
 #[derive(Debug, Clone)]

@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::ast::{Pattern, PatternKind};
-use crate::data_type::DataType;
-use crate::{diagnostics::Span, errors::CompileError};
+use common::ast::{Pattern, PatternKind};
+use common::data_type::DataType;
+use common::{compile_error::CompileError, diagnostics::Span};
 
 pub struct DataTypeScope {
     scopes: Vec<HashMap<String, DataType>>,
