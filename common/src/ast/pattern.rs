@@ -4,9 +4,14 @@ use crate::{ast::Expr, diagnostics::Span};
 pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
+    pub type_id: Option<u32>,
 }
 
 impl Pattern {
+    pub fn set_type(&mut self, type_id: u32) {
+        self.type_id = Some(type_id);
+    }
+
     pub fn is_declarable(&self) -> bool {
         matches!(self.kind, PatternKind::Variable(_))
     }
@@ -15,6 +20,7 @@ impl Pattern {
         Self {
             kind: PatternKind::Variable(name),
             span,
+            type_id: None,
         }
     }
 
@@ -22,9 +28,10 @@ impl Pattern {
         Self {
             kind: PatternKind::Index {
                 callee: Box::new(callee),
-                index: Box::new(index),
+                index: index,
             },
             span,
+            type_id: None,
         }
     }
 }
@@ -32,8 +39,5 @@ impl Pattern {
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternKind {
     Variable(String),
-    Index {
-        callee: Box<Pattern>,
-        index: Box<Expr>,
-    },
+    Index { callee: Box<Pattern>, index: Expr },
 }

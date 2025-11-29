@@ -5,81 +5,60 @@ use crate::diagnostics::Span;
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
+    pub type_id: Option<u32>,
 }
 
 impl Expr {
+    pub fn set_type(&mut self, type_id: u32) {
+        self.type_id = Some(type_id);
+    }
+
     pub fn new(kind: ExprKind, span: Span) -> Self {
-        Self { kind, span }
+        Self {
+            kind,
+            span,
+            type_id: None,
+        }
     }
 
     pub fn void_literal(span: Span) -> Self {
-        Self {
-            kind: ExprKind::VoidLiteral,
-            span,
-        }
+        Self::new(ExprKind::VoidLiteral, span)
     }
 
-    pub fn int_literal(value: i32, span: Span) -> Self {
-        Self {
-            kind: ExprKind::IntLiteral(value),
-            span,
-        }
+    pub fn i32_literal(value: i32, span: Span) -> Self {
+        Self::new(ExprKind::I32Literal(value), span)
     }
 
-    pub fn float_literal(value: f32, span: Span) -> Self {
-        Self {
-            kind: ExprKind::FloatLiteral(value),
-            span,
-        }
+    pub fn f32_literal(value: f32, span: Span) -> Self {
+        Self::new(ExprKind::F32Literal(value), span)
     }
 
     pub fn bool_literal(value: bool, span: Span) -> Self {
-        Self {
-            kind: ExprKind::BoolLiteral(value),
-            span,
-        }
+        Self::new(ExprKind::BoolLiteral(value), span)
     }
 
     pub fn string_literal(value: String, span: Span) -> Self {
-        Self {
-            kind: ExprKind::StringLiteral(value),
-            span,
-        }
+        Self::new(ExprKind::StringLiteral(value), span)
     }
 
-    pub fn list_literal(elements: Vec<Self>, span: Span) -> Self {
-        Self {
-            kind: ExprKind::ListLiteral(elements),
-            span,
-        }
+    pub fn list_literal(list: Vec<Self>, span: Span) -> Self {
+        Self::new(ExprKind::ListLiteral(list), span)
     }
 
     pub fn var(name: String, span: Span) -> Self {
-        Self {
-            kind: ExprKind::Var(name),
-            span,
-        }
+        Self::new(ExprKind::Var(name), span)
     }
 
     pub fn binary_op(op: BinaryOp, lhs: Self, rhs: Self, span: Span) -> Self {
-        Self {
-            kind: ExprKind::BinaryOp(op, Box::new(lhs), Box::new(rhs)),
-            span,
-        }
+        Self::new(ExprKind::BinaryOp(op, Box::new(lhs), Box::new(rhs)), span)
     }
 
     pub fn unary_op(op: UnaryOp, expr: Self, span: Span) -> Self {
-        Self {
-            kind: ExprKind::UnaryOp(op, Box::new(expr)),
-            span,
-        }
+        Self::new(ExprKind::UnaryOp(op, Box::new(expr)), span)
     }
 
     pub fn function_call(func_name: String, args: Vec<Self>, span: Span) -> Self {
-        Self {
-            kind: ExprKind::FunctionCall { func_name, args },
-            span,
-        }
+        Self::new(ExprKind::FunctionCall { func_name, args }, span)
     }
 
     pub fn foreign_function_call(
@@ -88,43 +67,43 @@ impl Expr {
         args: Vec<Self>,
         span: Span,
     ) -> Self {
-        Self {
-            kind: ExprKind::ForeignFunctionCall {
+        Self::new(
+            ExprKind::ForeignFunctionCall {
                 module_name,
                 func_name,
                 args,
             },
             span,
-        }
+        )
     }
 
     pub fn method_call(callee: Self, method_name: String, args: Vec<Self>, span: Span) -> Self {
-        Self {
-            kind: ExprKind::MethodCall {
+        Self::new(
+            ExprKind::MethodCall {
                 callee: Box::new(callee),
                 method_name,
                 args,
             },
             span,
-        }
+        )
     }
 
     pub fn index_get(callee: Self, index: Self, span: Span) -> Self {
-        Self {
-            kind: ExprKind::IndexGet {
+        Self::new(
+            ExprKind::IndexGet {
                 callee: Box::new(callee),
                 index: Box::new(index),
             },
             span,
-        }
+        )
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
     VoidLiteral,
-    IntLiteral(i32),
-    FloatLiteral(f32),
+    I32Literal(i32),
+    F32Literal(f32),
     BoolLiteral(bool),
     StringLiteral(String),
     ListLiteral(Vec<Expr>),

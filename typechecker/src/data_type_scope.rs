@@ -2,10 +2,11 @@ use std::collections::HashMap;
 
 use common::ast::{Pattern, PatternKind};
 use common::data_type::DataType;
+use common::type_manager::{Type, TypeSpec};
 use common::{compile_error::CompileError, diagnostics::Span};
 
 pub struct DataTypeScope {
-    scopes: Vec<HashMap<String, DataType>>,
+    scopes: Vec<HashMap<String, TypeSpec>>,
 }
 
 impl DataTypeScope {
@@ -33,21 +34,21 @@ impl DataTypeScope {
     pub fn insert_new_pattern(
         &mut self,
         assignee: Pattern,
-        data_type: DataType,
+        ty: TypeSpec,
         span: Span,
     ) -> Result<(), CompileError> {
         match assignee.kind {
             PatternKind::Index { .. } => {
                 return Err(CompileError::invalid_pattern_at(assignee.span));
             }
-            PatternKind::Variable(var) => self.insert_new_var(var, data_type, span),
+            PatternKind::Variable(var) => self.insert_new_var(var, ty, span),
         }
     }
 
     pub fn insert_new_var(
         &mut self,
         name: String,
-        data_type: DataType,
+        data_type: TypeSpec,
         span: Span,
     ) -> Result<(), CompileError> {
         if self.contains(&name) {
@@ -62,7 +63,7 @@ impl DataTypeScope {
         Ok(())
     }
 
-    pub fn get_pattern(&self, pattern: &Pattern) -> Result<DataType, CompileError> {
+    pub fn get_pattern(&self, pattern: &Pattern) -> Result<TypeSpec, CompileError> {
         match &pattern.kind {
             PatternKind::Variable(name) => self
                 .get(name)
@@ -77,7 +78,7 @@ impl DataTypeScope {
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<&DataType> {
+    pub fn get(&self, key: &str) -> Option<&TypeSpec> {
         for scope in self.scopes.iter().rev() {
             if let Some(value) = scope.get(key) {
                 return Some(value);

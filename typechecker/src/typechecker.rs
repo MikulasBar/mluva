@@ -2,22 +2,29 @@ use std::collections::HashMap;
 
 use super::data_type_scope::DataTypeScope;
 use crate::bin_op_pat;
-use common::ast::{Ast, BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
+use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
 use common::compile_error::CompileError;
 use common::data_type::DataType;
 use common::diagnostics::Span;
-use common::module::module_signiture::ModuleSigniture;
+use common::function_signiture_manager::{self, FunctionSignitureManager};
+use common::type_manager::{TypeManager, TypeSpec};
 
 pub struct TypeChecker<'a> {
-    ast: &'a Ast,
-    dependencies: &'a HashMap<String, ModuleSigniture>,
+    type_manager: &'a TypeManager,
+    function_manager: &'a FunctionSignitureManager,
+    dependencies: &'a HashMap<String, FunctionSignitureManager>,
     scope: DataTypeScope,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(ast: &'a Ast, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
+    pub fn new(
+        type_manager: &'a TypeManager,
+        function_manager: &'a FunctionSignitureManager,
+        dependencies: &'a HashMap<String, FunctionSignitureManager>,
+    ) -> Self {
         Self {
-            ast,
+            type_manager,
+            function_manager,
             dependencies,
             scope: DataTypeScope::new(),
         }
@@ -28,26 +35,23 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_functions(&mut self) -> Result<(), CompileError> {
-        for slot in 0..self.ast.function_count() {
+        for slot in 0..self.function_manager.count() {
             self.scope.enter();
 
-            self.ast
-                .get_function_signiture_by_slot(slot)
+            self.function_manager
+                .get_signiture(slot as u32)
                 .unwrap()
                 .params
                 .iter()
                 .try_for_each(|param| {
-                    self.scope.insert_new_var(
-                        param.name.clone(),
-                        param.data_type.clone(),
-                        param.span,
-                    )
+                    self.scope
+                        .insert_new_var(param.name.clone(), param.ty.clone(), param.span)
                 })?;
 
-            let statements = self.ast.get_function_body_by_slot(slot).unwrap();
+            let statements = self.function_manager.get_body(slot as u32).unwrap();
             let return_type = self
-                .ast
-                .get_function_signiture_by_slot(slot)
+                .function_manager
+                .get_signiture(slot as u32)
                 .unwrap()
                 .return_type
                 .clone();
@@ -63,7 +67,7 @@ impl<'a> TypeChecker<'a> {
     fn check_statements(
         &mut self,
         statements: &[Statement],
-        return_type: &DataType,
+        return_type: &TypeSpec,
     ) -> Result<(), CompileError> {
         for statement in statements {
             self.check_statement(statement, return_type)?;
@@ -75,7 +79,7 @@ impl<'a> TypeChecker<'a> {
     fn check_statement(
         &mut self,
         statement: &Statement,
-        return_type: &DataType,
+        return_type: &TypeSpec,
     ) -> Result<(), CompileError> {
         match &statement.kind {
             StatementKind::If {
@@ -86,9 +90,10 @@ impl<'a> TypeChecker<'a> {
                 let cond = self.check_expr(&condition)?;
                 if !cond.is_bool() {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Bool,
+                        TypeSpec::bool(),
                         cond,
                         statement.span,
+                        self.type_manager,
                     ));
                 }
 
@@ -99,7 +104,7 @@ impl<'a> TypeChecker<'a> {
             }
 
             StatementKind::VarDeclare {
-                data_type: var_type,
+                assignee_ty: var_type,
                 assignee,
                 value,
             } => {
@@ -116,6 +121,7 @@ impl<'a> TypeChecker<'a> {
                             var_type.clone(),
                             expr_type,
                             expr_span,
+                            self.type_manager,
                         ));
                     }
                     (None, DataType::List { item_type: None }) => {
@@ -174,7 +180,7 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_expr(&self, expr: &Expr) -> Result<DataType, CompileError> {
+    fn check_expr(&self, expr: &Expr) -> Result<TypeSpec, CompileError> {
         match &expr.kind {
             ExprKind::Var(ident) => {
                 let Some(data_type) = self.scope.get(&ident) else {
@@ -186,14 +192,14 @@ impl<'a> TypeChecker<'a> {
 
                 Ok(data_type.clone())
             }
-            ExprKind::VoidLiteral => Ok(DataType::Void),
-            ExprKind::IntLiteral(_) => Ok(DataType::Int),
-            ExprKind::FloatLiteral(_) => Ok(DataType::Float),
-            ExprKind::BoolLiteral(_) => Ok(DataType::Bool),
-            ExprKind::StringLiteral(_) => Ok(DataType::String),
+            ExprKind::VoidLiteral => Ok(TypeSpec::void()),
+            ExprKind::I32Literal(_) => Ok(TypeSpec::i32()),
+            ExprKind::F32Literal(_) => Ok(TypeSpec::f32()),
+            ExprKind::BoolLiteral(_) => Ok(TypeSpec::bool()),
+            ExprKind::StringLiteral(_) => Ok(TypeSpec::string()),
             ExprKind::ListLiteral(list) => {
                 if list.is_empty() {
-                    Ok(DataType::unknown_list())
+                    Ok(TypeSpec::unknown_list())
                 } else {
                     let first_type = self.check_expr(&list[0])?;
                     for element in list.iter().skip(1) {
@@ -203,11 +209,12 @@ impl<'a> TypeChecker<'a> {
                                 first_type.clone(),
                                 element_type,
                                 expr.span,
+                                self.type_manager,
                             ));
                         }
                     }
 
-                    Ok(DataType::list_of(first_type))
+                    Ok(TypeSpec::list_of(first_type))
                 }
             }
 
@@ -215,18 +222,19 @@ impl<'a> TypeChecker<'a> {
                 let callee_type = self.check_expr(callee)?;
                 let index_type = self.check_expr(index)?;
 
-                match (&callee_type, &index_type) {
-                    (
-                        DataType::List {
-                            item_type: Some(item_ty),
-                        },
-                        DataType::Int,
-                    ) => Ok(item_ty.as_ref().clone()),
-                    _ => Err(CompileError::wrong_type_at(
-                        DataType::unknown_list(),
-                        callee_type,
+                if index_type != TypeSpec::i32() {
+                    return Err(CompileError::wrong_type_at(
+                        TypeSpec::i32(),
+                        index_type,
                         expr.span,
-                    )),
+                        self.type_manager,
+                    ));
+                }
+
+                if let Some(item_type) = callee_type.get_index_type() {
+                    Ok(item_type)
+                } else {
+                    return Err(CompileError::invalid_indexing_at(expr.span));
                 }
             }
 

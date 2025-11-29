@@ -2,15 +2,15 @@ use core::panic;
 use std::collections::HashMap;
 
 use common::ast::{
-    Ast, BinaryOp, Expr, ExprKind, Pattern, PatternKind, SpannedFunctionSigniture,
-    SpannedParameter, Statement, StatementKind, UnaryOp,
+    BinaryOp, Expr, ExprKind, FunctionSigniture, Parameter, Pattern, PatternKind, Statement,
+    StatementKind, UnaryOp,
 };
 use common::compile_error::CompileError;
 use common::data_type::DataType;
-use common::function::FunctionSource;
+use common::function_source::FunctionSource;
 use common::instruction::Instruction;
 use common::module::module_signiture::ModuleSigniture;
-use common::type_map::{BOOL_TYPE_ID, F32_TYPE_ID, I32_TYPE_ID};
+use common::type_manager::{BOOL_TYPE_ID, F32_TYPE_ID, I32_TYPE_ID};
 use common::word::Word;
 
 pub struct Compiler<'a> {

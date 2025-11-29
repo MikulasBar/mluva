@@ -3,6 +3,7 @@ use std::fmt;
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
 use crate::token::TokenKind;
+use crate::type_manager::{TypeManager, TypeSpec};
 use crate::{
     data_type::DataType,
     diagnostics::{FileId, Span},
@@ -78,8 +79,17 @@ impl CompileError {
         .with_span(span)
     }
 
-    pub fn wrong_type_at(expected: DataType, found: DataType, span: Span) -> Self {
-        let message = format!("wrong type: expected {}, found {}", expected, found);
+    pub fn wrong_type_at(
+        expected: TypeSpec,
+        found: TypeSpec,
+        span: Span,
+        tm: &TypeManager,
+    ) -> Self {
+        let message = format!(
+            "wrong type: expected {}, found {}",
+            expected.format(tm),
+            found.format(tm)
+        );
         Self::new(CompileErrorKind::WrongType { expected, found }, message).with_span(span)
     }
 
@@ -255,8 +265,8 @@ pub enum CompileErrorKind {
     UnterminatedString,
     UnexpectedEndOfFile,
     WrongType {
-        expected: DataType,
-        found: DataType,
+        expected: TypeSpec,
+        found: TypeSpec,
     },
     WrongNumberOfArguments {
         expected: usize,

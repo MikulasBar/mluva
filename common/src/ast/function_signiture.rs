@@ -1,14 +1,18 @@
-use crate::{compile_error::CompileError, data_type::DataType, diagnostics::Span};
+use crate::{
+    compile_error::CompileError,
+    diagnostics::Span,
+    type_manager::{TypeManager, TypeSpec},
+};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SpannedFunctionSigniture {
-    pub return_type: DataType,
-    pub params: Vec<SpannedParameter>,
+pub struct FunctionSigniture {
+    pub return_type: TypeSpec,
+    pub params: Vec<Parameter>,
     pub span: Span,
 }
 
-impl SpannedFunctionSigniture {
-    pub fn new(return_type: DataType, params: Vec<SpannedParameter>, span: Span) -> Self {
+impl FunctionSigniture {
+    pub fn new(return_type: TypeSpec, params: Vec<Parameter>, span: Span) -> Self {
         Self {
             return_type,
             params,
@@ -18,8 +22,9 @@ impl SpannedFunctionSigniture {
 
     pub fn check_argument_types(
         &self,
-        args: &[(DataType, Span)],
+        args: &[(TypeSpec, Span)],
         call_span: Span,
+        tm: &TypeManager,
     ) -> Result<(), CompileError> {
         if self.params.len() != args.len() {
             return Err(CompileError::wrong_number_of_arguments_at(
@@ -31,11 +36,12 @@ impl SpannedFunctionSigniture {
 
         for (i, param) in self.params.iter().enumerate() {
             let (arg_type, arg_span) = &args[i];
-            if *arg_type != param.data_type {
+            if *arg_type != param.ty {
                 return Err(CompileError::wrong_type_at(
-                    param.data_type.clone(),
+                    param.ty.clone(),
                     arg_type.clone(),
                     *arg_span,
+                    tm,
                 ));
             }
         }
@@ -45,18 +51,14 @@ impl SpannedFunctionSigniture {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct SpannedParameter {
+pub struct Parameter {
     pub name: String,
-    pub data_type: DataType,
+    pub ty: TypeSpec,
     pub span: Span,
 }
 
-impl SpannedParameter {
-    pub fn new(name: String, data_type: DataType, span: Span) -> Self {
-        Self {
-            name,
-            data_type,
-            span,
-        }
+impl Parameter {
+    pub fn new(name: String, ty: TypeSpec, span: Span) -> Self {
+        Self { name, ty, span }
     }
 }

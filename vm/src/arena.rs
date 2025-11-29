@@ -9,7 +9,7 @@ use crate::{
     vtable::{Method, VTable},
 };
 
-use common::{heap_handle::HeapHandle, type_map::PRIMITIVE_TYPES_COUNT};
+use common::{heap_handle::HeapHandle, type_manager::PRIMITIVE_TYPES_COUNT};
 
 pub struct Arena {
     slots: Vec<Slot>,

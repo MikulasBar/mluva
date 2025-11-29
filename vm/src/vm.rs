@@ -4,10 +4,10 @@ use crate::{
 };
 
 use common::{
-    function::FunctionSource,
+    function_source::FunctionSource,
     instruction::Instruction,
-    module::module_cluster::ModuleCluster,
-    type_map::{LIST_TYPE_ID, STRING_TYPE_ID},
+    module::module_manager::ModuleManager,
+    type_manager::{LIST_TYPE_ID, STRING_TYPE_ID},
     word::Word,
 };
 
@@ -16,7 +16,7 @@ pub struct Vm {
     pub arena: Arena,
     pub vtables: Vec<VTable>,
     pub callstack: Vec<CallFrame>,
-    pub modules: ModuleCluster,
+    pub modules: ModuleManager,
 }
 
 impl Vm {
@@ -47,7 +47,7 @@ impl Vm {
 }
 
 struct FunctionInterpreter<'a> {
-    modules: &'a ModuleCluster,
+    modules: &'a ModuleManager,
     arena: &'a mut Arena,
     value_stack: &'a mut ValueStack,
     vtables: &'a Vec<VTable>,
@@ -59,7 +59,7 @@ struct FunctionInterpreter<'a> {
 
 impl<'a> FunctionInterpreter<'a> {
     pub fn new(
-        modules: &'a ModuleCluster,
+        modules: &'a ModuleManager,
         arena: &'a mut Arena,
         value_stack: &'a mut ValueStack,
         vtables: &'a Vec<VTable>,

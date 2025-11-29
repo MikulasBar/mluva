@@ -1,5 +1,5 @@
 use super::expr::Expr;
-use crate::{ast::pattern::Pattern, data_type::DataType, diagnostics::Span};
+use crate::{ast::pattern::Pattern, diagnostics::Span, type_manager::TypeSpec};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Statement {
@@ -19,15 +19,10 @@ impl Statement {
         }
     }
 
-    pub fn var_declare(
-        data_type: Option<DataType>,
-        assignee: Pattern,
-        value: Expr,
-        span: Span,
-    ) -> Self {
+    pub fn var_declare(ty: Option<TypeSpec>, assignee: Pattern, value: Expr, span: Span) -> Self {
         Self {
             kind: StatementKind::VarDeclare {
-                data_type,
+                assignee_ty: ty,
                 assignee,
                 value,
             },
@@ -80,7 +75,7 @@ pub enum StatementKind {
         value: Expr,
     },
     VarDeclare {
-        data_type: Option<DataType>,
+        assignee_ty: Option<TypeSpec>,
         assignee: Pattern,
         value: Expr,
     },

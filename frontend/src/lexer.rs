@@ -34,7 +34,7 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
                 continue;
             }
 
-            '\'' => tokenize_string(&mut chars, file_id, input),
+            '\"' => tokenize_string(&mut chars, file_id, input),
 
             '\n' => {
                 // EOL token; avoid duplicate sequential EOLs
@@ -138,10 +138,7 @@ pub fn tokenize(input: &str, file_id: usize) -> Result<Vec<Token>, CompileError>
             }
         };
 
-        match token {
-            Ok(t) => tokens.push(t),
-            Err(e) => return Err(e),
-        }
+        tokens.push(token?);
     }
 
     // push EOL at EOF
@@ -227,21 +224,19 @@ fn tokenize_string(
     // consume opening quote
     let (start_idx, _quote) = chars.next().unwrap();
     let mut string = String::new();
-    let mut last_hi = start_idx + 1;
 
     while let Some(&(idx, ch)) = chars.peek() {
         match ch {
             '\\' => {
                 chars.next();
-                if let Some(&(esc_idx, escaped)) = chars.peek() {
+                if let Some(&(_, escaped)) = chars.peek() {
                     match escaped {
                         'n' => string.push('\n'),
                         't' => string.push('\t'),
-                        '\'' => string.push('\''),
+                        '\"' => string.push('\"'),
                         '\\' => string.push('\\'),
                         other => string.push(other),
                     }
-                    last_hi = esc_idx + escaped.len_utf8();
                     chars.next(); // consume escaped
                 } else {
                     // escape at EOF: treat as unterminated -> span to EOF
@@ -253,20 +248,18 @@ fn tokenize_string(
                 }
             }
 
-            '\'' => {
+            '\"' => {
                 // closing quote at idx
                 let end = idx + 1;
                 chars.next(); // consume closing
-                last_hi = end;
                 return Ok(Token::new(
                     TokenKind::StringLiteral(string),
-                    Span::new(file_id, start_idx, last_hi),
+                    Span::new(file_id, start_idx, end),
                 ));
             }
 
             _ => {
                 string.push(ch);
-                last_hi = idx + ch.len_utf8();
                 chars.next();
             }
         }
@@ -315,7 +308,7 @@ fn tokenize_number(
             }
         }
 
-        match num.parse::<f64>() {
+        match num.parse::<f32>() {
             Ok(f) => Ok(Token::new(TokenKind::Float(f), span)),
             Err(_) => Err(CompileError::unexpected_char_at('.', span)),
         }

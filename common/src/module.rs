@@ -1,3 +1,2 @@
-pub mod module_cluster;
-pub mod module_signiture;
+pub mod module_manager;
 pub mod module_source;

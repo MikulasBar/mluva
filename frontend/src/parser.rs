@@ -1,15 +1,18 @@
 use crate::expect_token;
 use common::ast::*;
 use common::compile_error::CompileError;
-use common::data_type::DataType;
 use common::diagnostics::{FileId, Span};
+use common::function_signiture_manager::FunctionSignitureManager;
 use common::token::{Token, TokenKind};
+use common::type_manager::{TypeManager, TypeSpec};
 
 pub struct Parser<'a> {
     file_id: FileId,
     tokens: &'a [Token],
     index: usize,
-    ast: Ast,
+    imports: Vec<Path>,
+    type_manager: TypeManager,
+    function_manager: FunctionSignitureManager,
 }
 
 impl<'a> Parser<'a> {
@@ -18,7 +21,9 @@ impl<'a> Parser<'a> {
             file_id,
             tokens,
             index: 0,
-            ast: Ast::empty(),
+            imports: vec![],
+            type_manager: TypeManager::builtin(),
+            function_manager: FunctionSignitureManager::empty(),
         }
     }
 
@@ -63,9 +68,11 @@ impl<'a> Parser<'a> {
         }
     }
 
-    pub fn parse(mut self) -> Result<Ast, CompileError> {
+    pub fn parse(
+        mut self,
+    ) -> Result<(Vec<Path>, TypeManager, FunctionSignitureManager), CompileError> {
         self.parse_top_level()?;
-        Ok(self.ast)
+        Ok((self.imports, self.type_manager, self.function_manager))
     }
 
     fn parse_top_level(&mut self) -> Result<(), CompileError> {
@@ -79,7 +86,7 @@ impl<'a> Parser<'a> {
                 }
 
                 TokenKind::Ident(_) => {
-                    let (return_type, _) = self.parse_data_type()?;
+                    let (return_type, _) = self.parse_type()?;
                     expect_token!(TokenKind::Ident(name), name_span in self);
                     expect_token!(TokenKind::ParenL in self);
 
@@ -92,13 +99,10 @@ impl<'a> Parser<'a> {
 
                     expect_token!(TokenKind::BraceR in self);
 
-                    let signiture = SpannedFunctionSigniture::new(
-                        return_type,
-                        params,
-                        token_span.join(paren_r_span),
-                    );
+                    let signiture =
+                        FunctionSigniture::new(return_type, params, token_span.join(paren_r_span));
 
-                    self.ast.add_function(name, signiture, body);
+                    self.function_manager.add(name, signiture, body);
                 }
 
                 TokenKind::Import => {
@@ -107,7 +111,7 @@ impl<'a> Parser<'a> {
                     expect_token!(TokenKind::EOL in self);
 
                     let import_path = Path::single(module_name);
-                    self.ast.add_import(import_path);
+                    self.imports.push(import_path);
                 }
 
                 _ => {
@@ -122,16 +126,16 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    fn parse_named_parameters(&mut self) -> Result<Vec<SpannedParameter>, CompileError> {
+    fn parse_named_parameters(&mut self) -> Result<Vec<Parameter>, CompileError> {
         let mut params = vec![];
         while let Some(token) = self.peek() {
             if token.kind == TokenKind::ParenR {
                 break;
             }
 
-            let (data_type, data_type_span) = self.parse_data_type()?;
+            let (ty, ty_span) = self.parse_type()?;
             expect_token!(TokenKind::Ident(ident), ident_span in self);
-            let param = SpannedParameter::new(ident, data_type, data_type_span.join(ident_span));
+            let param = Parameter::new(ident, ty, ty_span.join(ident_span));
             params.push(param);
 
             if let Some(&TokenKind::Comma) = self.peek_kind() {
@@ -223,11 +227,11 @@ impl<'a> Parser<'a> {
         let mut pattern = None;
 
         // Try to parse as typed variable declaration first
-        if let Ok((data_type, data_type_span)) = self.parse_data_type() {
+        if let Ok((ty, ty_span)) = self.parse_type() {
             if let Ok(decl_pattern) = self.parse_pattern() {
                 pattern = Some(decl_pattern);
-                var_type = Some(data_type);
-                start_span = Some(data_type_span);
+                var_type = Some(ty);
+                start_span = Some(ty_span);
             }
         }
 
@@ -479,12 +483,12 @@ impl<'a> Parser<'a> {
 
             TokenKind::Int(_) => {
                 expect_token!(TokenKind::Int(int) in self);
-                Ok(Expr::int_literal(int, token_span))
+                Ok(Expr::i32_literal(int, token_span))
             }
 
             TokenKind::Float(_) => {
                 expect_token!(TokenKind::Float(float) in self);
-                Ok(Expr::float_literal(float as f32, token_span))
+                Ok(Expr::f32_literal(float as f32, token_span))
             }
 
             TokenKind::StringLiteral(_) => {
@@ -570,28 +574,42 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn parse_data_type(&mut self) -> Result<(DataType, Span), CompileError> {
+    fn parse_type(&mut self) -> Result<(TypeSpec, Span), CompileError> {
         expect_token!(TokenKind::Ident(ident), ident_span in self);
-        let mut span = ident_span;
 
-        let ty = match ident.as_str() {
-            "Int" => DataType::Int,
-            "Float" => DataType::Float,
-            "Bool" => DataType::Bool,
-            "String" => DataType::String,
-            "Void" => DataType::Void,
-            "List" => {
-                expect_token!(TokenKind::ArrowL in self);
-                let (item_type, _) = self.parse_data_type()?;
-                expect_token!(TokenKind::ArrowR, end_span in self);
-                span = span.join(end_span);
-                DataType::list_of(item_type)
-            }
-
-            _ => return Err(CompileError::unknown_type_at(ident, span)),
+        let type_id = if let Some(type_id) = self.type_manager.get_id(&ident) {
+            type_id
+        } else {
+            return Err(CompileError::unknown_type_at(ident, ident_span));
         };
 
-        Ok((ty, span))
+        match self.peek_kind() {
+            Some(TokenKind::ArrowL) => {
+                self.skip();
+                let generics = self.parse_type_args()?;
+                expect_token!(TokenKind::ArrowR, end_span in self);
+                Ok((TypeSpec::new(type_id, generics), ident_span.join(end_span)))
+            }
+
+            _ => Ok((TypeSpec::new(type_id, vec![]), ident_span)),
+        }
+    }
+
+    fn parse_type_args(&mut self) -> Result<Vec<TypeSpec>, CompileError> {
+        let mut type_args = vec![];
+
+        loop {
+            let (ty, _) = self.parse_type()?;
+            type_args.push(ty);
+
+            if let Some(&TokenKind::Comma) = self.peek_kind() {
+                self.skip();
+            } else {
+                break;
+            }
+        }
+
+        Ok(type_args)
     }
 }
 

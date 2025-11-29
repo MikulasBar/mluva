@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use super::module_source::ModuleSource;
 
-pub struct ModuleCluster {
+pub struct ModuleManager {
     main_slot: Option<usize>,
     sources: Vec<ModuleSource>,
     slot_map: HashMap<String, usize>,
 }
 
-impl ModuleCluster {
+impl ModuleManager {
     pub fn new() -> Self {
         Self {
             main_slot: None,

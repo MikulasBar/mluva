@@ -55,7 +55,7 @@ pub enum TokenKind {
     Ident(String),
     StringLiteral(String),
     Int(i32),
-    Float(f64),
+    Float(f32),
     Bool(bool),
 }
 
