@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-pub const PRIMITIVE_TYPES_COUNT: u32 = 3;
-pub const I32_TYPE_ID: u32 = 0;
-pub const F32_TYPE_ID: u32 = 1;
-pub const BOOL_TYPE_ID: u32 = 2;
+pub const PRIMITIVE_TYPES_COUNT: u32 = 4;
+pub const VOID_TYPE_ID: u32 = 0;
+pub const I32_TYPE_ID: u32 = 1;
+pub const F32_TYPE_ID: u32 = 2;
+pub const BOOL_TYPE_ID: u32 = 3;
 pub const STRING_TYPE_ID: u32 = 4;
 pub const LIST_TYPE_ID: u32 = 5;
 
@@ -42,19 +43,27 @@ impl TypeManager {
     pub fn get_id(&self, name: &str) -> Option<u32> {
         self.slots.get(name).copied()
     }
+
+    pub fn get_type(&self, id: u32) -> Option<&Type> {
+        self.types.get(id as usize)
+    }
 }
 
 pub struct Type {
     generic_count: u32,
-    methods: HashMap<String, u32>,
+    method_slots: HashMap<String, u32>,
 }
 
 impl Type {
     pub fn new(generic_count: u32) -> Self {
         Self {
             generic_count,
-            methods: HashMap::new(),
+            method_slots: HashMap::new(),
         }
+    }
+
+    pub fn get_method_slot(&self, name: &str) -> Option<u32> {
+        self.method_slots.get(name).copied()
     }
 }
 
@@ -69,8 +78,12 @@ impl TypeSpec {
         Self { id, generics }
     }
 
+    pub fn unknown_type() -> Self {
+        Self::new(u32::MAX, vec![])
+    }
+
     pub fn void() -> Self {
-        Self::new(0, vec![])
+        Self::new(VOID_TYPE_ID, vec![])
     }
 
     pub fn i32() -> Self {
@@ -90,7 +103,7 @@ impl TypeSpec {
     }
 
     pub fn unknown_list() -> Self {
-        Self::new(LIST_TYPE_ID, vec![Self::new(u32::MAX, vec![])])
+        Self::new(LIST_TYPE_ID, vec![Self::unknown_type()])
     }
 
     pub fn list_of(item_type: TypeSpec) -> Self {
@@ -113,6 +126,14 @@ impl TypeSpec {
         }
     }
 
+    pub fn is_i32(&self) -> bool {
+        self.id == I32_TYPE_ID && self.generics.is_empty()
+    }
+
+    pub fn is_f32(&self) -> bool {
+        self.id == F32_TYPE_ID && self.generics.is_empty()
+    }
+
     pub fn is_bool(&self) -> bool {
         self.id == BOOL_TYPE_ID && self.generics.is_empty()
     }
@@ -122,5 +143,39 @@ impl TypeSpec {
             LIST_TYPE_ID => self.generics.get(0).cloned(),
             _ => None,
         }
+    }
+
+    pub fn matches(&self, other: &TypeSpec) -> bool {
+        if self == &TypeSpec::unknown_type() || other == &TypeSpec::unknown_type() {
+            return true;
+        }
+
+        if self.id != other.id {
+            return false;
+        }
+
+        if self.generics.len() != other.generics.len() {
+            return false;
+        }
+
+        for (g1, g2) in self.generics.iter().zip(other.generics.iter()) {
+            if !g1.matches(g2) {
+                return false;
+            }
+        }
+
+        true
+    }
+
+    pub fn matches_type(&self, ty: &Type) -> bool {
+        if self == &TypeSpec::unknown_type() {
+            return true;
+        }
+
+        if self.generics.len() != ty.generic_count as usize {
+            return false;
+        }
+
+        true
     }
 }

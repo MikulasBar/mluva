@@ -2,12 +2,9 @@ use std::fmt;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
+use crate::diagnostics::{FileId, Span};
 use crate::token::TokenKind;
 use crate::type_manager::{TypeManager, TypeSpec};
-use crate::{
-    data_type::DataType,
-    diagnostics::{FileId, Span},
-};
 
 /// CLI / top-level runner can convert this into a codespan_reporting Diagnostic
 /// using `to_diagnostic` and then render it.
@@ -164,19 +161,20 @@ impl CompileError {
     }
 
     pub fn method_not_found_at(
-        data_type: DataType,
+        ty: TypeSpec,
         method_name: impl Into<String> + Clone,
         span: Span,
+        tm: &TypeManager,
     ) -> Self {
         let message = format!(
             "method '{}' not found for type {}",
             method_name.clone().into(),
-            data_type
+            ty.format(tm)
         );
 
         Self::new(
             CompileErrorKind::MethodNotFound {
-                data_type,
+                type_name: ty.format(tm),
                 method_name: method_name.clone().into(),
             },
             message,
@@ -284,7 +282,7 @@ pub enum CompileErrorKind {
     },
     ReservedFunctionName(String),
     MethodNotFound {
-        data_type: DataType,
+        type_name: String,
         method_name: String,
     },
     CannotInferType,

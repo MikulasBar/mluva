@@ -1,32 +1,32 @@
 use std::collections::HashMap;
+use std::mem;
 
-use super::data_type_scope::DataTypeScope;
+use super::type_scope::TypeScope;
 use crate::bin_op_pat;
 use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
 use common::compile_error::CompileError;
-use common::data_type::DataType;
 use common::diagnostics::Span;
-use common::function_signiture_manager::{self, FunctionSignitureManager};
+use common::function_signiture_manager::FunctionSignitureManager;
 use common::type_manager::{TypeManager, TypeSpec};
 
 pub struct TypeChecker<'a> {
     type_manager: &'a TypeManager,
-    function_manager: &'a FunctionSignitureManager,
+    function_manager: &'a mut FunctionSignitureManager,
     dependencies: &'a HashMap<String, FunctionSignitureManager>,
-    scope: DataTypeScope,
+    scope: TypeScope,
 }
 
 impl<'a> TypeChecker<'a> {
     pub fn new(
         type_manager: &'a TypeManager,
-        function_manager: &'a FunctionSignitureManager,
+        function_manager: &'a mut FunctionSignitureManager,
         dependencies: &'a HashMap<String, FunctionSignitureManager>,
     ) -> Self {
         Self {
             type_manager,
             function_manager,
             dependencies,
-            scope: DataTypeScope::new(),
+            scope: TypeScope::new(),
         }
     }
 
@@ -38,25 +38,25 @@ impl<'a> TypeChecker<'a> {
         for slot in 0..self.function_manager.count() {
             self.scope.enter();
 
-            self.function_manager
-                .get_signiture(slot as u32)
-                .unwrap()
-                .params
-                .iter()
-                .try_for_each(|param| {
-                    self.scope
-                        .insert_new_var(param.name.clone(), param.ty.clone(), param.span)
-                })?;
+            let signiture = self.function_manager.get_signiture(slot as u32).unwrap();
 
-            let statements = self.function_manager.get_body(slot as u32).unwrap();
-            let return_type = self
-                .function_manager
-                .get_signiture(slot as u32)
-                .unwrap()
-                .return_type
-                .clone();
+            signiture.params.iter().try_for_each(|p| {
+                self.scope
+                    .insert_new_var(p.name.clone(), p.ty.clone(), p.span)
+            })?;
 
-            self.check_statements(statements, &return_type)?;
+            let return_type = signiture.return_type.clone();
+
+            // Take the body out to avoid borrowing issues
+            // This shouldn't break anything, because we this only once,
+            // so no one else will use the body when we have it taken out
+            let mut statements =
+                mem::take(self.function_manager.get_body_mut(slot as u32).unwrap());
+
+            self.check_statements(&mut statements, &return_type)?;
+
+            let body = self.function_manager.get_body_mut(slot as u32).unwrap();
+            *body = statements;
 
             self.scope.exit();
         }
@@ -66,7 +66,7 @@ impl<'a> TypeChecker<'a> {
 
     fn check_statements(
         &mut self,
-        statements: &[Statement],
+        statements: &mut [Statement],
         return_type: &TypeSpec,
     ) -> Result<(), CompileError> {
         for statement in statements {
@@ -78,16 +78,16 @@ impl<'a> TypeChecker<'a> {
 
     fn check_statement(
         &mut self,
-        statement: &Statement,
+        statement: &mut Statement,
         return_type: &TypeSpec,
     ) -> Result<(), CompileError> {
-        match &statement.kind {
+        match &mut statement.kind {
             StatementKind::If {
                 condition,
                 if_block,
                 else_block,
             } => {
-                let cond = self.check_expr(&condition)?;
+                let cond = self.check_expr(condition)?;
                 if !cond.is_bool() {
                     return Err(CompileError::wrong_type_at(
                         TypeSpec::bool(),
@@ -97,9 +97,9 @@ impl<'a> TypeChecker<'a> {
                     ));
                 }
 
-                self.check_statements(&if_block, return_type)?;
+                self.check_statements(if_block, return_type)?;
                 if let Some(else_stmts) = else_block {
-                    self.check_statements(&else_stmts, return_type)?;
+                    self.check_statements(else_stmts, return_type)?;
                 }
             }
 
@@ -112,23 +112,23 @@ impl<'a> TypeChecker<'a> {
                     return Err(CompileError::invalid_pattern_at(assignee.span));
                 }
 
-                let expr_type = self.check_expr(&value)?;
+                let value_type = self.check_expr(value)?;
                 let expr_span = value.span;
 
-                let data_type = match (var_type, expr_type) {
-                    (Some(var_type), expr_type) if !expr_type.matches_type(var_type) => {
+                let data_type = match (var_type, value_type) {
+                    (Some(var_type), val_type) if !val_type.matches(var_type) => {
                         return Err(CompileError::wrong_type_at(
                             var_type.clone(),
-                            expr_type,
+                            val_type,
                             expr_span,
                             self.type_manager,
                         ));
                     }
-                    (None, DataType::List { item_type: None }) => {
+                    (None, ty) if ty == TypeSpec::unknown_list() => {
                         return Err(CompileError::cannot_infer_type_at(expr_span));
                     }
                     (Some(var_type), _) => var_type.clone(),
-                    (None, expr_type) => expr_type,
+                    (None, val_type) => val_type,
                 };
 
                 self.scope
@@ -136,42 +136,45 @@ impl<'a> TypeChecker<'a> {
             }
 
             StatementKind::VarAssign { assignee, value } => {
-                let expr_type = self.check_expr(&value)?;
+                let expr_type = self.check_expr(value)?;
                 let assignee_type = self.scope.get_pattern(assignee)?;
 
-                if !expr_type.matches_type(&assignee_type) {
+                if !expr_type.matches(&assignee_type) {
                     return Err(CompileError::wrong_type_at(
                         assignee_type,
                         expr_type,
                         statement.span,
+                        self.type_manager,
                     ));
                 }
             }
 
             StatementKind::While { condition, block } => {
-                let cond = self.check_expr(&condition)?;
+                let cond = self.check_expr(condition)?;
                 if !cond.is_bool() {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Bool,
+                        TypeSpec::bool(),
                         cond,
                         statement.span,
+                        self.type_manager,
                     ));
                 }
 
-                return self.check_statements(&block, return_type);
+                return self.check_statements(block, return_type);
             }
 
             StatementKind::Expr(expr) => {
-                self.check_expr(&expr)?;
+                self.check_expr(expr)?;
             }
 
             StatementKind::Return(expr) => {
-                let expr_type = self.check_expr(&expr)?;
+                let expr_type = self.check_expr(expr)?;
                 if expr_type != *return_type {
                     return Err(CompileError::wrong_type_at(
                         return_type.clone(),
                         expr_type,
                         statement.span,
+                        self.type_manager,
                     ));
                 }
             }
@@ -180,29 +183,29 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_expr(&self, expr: &Expr) -> Result<TypeSpec, CompileError> {
-        match &expr.kind {
+    fn check_expr(&self, expr: &mut Expr) -> Result<TypeSpec, CompileError> {
+        let expr_ty = match &mut expr.kind {
             ExprKind::Var(ident) => {
-                let Some(data_type) = self.scope.get(&ident) else {
+                let Some(ty) = self.scope.get(&ident) else {
                     return Err(CompileError::variable_not_found_at(
                         ident.clone(),
                         expr.span,
                     ));
                 };
 
-                Ok(data_type.clone())
+                ty.clone()
             }
-            ExprKind::VoidLiteral => Ok(TypeSpec::void()),
-            ExprKind::I32Literal(_) => Ok(TypeSpec::i32()),
-            ExprKind::F32Literal(_) => Ok(TypeSpec::f32()),
-            ExprKind::BoolLiteral(_) => Ok(TypeSpec::bool()),
-            ExprKind::StringLiteral(_) => Ok(TypeSpec::string()),
+            ExprKind::VoidLiteral => TypeSpec::void(),
+            ExprKind::I32Literal(_) => TypeSpec::i32(),
+            ExprKind::F32Literal(_) => TypeSpec::f32(),
+            ExprKind::BoolLiteral(_) => TypeSpec::bool(),
+            ExprKind::StringLiteral(_) => TypeSpec::string(),
             ExprKind::ListLiteral(list) => {
                 if list.is_empty() {
-                    Ok(TypeSpec::unknown_list())
+                    TypeSpec::unknown_list()
                 } else {
-                    let first_type = self.check_expr(&list[0])?;
-                    for element in list.iter().skip(1) {
+                    let first_type = self.check_expr(&mut list[0])?;
+                    for element in list.iter_mut().skip(1) {
                         let element_type = self.check_expr(element)?;
                         if element_type != first_type {
                             return Err(CompileError::wrong_type_at(
@@ -214,7 +217,7 @@ impl<'a> TypeChecker<'a> {
                         }
                     }
 
-                    Ok(TypeSpec::list_of(first_type))
+                    TypeSpec::list_of(first_type)
                 }
             }
 
@@ -232,187 +235,233 @@ impl<'a> TypeChecker<'a> {
                 }
 
                 if let Some(item_type) = callee_type.get_index_type() {
-                    Ok(item_type)
+                    item_type
                 } else {
                     return Err(CompileError::invalid_indexing_at(expr.span));
                 }
             }
 
             ExprKind::FunctionCall { func_name, args } => {
-                self.check_call_expr(expr, func_name, args)
+                self.check_call_expr(expr.span, func_name, args)?
             }
 
             ExprKind::ForeignFunctionCall {
                 module_name,
                 func_name,
                 args,
-            } => self.check_foreign_call_expr(expr, module_name, func_name, args),
+            } => self.check_foreign_call_expr(expr.span, module_name, func_name, args)?,
 
             ExprKind::MethodCall {
                 callee,
                 method_name,
                 args,
-            } => self.check_method_call_expr(expr, callee, method_name, args),
+            } => self.check_method_call_expr(expr.span, callee, method_name, args)?,
 
-            ExprKind::BinaryOp(op, lhs, rhs) => self.check_binary_op_expr(expr, op, lhs, rhs),
-            ExprKind::UnaryOp(op, expr) => self.check_unary_op_expr(expr, op),
-        }
+            ExprKind::BinaryOp(op, lhs, rhs) => {
+                self.check_binary_op_expr(expr.span, op, lhs, rhs)?
+            }
+            ExprKind::UnaryOp(op, expr) => self.check_unary_op_expr(expr, op)?,
+        };
+
+        expr.ty = Some(expr_ty.clone());
+
+        Ok(expr_ty)
     }
 
     fn check_call_expr(
         &self,
-        expr: &Expr,
+        span: Span,
         func_name: &str,
-        args: &[Expr],
-    ) -> Result<DataType, CompileError> {
-        let Some(signiture) = self.ast.get_function_signiture(&func_name) else {
-            return Err(CompileError::function_not_found_at(func_name, expr.span));
+        args: &mut [Expr],
+    ) -> Result<TypeSpec, CompileError> {
+        let Some(signiture) = self.function_manager.get_signiture_by_name(&func_name) else {
+            return Err(CompileError::function_not_found_at(func_name, span));
         };
 
-        let arg_types: Vec<(DataType, Span)> = args
-            .iter()
+        let arg_types: Vec<(TypeSpec, Span)> = args
+            .iter_mut()
             .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-            .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
+            .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
 
-        signiture.check_argument_types(&arg_types, expr.span)?;
+        signiture.check_argument_types(&arg_types, span, self.type_manager)?;
 
         Ok(signiture.return_type.clone())
     }
 
     fn check_foreign_call_expr(
         &self,
-        expr: &Expr,
+        span: Span,
         module_name: &str,
         func_name: &str,
-        args: &[Expr],
-    ) -> Result<DataType, CompileError> {
+        args: &mut [Expr],
+    ) -> Result<TypeSpec, CompileError> {
         let signiture = self
             .dependencies
             .get(module_name)
-            .ok_or_else(|| CompileError::module_not_found_at(module_name.clone(), expr.span))?
-            .get_function_signiture(&func_name)
-            .ok_or_else(|| CompileError::function_not_found_at(func_name.clone(), expr.span))?;
+            .ok_or_else(|| CompileError::module_not_found_at(module_name, span))?
+            .get_signiture_by_name(&func_name)
+            .ok_or_else(|| CompileError::function_not_found_at(func_name, span))?;
 
-        let arg_types: Vec<(DataType, Span)> = args
-            .iter()
+        let arg_types: Vec<(TypeSpec, Span)> = args
+            .iter_mut()
             .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-            .collect::<Result<Vec<(DataType, Span)>, CompileError>>()?;
+            .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
 
-        signiture.check_argument_types(&arg_types, expr.span)?;
+        signiture.check_argument_types(&arg_types, span, self.type_manager)?;
 
         Ok(signiture.return_type.clone())
     }
 
     fn check_method_call_expr(
         &self,
-        expr: &Expr,
-        callee: &Expr,
+        span: Span,
+        callee: &mut Expr,
         method_name: &str,
-        args: &[Expr],
-    ) -> Result<DataType, CompileError> {
+        args: &mut [Expr],
+    ) -> Result<TypeSpec, CompileError> {
         let callee_type = self.check_expr(callee)?;
 
-        let arg_types: Vec<DataType> = args
-            .iter()
-            .map(|arg| self.check_expr(arg))
-            .collect::<Result<Vec<DataType>, CompileError>>()?;
+        let arg_types: Vec<(TypeSpec, Span)> = args
+            .iter_mut()
+            .map(|arg| self.check_expr(arg).map(|t| (t, arg.span)))
+            .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
 
-        callee_type.check_method_call(method_name, expr.span, &arg_types)
+        let ty = self
+            .type_manager
+            .get_type(callee_type.id)
+            .expect("Internal Typechecker error, not recovering");
+
+        let method_slot =
+            ty.get_method_slot(method_name)
+                .ok_or(CompileError::method_not_found_at(
+                    callee_type,
+                    method_name,
+                    span,
+                    self.type_manager,
+                ))?;
+
+        let method = self.function_manager.get_signiture(method_slot).unwrap();
+        method.check_argument_types(&arg_types, span, self.type_manager)?;
+
+        Ok(method.return_type.clone())
     }
 
     fn check_binary_op_expr(
         &self,
-        expr: &Expr,
+        span: Span,
         op: &BinaryOp,
-        lhs: &Expr,
-        rhs: &Expr,
-    ) -> Result<DataType, CompileError> {
-        let lhs_type = self.check_expr(&lhs)?;
-        let rhs_type = self.check_expr(&rhs)?;
+        lhs: &mut Expr,
+        rhs: &mut Expr,
+    ) -> Result<TypeSpec, CompileError> {
+        let lhs_type = self.check_expr(lhs)?;
+        let rhs_type = self.check_expr(rhs)?;
         match op {
-            bin_op_pat!(NUMERIC) => match (&lhs_type, &rhs_type) {
-                (DataType::Int, DataType::Int) => Ok(DataType::Int),
-                (DataType::Float, DataType::Float) => Ok(DataType::Float),
-                (DataType::Int | DataType::Float, _) => {
-                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span));
-                }
-                (_, DataType::Int | DataType::Float) => {
-                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span));
-                }
-                _ => {
+            bin_op_pat!(NUMERIC) => {
+                if !lhs_type.is_i32() && !lhs_type.is_f32() {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Int,
+                        TypeSpec::i32(),
                         lhs_type,
-                        expr.span,
+                        span,
+                        self.type_manager,
                     ));
                 }
-            },
 
-            bin_op_pat!(NUMERIC_COMPARISON) => match (&lhs_type, &rhs_type) {
-                (DataType::Int, DataType::Int) => Ok(DataType::Bool),
-                (DataType::Float, DataType::Float) => Ok(DataType::Bool),
-                (DataType::Int | DataType::Float, _) => {
-                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, expr.span));
-                }
-                (_, DataType::Int | DataType::Float) => {
-                    return Err(CompileError::wrong_type_at(rhs_type, lhs_type, expr.span));
-                }
-                _ => {
+                if rhs_type != lhs_type {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Int,
                         lhs_type,
-                        expr.span,
+                        rhs_type,
+                        span,
+                        self.type_manager,
                     ));
                 }
-            },
 
-            bin_op_pat!(COMPARISON) => Ok(DataType::Bool),
+                Ok(lhs_type)
+            }
+
+            bin_op_pat!(NUMERIC_COMPARISON) => {
+                if !lhs_type.is_i32() && !lhs_type.is_f32() {
+                    return Err(CompileError::wrong_type_at(
+                        TypeSpec::i32(),
+                        lhs_type,
+                        span,
+                        self.type_manager,
+                    ));
+                }
+
+                if rhs_type != lhs_type {
+                    return Err(CompileError::wrong_type_at(
+                        lhs_type,
+                        rhs_type,
+                        span,
+                        self.type_manager,
+                    ));
+                }
+
+                Ok(TypeSpec::bool())
+            }
+
+            bin_op_pat!(COMPARISON) => {
+                if lhs_type != rhs_type {
+                    return Err(CompileError::wrong_type_at(
+                        lhs_type,
+                        rhs_type,
+                        span,
+                        self.type_manager,
+                    ));
+                }
+
+                Ok(TypeSpec::bool())
+            }
 
             bin_op_pat!(LOGICAL) => {
-                if lhs_type != DataType::Bool {
+                if !lhs_type.is_bool() {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Bool,
+                        TypeSpec::bool(),
                         lhs_type,
-                        expr.span,
+                        span,
+                        self.type_manager,
                     ));
                 }
 
-                if rhs_type != DataType::Bool {
+                if !rhs_type.is_bool() {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Bool,
+                        TypeSpec::bool(),
                         rhs_type,
-                        expr.span,
+                        span,
+                        self.type_manager,
                     ));
                 }
 
-                Ok(DataType::Bool)
+                Ok(TypeSpec::bool())
             }
         }
     }
 
-    fn check_unary_op_expr(&self, expr: &Expr, op: &UnaryOp) -> Result<DataType, CompileError> {
-        let expr_type = self.check_expr(&expr)?;
+    fn check_unary_op_expr(&self, expr: &mut Expr, op: &UnaryOp) -> Result<TypeSpec, CompileError> {
+        let expr_type = self.check_expr(expr)?;
         match op {
             UnaryOp::Not => {
-                if expr_type != DataType::Bool {
+                if !expr_type.is_bool() {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Bool,
+                        TypeSpec::bool(),
                         expr_type,
                         expr.span,
+                        self.type_manager,
                     ));
                 }
 
-                Ok(DataType::Bool)
+                Ok(TypeSpec::bool())
             }
 
             UnaryOp::Negate => match expr_type {
-                DataType::Int => Ok(DataType::Int),
-                DataType::Float => Ok(DataType::Float),
+                t if t == TypeSpec::i32() => Ok(TypeSpec::i32()),
+                t if t == TypeSpec::f32() => Ok(TypeSpec::f32()),
                 _ => {
                     return Err(CompileError::wrong_type_at(
-                        DataType::Int,
+                        TypeSpec::i32(),
                         expr_type,
                         expr.span,
+                        self.type_manager,
                     ));
                 }
             },

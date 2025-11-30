@@ -1,23 +1,23 @@
 use super::{UnaryOp, binary_op::BinaryOp};
-use crate::diagnostics::Span;
+use crate::{diagnostics::Span, type_manager::TypeSpec};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
-    pub type_id: Option<u32>,
+    pub ty: Option<TypeSpec>,
 }
 
 impl Expr {
-    pub fn set_type(&mut self, type_id: u32) {
-        self.type_id = Some(type_id);
+    pub fn set_type(&mut self, ty: TypeSpec) {
+        self.ty = Some(ty);
     }
 
     pub fn new(kind: ExprKind, span: Span) -> Self {
         Self {
             kind,
             span,
-            type_id: None,
+            ty: None,
         }
     }
 

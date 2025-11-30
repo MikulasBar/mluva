@@ -1,38 +1,41 @@
-use crate::{ast::Expr, diagnostics::Span};
+use crate::{ast::Expr, diagnostics::Span, type_manager::TypeSpec};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
-    pub type_id: Option<u32>,
+    pub ty: Option<TypeSpec>,
 }
 
 impl Pattern {
-    pub fn set_type(&mut self, type_id: u32) {
-        self.type_id = Some(type_id);
+    pub fn set_type(&mut self, ty: TypeSpec) {
+        self.ty = Some(ty);
     }
 
     pub fn is_declarable(&self) -> bool {
         matches!(self.kind, PatternKind::Variable(_))
     }
 
-    pub fn var(name: String, span: Span) -> Self {
+    pub fn new(kind: PatternKind, span: Span) -> Self {
         Self {
-            kind: PatternKind::Variable(name),
+            kind,
             span,
-            type_id: None,
+            ty: None,
         }
     }
 
+    pub fn var(name: String, span: Span) -> Self {
+        Self::new(PatternKind::Variable(name), span)
+    }
+
     pub fn index(callee: Self, index: Expr, span: Span) -> Self {
-        Self {
-            kind: PatternKind::Index {
+        Self::new(
+            PatternKind::Index {
                 callee: Box::new(callee),
-                index: index,
+                index,
             },
             span,
-            type_id: None,
-        }
+        )
     }
 }
 

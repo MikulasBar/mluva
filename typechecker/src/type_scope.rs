@@ -1,15 +1,14 @@
 use std::collections::HashMap;
 
 use common::ast::{Pattern, PatternKind};
-use common::data_type::DataType;
-use common::type_manager::{Type, TypeSpec};
+use common::type_manager::TypeSpec;
 use common::{compile_error::CompileError, diagnostics::Span};
 
-pub struct DataTypeScope {
+pub struct TypeScope {
     scopes: Vec<HashMap<String, TypeSpec>>,
 }
 
-impl DataTypeScope {
+impl TypeScope {
     pub fn new() -> Self {
         Self { scopes: vec![] }
     }
@@ -23,7 +22,7 @@ impl DataTypeScope {
     }
 }
 
-impl DataTypeScope {
+impl TypeScope {
     pub fn contains(&self, name: &str) -> bool {
         self.scopes
             .iter()

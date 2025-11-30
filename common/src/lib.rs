@@ -1,9 +1,8 @@
 pub mod ast;
 pub mod compile_error;
-pub mod data_type;
 pub mod diagnostics;
+pub mod function;
 pub mod function_signiture_manager;
-pub mod function_source;
 pub mod heap_handle;
 pub mod instruction;
 pub mod module;

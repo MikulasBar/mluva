@@ -1,4 +1,4 @@
-mod data_type_scope;
+mod type_scope;
 mod typechecker;
 
 pub use typechecker::TypeChecker;

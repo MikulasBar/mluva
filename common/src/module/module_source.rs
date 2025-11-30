@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::function_source::FunctionSource;
+use crate::function::FunctionSource;
 
 pub struct ModuleSource {
     string_pool: Vec<String>,
