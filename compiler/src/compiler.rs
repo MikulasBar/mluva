@@ -6,87 +6,124 @@ use common::ast::{
     StatementKind, UnaryOp,
 };
 use common::compile_error::CompileError;
-use common::data_type::DataType;
-use common::function_source::FunctionSource;
+use common::function::FunctionSource;
+use common::function_signiture_manager::FunctionSignitureManager;
 use common::instruction::Instruction;
-use common::module::module_signiture::ModuleSigniture;
-use common::type_manager::{BOOL_TYPE_ID, F32_TYPE_ID, I32_TYPE_ID};
+use common::module::module_source::ModuleSource;
+use common::type_manager::{
+    BOOL_TYPE_ID, F32_TYPE_ID, I32_TYPE_ID, PRIMITIVE_TYPES_COUNT, TypeManager, TypeSpec,
+};
 use common::word::Word;
+
+use crate::local_slot::LocalSlot;
 
 pub struct Compiler<'a> {
     sources: Vec<FunctionSource>,
     string_pool: HashMap<String, usize>,
-    ast: Ast,
-    dependencies: &'a HashMap<String, ModuleSigniture>,
+    type_manager: &'a TypeManager,
+    function_manager: FunctionSignitureManager,
+    dependencies: &'a HashMap<String, FunctionSignitureManager>,
     next_string_slot: usize,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(ast: Ast, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
-        let function_count = ast.function_count() as usize;
+    pub fn new(
+        type_manager: &'a TypeManager,
+        function_manager: FunctionSignitureManager,
+        dependencies: &'a HashMap<String, FunctionSignitureManager>,
+    ) -> Self {
+        let count = function_manager.count();
 
         Self {
-            sources: Vec::with_capacity(function_count),
+            type_manager,
+            function_manager,
+            sources: Vec::with_capacity(count),
             string_pool: HashMap::new(),
-            ast,
             dependencies,
             next_string_slot: 0,
         }
     }
 
-    pub fn compile(mut self) -> Result<ModuleSigniture, CompileError> {
-        for slot in 0..self.ast.function_count() {
+    pub fn compile(mut self) -> Result<ModuleSource, CompileError> {
+        for slot in 0..self.function_manager.count() as u32 {
             self.compile_function(slot)?;
         }
 
-        let (function_map, spanned_function_signitures, ..) = self.ast.deconstruct();
-        // let function_signitures = spanned_function_signitures
-        //     .into_iter()
-        //     .map(Into::<>::into)
-        // .collect();
+        let Compiler {
+            sources,
+            string_pool,
+            function_manager,
+            next_string_slot,
+            ..
+        } = self;
 
-        let main_slot = function_map.get("main").copied();
-        todo!()
-        // let module =
-        //     ModuleSigniture::new(main_slot, function_map, function_signitures, self.sources);
+        let string_pool_vec = {
+            let mut vec = vec![String::new(); next_string_slot];
+            for (string, slot) in string_pool {
+                vec[slot] = string;
+            }
+            vec
+        };
 
-        // Ok(module)
+        let main_slot = function_manager.get_slot("main");
+        let FunctionSignitureManager { slots, .. } = function_manager;
+
+        Ok(ModuleSource::new(
+            string_pool_vec,
+            main_slot,
+            slots,
+            sources,
+        ))
     }
 
     fn compile_function(&mut self, slot: u32) -> Result<(), CompileError> {
-        let function_map = self.ast.get_function_map();
-        let signiture = self.ast.get_function_signiture_by_slot(slot).unwrap();
-        let body = self.ast.get_function_body_by_slot(slot).unwrap();
+        let signiture = self
+            .function_manager
+            .get_signiture(slot)
+            .expect("Function signiture should exist");
 
-        todo!()
-        // let source =
-        //     FunctionCompiler::new(self.dependencies, function_map, body, signiture).compile()?;
+        let body = self
+            .function_manager
+            .get_body(slot)
+            .expect("Function body should exist");
 
-        // self.sources.push(source);
+        let function_compiler = FunctionCompiler::new(
+            self.dependencies,
+            self.function_manager.slots(),
+            body,
+            signiture,
+            self.type_manager,
+            &mut self.string_pool,
+            &mut self.next_string_slot,
+        );
 
-        // Ok(())
+        let function_source = function_compiler.compile()?;
+        self.sources.push(function_source);
+
+        Ok(())
     }
 }
 
 struct FunctionCompiler<'b> {
-    dependencies: &'b HashMap<String, ModuleSigniture>,
+    dependencies: &'b HashMap<String, FunctionSignitureManager>,
     function_map: &'b HashMap<String, u32>,
     body: &'b [Statement],
-    signiture: &'b SpannedFunctionSigniture,
-
+    signiture: &'b FunctionSigniture,
+    type_manager: &'b TypeManager,
     string_pool: &'b mut HashMap<String, usize>,
     instructions: Vec<Instruction>,
-    locals: HashMap<String, usize>,
-    next_local_slot: usize,
+    locals: HashMap<String, LocalSlot>,
+    next_local_index: usize,
     next_string_slot: &'b mut usize,
 }
 
 impl<'b> FunctionCompiler<'b> {
     fn new(
-        dependencies: &'b HashMap<String, ModuleSigniture>,
+        dependencies: &'b HashMap<String, FunctionSignitureManager>,
         function_map: &'b HashMap<String, u32>,
         body: &'b [Statement],
-        signiture: &'b SpannedFunctionSigniture,
+        signiture: &'b FunctionSigniture,
+        type_manager: &'b TypeManager,
         string_pool: &'b mut HashMap<String, usize>,
         next_string_slot: &'b mut usize,
     ) -> Self {
@@ -95,11 +132,41 @@ impl<'b> FunctionCompiler<'b> {
             function_map,
             body,
             signiture,
+            type_manager,
             locals: HashMap::new(),
             instructions: Vec::new(),
             string_pool,
-            next_local_slot: 0,
+            next_local_index: 0,
             next_string_slot,
+        }
+    }
+
+    fn emit(&mut self, instr: Instruction) {
+        self.instructions.push(instr);
+    }
+
+    fn emit_load_local(&mut self, slot: LocalSlot) {
+        self.emit(Instruction::LoadLocal { slot: slot.index });
+        if slot.type_id >= PRIMITIVE_TYPES_COUNT {
+            self.emit(Instruction::RcInc);
+        }
+    }
+
+    fn emit_drop(&mut self, type_id: u32) {
+        if type_id >= PRIMITIVE_TYPES_COUNT {
+            self.emit(Instruction::RcDec);
+        }
+        self.emit(Instruction::Drop);
+    }
+
+    fn emit_locals_drop(&mut self) {
+        let slots = self.locals.values().copied().collect::<Vec<LocalSlot>>();
+        for s in slots {
+            if s.type_id >= PRIMITIVE_TYPES_COUNT {
+                self.emit(Instruction::LoadLocal { slot: s.index });
+                self.emit(Instruction::RcDec);
+                self.emit(Instruction::Drop);
+            }
         }
     }
 
@@ -114,11 +181,14 @@ impl<'b> FunctionCompiler<'b> {
             })
     }
 
-    fn get_local_slot(&mut self, name: &str) -> usize {
+    fn get_local_slot(&mut self, name: &str, ty: Option<u32>) -> LocalSlot {
         *self.locals.entry(name.to_string()).or_insert_with(|| {
-            let slot = self.next_local_slot;
-            self.next_local_slot += 1;
-            slot
+            let i = self.next_local_index;
+            self.next_local_index += 1;
+            LocalSlot {
+                index: i as u32,
+                type_id: ty.expect("var should be already known."),
+            }
         })
     }
 
@@ -131,27 +201,23 @@ impl<'b> FunctionCompiler<'b> {
         self.instructions[index] = inst;
     }
 
-    fn push(&mut self, instr: Instruction) {
-        self.instructions.push(instr);
-    }
-
     fn compile(mut self) -> Result<FunctionSource, CompileError> {
         self.setup_parameters();
         self.compile_statements(&self.body)?;
 
         // implicit return at the end of Void functions
-        if let DataType::Void = self.signiture.return_type {
-            self.instructions.push(Instruction::LoadConst(Word::void()));
-            self.instructions.push(Instruction::Return);
+        if self.signiture.return_type == TypeSpec::void() {
+            self.emit(Instruction::LoadConst(Word::void()));
+            self.emit(Instruction::Return);
         }
 
         Ok(FunctionSource::new(self.locals.len(), self.instructions))
     }
 
     fn setup_parameters(&mut self) {
-        for SpannedParameter { name, .. } in &self.signiture.params {
-            let slot = self.get_local_slot(&name) as u32;
-            self.instructions.push(Instruction::Store { slot });
+        for Parameter { name, ty, .. } in &self.signiture.params {
+            let slot = self.get_local_slot(&name, Some(ty.id));
+            self.emit(Instruction::Store { slot: slot.index });
         }
     }
 
@@ -177,7 +243,7 @@ impl<'b> FunctionCompiler<'b> {
             StatementKind::Expr(expr) => {
                 self.compile_expr(&expr)?;
                 // We need to pop the expression from stack since we don't use it anywhere.
-                self.push(Instruction::Pop);
+                self.emit(Instruction::Drop);
             }
 
             StatementKind::If {
@@ -194,7 +260,8 @@ impl<'b> FunctionCompiler<'b> {
 
             StatementKind::Return(expr) => {
                 self.compile_expr(&expr)?;
-                self.push(Instruction::Return);
+                self.emit_locals_drop();
+                self.emit(Instruction::Return);
             }
         }
 
@@ -212,7 +279,7 @@ impl<'b> FunctionCompiler<'b> {
 
         // Store the index of the jump instruction for the "if" block
         let cond_jump_index = self.instructions.len();
-        self.instructions.push(Instruction::JumpIfFalse(0)); // Placeholder instruction
+        self.emit(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the statements in the "if" block
         self.compile_statements(stmts)?;
@@ -220,7 +287,7 @@ impl<'b> FunctionCompiler<'b> {
         if let Some(else_stmts) = else_stmts {
             // Store the index of the jump instruction for the "else" block
             let if_jump_index = self.instructions.len();
-            self.instructions.push(Instruction::Jump(0)); // Placeholder instruction
+            self.emit(Instruction::Jump(0)); // Placeholder instruction
 
             // Store the index of else block
             let post_if_index = self.instructions.len();
@@ -261,13 +328,13 @@ impl<'b> FunctionCompiler<'b> {
         self.compile_expr(cond)?;
         // Store the index of the jump instruction so we can update it later
         let cond_jump_index = self.instructions.len();
-        self.instructions.push(Instruction::JumpIfFalse(0)); // Placeholder instruction
+        self.emit(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the instructions in the "while" block
         self.compile_statements(stmts)?;
 
         // Jump back to the condition check
-        self.push(Instruction::Jump(start_index as u32));
+        self.emit(Instruction::Jump(start_index as u32));
 
         // Index of the end of the "while" block
         let end_index = self.instructions.len();
@@ -281,14 +348,17 @@ impl<'b> FunctionCompiler<'b> {
     fn compile_pattern(&mut self, pattern: &Pattern) -> Result<(), CompileError> {
         match &pattern.kind {
             PatternKind::Variable(var) => {
-                let slot = self.get_local_slot(&var) as u32;
-                self.instructions.push(Instruction::Store { slot });
+                let slot = self.get_local_slot(&var, pattern.ty.as_ref().map(|t| t.id));
+                self.emit(Instruction::Store { slot: slot.index });
             }
             PatternKind::Index { callee, index } => {
                 self.compile_expr(&*index)?;
                 self.compile_pattern(&*callee);
+                if let Some(instr @ Instruction::ListSet) = self.instructions.last_mut() {
+                    *instr = Instruction::ListGet;
+                }
 
-                todo!()
+                self.emit(Instruction::ListSet);
             }
         }
 
@@ -298,28 +368,24 @@ impl<'b> FunctionCompiler<'b> {
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
         match &expr.kind {
             ExprKind::VoidLiteral => {
-                self.instructions.push(Instruction::LoadConst(Word::void()));
+                self.emit(Instruction::LoadConst(Word::void()));
             }
 
-            ExprKind::IntLiteral(val) => {
-                self.instructions
-                    .push(Instruction::LoadConst(Word::from_i32(*val)));
+            ExprKind::I32Literal(val) => {
+                self.emit(Instruction::LoadConst(Word::from_i32(*val)));
             }
 
-            ExprKind::FloatLiteral(val) => {
-                self.instructions
-                    .push(Instruction::LoadConst(Word::from_f32(*val)));
+            ExprKind::F32Literal(val) => {
+                self.emit(Instruction::LoadConst(Word::from_f32(*val)));
             }
 
             ExprKind::BoolLiteral(val) => {
-                self.instructions
-                    .push(Instruction::LoadConst(Word::from_bool(*val)));
+                self.emit(Instruction::LoadConst(Word::from_bool(*val)));
             }
 
             ExprKind::StringLiteral(val) => {
                 let slot = self.get_string_slot(val) as u32;
-                self.instructions
-                    .push(Instruction::CreateString { pool_slot: slot });
+                self.emit(Instruction::CreateString { pool_slot: slot });
             }
 
             ExprKind::ListLiteral(list) => {
@@ -327,31 +393,36 @@ impl<'b> FunctionCompiler<'b> {
                     self.compile_expr(element)?;
                 }
 
-                todo!()
+                let el_type = expr.ty.as_ref().unwrap().get_index_type().unwrap();
+
+                self.emit(Instruction::CreateList {
+                    item_count: list.len() as u32,
+                    type_id: el_type.id,
+                });
             }
 
             ExprKind::Var(name) => {
-                let slot = self.get_local_slot(name) as u32;
-                self.instructions.push(Instruction::LoadLocal { slot });
+                let slot = self.get_local_slot(name, None);
+                self.emit(Instruction::LoadLocal { slot: slot.index });
             }
 
             ExprKind::BinaryOp(op, lhs, rhs) => {
                 self.compile_expr(lhs)?;
                 self.compile_expr(rhs)?;
-                let op_instruction = bin_op_to_instruction(op, todo!());
-                self.instructions.push(op_instruction);
+                let op_instruction = bin_op_to_instruction(op, expr.ty.as_ref().unwrap().id);
+                self.emit(op_instruction);
             }
 
             ExprKind::UnaryOp(op, expr) => {
                 self.compile_expr(expr)?;
-                let op_instruction = un_op_to_instruction(op, todo!());
-                self.instructions.push(op_instruction);
+                let op_instruction = un_op_to_instruction(op, expr.ty.as_ref().unwrap().id);
+                self.emit(op_instruction);
             }
 
             ExprKind::IndexGet { callee, index } => {
                 self.compile_expr(callee)?;
                 self.compile_expr(index)?;
-                self.instructions.push(Instruction::ListGet);
+                self.emit(Instruction::ListGet);
             }
 
             ExprKind::FunctionCall { func_name, args } => {
@@ -366,7 +437,7 @@ impl<'b> FunctionCompiler<'b> {
                     );
                 };
 
-                self.instructions.push(Instruction::LocalCall { slot });
+                self.emit(Instruction::LocalCall { slot });
             }
 
             ExprKind::ForeignFunctionCall {
@@ -390,7 +461,7 @@ impl<'b> FunctionCompiler<'b> {
                     ));
                 };
 
-                self.instructions.push(Instruction::ForeignCall {
+                self.emit(Instruction::ForeignCall {
                     module_name: module_name.clone(),
                     call_slot,
                 });
@@ -405,9 +476,17 @@ impl<'b> FunctionCompiler<'b> {
                     self.compile_expr(arg)?;
                 }
 
+                let type_id = callee.ty.as_ref().unwrap().id;
+                let slot = self
+                    .type_manager
+                    .get_type(type_id)
+                    .unwrap()
+                    .get_method_slot(&method_name)
+                    .expect("Method should exist, should be handled in typechecker");
+
                 self.compile_expr(callee)?;
 
-                todo!()
+                self.emit(Instruction::MethodCall { type_id, slot });
             }
         }
 

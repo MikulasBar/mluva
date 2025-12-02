@@ -1,3 +1,5 @@
+use std::str;
+
 pub struct StringObject {
     bytes: Box<[u8]>,
 }

@@ -1,9 +1,9 @@
-use std::{collections::HashMap, mem};
+use std::collections::HashMap;
 
 use crate::ast::{FunctionSigniture, Statement};
 
 pub struct FunctionSignitureManager {
-    slots: HashMap<String, u32>,
+    pub slots: HashMap<String, u32>,
     signitures: Vec<FunctionSigniture>,
     bodies: Vec<Vec<Statement>>,
 }
@@ -28,6 +28,14 @@ impl FunctionSignitureManager {
 
     pub fn count(&self) -> usize {
         self.signitures.len()
+    }
+
+    pub fn slots(&self) -> &HashMap<String, u32> {
+        &self.slots
+    }
+
+    pub fn get_slot(&self, name: &str) -> Option<u32> {
+        self.slots.get(name).copied()
     }
 
     pub fn get_signiture(&self, slot: u32) -> Option<&FunctionSigniture> {

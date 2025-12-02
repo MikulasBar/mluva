@@ -4,7 +4,7 @@ use crate::{
 };
 
 use common::{
-    function_source::FunctionSource,
+    function::FunctionSource,
     instruction::Instruction,
     module::module_manager::ModuleManager,
     type_manager::{LIST_TYPE_ID, STRING_TYPE_ID},
@@ -129,7 +129,7 @@ impl<'a> FunctionInterpreter<'a> {
                 Instruction::LoadConst(word) => {
                     self.value_stack.push(*word);
                 }
-                Instruction::Pop => {
+                Instruction::Drop => {
                     self.pop()?;
                 }
                 Instruction::LoadLocal { slot } => {
@@ -238,18 +238,21 @@ impl<'a> FunctionInterpreter<'a> {
                 }
                 Instruction::ListGet => {
                     let index = self.pop()?.as_u32();
-                    let list_handle = self.pop()?.as_hhandle();
-                    let list = self.arena.get_mut::<ListObject>(&list_handle)?;
+                    let handle = self.pop()?.as_hhandle();
+                    let list = self.arena.get_mut::<ListObject>(&handle)?;
                     let item = list.get_item(index)?;
+                    self.arena
+                        .decrement_rc(&handle, self.value_stack, self.vtables)?;
                     self.push(item);
                 }
                 Instruction::ListSet => {
                     let value = self.pop()?;
                     let index = self.pop()?.as_u32();
-                    let list_handle = self.pop()?.as_hhandle();
-                    let list = self.arena.get_mut::<ListObject>(&list_handle)?;
-
+                    let handle = self.pop()?.as_hhandle();
+                    let list = self.arena.get_mut::<ListObject>(&handle)?;
                     list.set_item(index, value)?;
+                    self.arena
+                        .decrement_rc(&handle, self.value_stack, self.vtables)?;
                 }
                 Instruction::IntrinsicPrint => {
                     let handle = self.pop()?.as_hhandle();

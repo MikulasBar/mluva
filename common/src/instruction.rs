@@ -5,7 +5,7 @@ pub enum Instruction {
     Store { slot: u32 },
     LoadLocal { slot: u32 },
     LoadConst(Word),
-    Pop,
+    Drop,
     WordEqual,
     WordNotEqual,
     Jump(u32),
