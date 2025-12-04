@@ -25,7 +25,8 @@ Void main() {
 fn create_meta_storage() -> Result<(), ()> {
     let dirs = [
         META_DIR.to_string(),
-        ModuleMetadataStorage::MODULES_DIR.to_string(),
+        ModuleMetadataStorage::CODE_DIR.to_string(),
+        ModuleMetadataStorage::SIGNITURE_DIR.to_string(),
     ];
 
     let files = [ModuleMetadataStorage::FILE_PATH.to_string()];

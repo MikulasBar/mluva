@@ -4,9 +4,9 @@ use crate::{
 };
 
 use common::{
-    function::FunctionSource,
+    function_code::FunctionCode,
     instruction::Instruction,
-    module::module_manager::ModuleManager,
+    module::module_code_manager::ModuleCodeManager,
     type_manager::{LIST_TYPE_ID, STRING_TYPE_ID},
     word::Word,
 };
@@ -16,21 +16,31 @@ pub struct Vm {
     pub arena: Arena,
     pub vtables: Vec<VTable>,
     pub callstack: Vec<CallFrame>,
-    pub modules: ModuleManager,
+    pub modules: ModuleCodeManager,
 }
 
 impl Vm {
+    pub fn new(modules: ModuleCodeManager) -> Self {
+        Self {
+            value_stack: ValueStack::new(),
+            arena: Arena::new(),
+            vtables: vec![],
+            callstack: vec![],
+            modules: modules,
+        }
+    }
+
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
         let main_module_slot = self
             .modules
-            .get_main_source_slot()
+            .get_main_slot()
             .ok_or(RuntimeError::other("main module not found"))?;
 
-        let main_source = self
+        let main_code = self
             .modules
             .get_by_slot(main_module_slot)
             .ok_or(RuntimeError::other("main module not found"))?
-            .get_main_source()
+            .get_main_code()
             .ok_or(RuntimeError::other("Main function not found"))?;
 
         FunctionInterpreter::new(
@@ -38,7 +48,7 @@ impl Vm {
             &mut self.arena,
             &mut self.value_stack,
             &mut self.vtables,
-            main_source,
+            main_code,
             &mut self.callstack,
             main_module_slot,
         )
@@ -47,27 +57,27 @@ impl Vm {
 }
 
 struct FunctionInterpreter<'a> {
-    modules: &'a ModuleManager,
+    modules: &'a ModuleCodeManager,
     arena: &'a mut Arena,
     value_stack: &'a mut ValueStack,
     vtables: &'a Vec<VTable>,
-    source: &'a FunctionSource,
+    code: &'a FunctionCode,
     callstack: &'a mut Vec<CallFrame>,
-    current_module_slot: usize,
+    current_module_slot: u32,
     ip: usize,
 }
 
 impl<'a> FunctionInterpreter<'a> {
     pub fn new(
-        modules: &'a ModuleManager,
+        modules: &'a ModuleCodeManager,
         arena: &'a mut Arena,
         value_stack: &'a mut ValueStack,
         vtables: &'a Vec<VTable>,
-        source: &'a FunctionSource,
+        code: &'a FunctionCode,
         callstack: &'a mut Vec<CallFrame>,
-        current_module_slot: usize,
+        current_module_slot: u32,
     ) -> Self {
-        let callframe = CallFrame::new(source.slot_count as u32);
+        let callframe = CallFrame::new(code.slot_count as u32);
         callstack.push(callframe);
 
         Self {
@@ -75,7 +85,7 @@ impl<'a> FunctionInterpreter<'a> {
             arena,
             value_stack,
             vtables,
-            source,
+            code,
             callstack,
             current_module_slot,
             ip: 0,
@@ -119,8 +129,8 @@ impl<'a> FunctionInterpreter<'a> {
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
-        while self.ip < self.source.body.len() {
-            let instr = &self.source.body[self.ip];
+        while self.ip < self.code.len() {
+            let instr = &self.code.get_instr(self.ip);
             match instr {
                 Instruction::Store { slot } => {
                     let w = self.pop()?;
@@ -154,7 +164,7 @@ impl<'a> FunctionInterpreter<'a> {
                 Instruction::CreateString { pool_slot } => {
                     let str = self
                         .modules
-                        .get_string_from_pool(self.current_module_slot, *pool_slot as usize)
+                        .get_string_from_pool(self.current_module_slot, *pool_slot)
                         .ok_or(RuntimeError::Unknown)?;
 
                     let string_object = StringObject::new(str);
@@ -186,7 +196,7 @@ impl<'a> FunctionInterpreter<'a> {
                         .modules
                         .get_by_slot(self.current_module_slot)
                         .ok_or(RuntimeError::other("Module not found"))?
-                        .get_function_source_by_slot(*slot)
+                        .get_code_by_slot(*slot)
                         .ok_or(RuntimeError::Unknown)?;
 
                     FunctionInterpreter::new(
@@ -213,7 +223,7 @@ impl<'a> FunctionInterpreter<'a> {
                         .modules
                         .get_by_slot(module_slot)
                         .ok_or(RuntimeError::other("Module not found"))?
-                        .get_function_source_by_slot(*call_slot)
+                        .get_code_by_slot(*call_slot)
                         .ok_or(RuntimeError::Unknown)?;
 
                     FunctionInterpreter::new(

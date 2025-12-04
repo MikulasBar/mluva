@@ -6,8 +6,6 @@ mod pattern;
 mod statement;
 mod unary_op;
 
-use std::collections::HashMap;
-
 pub use binary_op::BinaryOp;
 pub use expr::{Expr, ExprKind};
 pub use function_signiture::{FunctionSigniture, Parameter};

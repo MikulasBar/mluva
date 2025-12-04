@@ -2,17 +2,15 @@ use crate::expect_token;
 use common::ast::*;
 use common::compile_error::CompileError;
 use common::diagnostics::{FileId, Span};
-use common::function_signiture_manager::FunctionSignitureManager;
+use common::module::module_ast::ModuleAST;
 use common::token::{Token, TokenKind};
-use common::type_manager::{TypeManager, TypeSpec};
+use common::type_manager::TypeSpec;
 
 pub struct Parser<'a> {
     file_id: FileId,
     tokens: &'a [Token],
     index: usize,
-    imports: Vec<Path>,
-    type_manager: TypeManager,
-    function_manager: FunctionSignitureManager,
+    ast: ModuleAST,
 }
 
 impl<'a> Parser<'a> {
@@ -21,9 +19,7 @@ impl<'a> Parser<'a> {
             file_id,
             tokens,
             index: 0,
-            imports: vec![],
-            type_manager: TypeManager::builtin(),
-            function_manager: FunctionSignitureManager::empty(),
+            ast: ModuleAST::empty(),
         }
     }
 
@@ -61,18 +57,9 @@ impl<'a> Parser<'a> {
         self.peek().map(|t| &t.kind)
     }
 
-    /// Shift the index back by one, but does not return the token.
-    fn back(&mut self) {
-        if self.index > 0 {
-            self.index -= 1;
-        }
-    }
-
-    pub fn parse(
-        mut self,
-    ) -> Result<(Vec<Path>, TypeManager, FunctionSignitureManager), CompileError> {
+    pub fn parse(mut self) -> Result<ModuleAST, CompileError> {
         self.parse_top_level()?;
-        Ok((self.imports, self.type_manager, self.function_manager))
+        Ok(self.ast)
     }
 
     fn parse_top_level(&mut self) -> Result<(), CompileError> {
@@ -102,7 +89,7 @@ impl<'a> Parser<'a> {
                     let signiture =
                         FunctionSigniture::new(return_type, params, token_span.join(paren_r_span));
 
-                    self.function_manager.add(name, signiture, body);
+                    self.ast.add_fn(name, signiture, body);
                 }
 
                 TokenKind::Import => {
@@ -111,7 +98,7 @@ impl<'a> Parser<'a> {
                     expect_token!(TokenKind::EOL in self);
 
                     let import_path = Path::single(module_name);
-                    self.imports.push(import_path);
+                    self.ast.add_import(import_path);
                 }
 
                 _ => {
@@ -577,7 +564,7 @@ impl<'a> Parser<'a> {
     fn parse_type(&mut self) -> Result<(TypeSpec, Span), CompileError> {
         expect_token!(TokenKind::Ident(ident), ident_span in self);
 
-        let type_id = if let Some(type_id) = self.type_manager.get_id(&ident) {
+        let type_id = if let Some(type_id) = self.ast.get_type_id(&ident) {
             type_id
         } else {
             return Err(CompileError::unknown_type_at(ident, ident_span));

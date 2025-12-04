@@ -10,5 +10,10 @@ serde = { version = "1.0.228", features = ["derive"] }
 serde_yaml = "0.9.34"
 base64 = "0.22.1"
 codespan-reporting.workspace = true
+bincode.workspace = true
 
-mluva = { path = ".." }
+common.workspace = true
+frontend.workspace = true
+compiler.workspace = true
+typechecker.workspace = true
+vm.workspace = true

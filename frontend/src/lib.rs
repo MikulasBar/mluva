@@ -1,5 +1,9 @@
-pub mod lexer;
-pub mod parser;
+use common::{compile_error::CompileError, module::module_ast::ModuleAST};
+
+use crate::{lexer::tokenize, parser::Parser};
+
+mod lexer;
+mod parser;
 
 #[macro_export]
 macro_rules! expect_token {
@@ -38,4 +42,9 @@ macro_rules! expect_token {
             let $span = __span;
         )?
     };
+}
+
+pub fn parse_source(source: &str, file_id: usize) -> Result<ModuleAST, CompileError> {
+    let tokens = tokenize(source, file_id)?;
+    Parser::new(&tokens, file_id).parse()
 }

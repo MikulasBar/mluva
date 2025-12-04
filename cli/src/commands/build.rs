@@ -7,15 +7,22 @@ use codespan_reporting::{
         termcolor::{ColorChoice, StandardStream},
     },
 };
-use mluva::{ast::Ast, errors::CompileError, module::Module};
+use common::module::{
+    module_code::{self, ModuleCode},
+    module_code_manager::{self, ModuleCodeManager},
+    module_signiture::ModuleSigniture,
+};
+use compiler::compiler::Compiler;
+use typechecker::TypeChecker;
 
 use crate::{
     commands::create_meta_storage,
     config::Config,
+    error::CliError,
     module_metadata::{ModuleMetadata, ModuleMetadataStorage},
 };
 
-pub fn command() -> Result<(Config, HashMap<String, Module>), ()> {
+pub fn command() -> Result<(Config, ModuleCodeManager), ()> {
     println!("Building the Mluva project...");
 
     let config = Config::load_from_file()?;
@@ -27,13 +34,15 @@ pub fn command() -> Result<(Config, HashMap<String, Module>), ()> {
     create_meta_storage()?;
 
     let mut module_meta_storage = ModuleMetadataStorage::load_from_file()?;
-    let mut compiled_modules: HashMap<String, Module> = HashMap::new();
+    let mut module_code_manager = ModuleCodeManager::new();
+    let mut dependencies: HashMap<String, ModuleSigniture> = HashMap::new();
     let mut parent_stack: Vec<String> = vec![];
     let mut files = SimpleFiles::new();
 
     let compile_result = compile_module(
         &config.root_module,
-        &mut compiled_modules,
+        &mut module_code_manager,
+        &mut dependencies,
         &mut module_meta_storage,
         &mut parent_stack,
         &mut files,
@@ -43,9 +52,9 @@ pub fn command() -> Result<(Config, HashMap<String, Module>), ()> {
         Ok(_) => {
             module_meta_storage.save_to_file()?;
             println!("Build completed!");
-            Ok((config, compiled_modules))
+            Ok((config, module_code_manager))
         }
-        Err(Some(e)) => {
+        Err(CliError::Compile(e)) => {
             let diag = e.to_diagnostic();
             let writer = StandardStream::stderr(ColorChoice::Auto);
             let Ok(_) = emit_to_io_write(
@@ -59,7 +68,19 @@ pub fn command() -> Result<(Config, HashMap<String, Module>), ()> {
             };
             Err(())
         }
-        Err(None) => {
+        Err(CliError::Encode(e)) => {
+            eprintln!("Encoding error during compilation: {}", e);
+            Err(())
+        }
+        Err(CliError::Decode(e)) => {
+            eprintln!("Decoding error during compilation: {}", e);
+            Err(())
+        }
+        Err(CliError::Other(msg)) => {
+            eprintln!("Error during compilation: {}", msg);
+            Err(())
+        }
+        Err(CliError::Handled) => {
             // Error already reported
             Err(())
         }
@@ -68,17 +89,18 @@ pub fn command() -> Result<(Config, HashMap<String, Module>), ()> {
 
 fn compile_module(
     source_module: &str,
-    compiled_modules: &mut HashMap<String, Module>,
+    module_code_manager: &mut ModuleCodeManager,
+    dependencies: &mut HashMap<String, ModuleSigniture>,
     module_meta_storage: &mut ModuleMetadataStorage,
     parent_stack: &mut Vec<String>, // TODO: change to something that is not O(n) on search but has ordering
     files: &mut SimpleFiles<String, String>,
-) -> Result<(), Option<CompileError>> {
+) -> Result<(), CliError> {
     let source_path = Path::new(source_module)
         .with_extension("mv")
         .to_string_lossy()
         .to_string();
 
-    if compiled_modules.contains_key(source_module) {
+    if module_code_manager.contains_mod(source_module) {
         return Ok(());
     }
 
@@ -88,25 +110,25 @@ fn compile_module(
             parent_stack.join(" -> "),
             source_module
         );
-        return Err(None);
+        return Err(CliError::Handled);
     }
 
     parent_stack.push(source_module.to_string());
 
     let Ok(content) = std::fs::read(&source_path) else {
         eprintln!("Failed to read module file: {}", source_path);
-        return Err(None);
+        return Err(CliError::Handled);
     };
 
     let Ok(content_str) = String::from_utf8(content.clone()) else {
         eprintln!("Module file is not valid UTF-8: {}", source_path);
-        return Err(None);
+        return Err(CliError::Handled);
     };
 
     let file_id = files.add(source_path.clone(), content_str.clone());
-    let ast = Ast::from_string(&content_str, file_id)?;
+    let mut module_ast = frontend::parse_source(&content_str, file_id)?;
 
-    for import in ast.get_imports() {
+    for import in module_ast.imports() {
         // TODO: resolve full path
         let import_path_str = import.get_tail().unwrap();
         let import_path = Path::new(import_path_str).with_extension("mv");
@@ -117,46 +139,63 @@ fn compile_module(
                 import_path.display(),
                 source_path
             );
-            return Err(None);
+            return Err(CliError::Handled);
         }
 
         compile_module(
             import_path_str,
-            compiled_modules,
+            module_code_manager,
+            dependencies,
             module_meta_storage,
             parent_stack,
             files,
         )?;
     }
 
-    let bytecode_path_str = ModuleMetadata::source_to_bytecode_path(&source_path);
-    let bytecode_path = Path::new(&bytecode_path_str);
+    let sign_path_str = ModuleMetadata::source_to_signiture_path(&source_path);
+    let code_path_str = ModuleMetadata::source_to_code_path(&source_path);
+    let sign_path = Path::new(&sign_path_str);
+    let code_path = Path::new(&code_path_str);
+
     let needs_compilation = module_meta_storage.needs_recompilation(&source_path, &content);
 
-    if needs_compilation || !bytecode_path.exists() {
-        let module = Module::from_ast_and_dependencies(ast, compiled_modules)?;
-        let bytecode = module.to_bytecode();
+    if needs_compilation || !code_path.exists() || !sign_path.exists() {
+        TypeChecker::new(&mut module_ast, dependencies).check();
+        let mod_code = Compiler::new(&module_ast, dependencies).compile()?;
+        let mod_sign = module_ast.to_signiture();
+        let bytecode = mod_code.serialize()?;
+        let sign_bytecode = mod_sign.serialize()?;
 
-        let Ok(_) = std::fs::write(&bytecode_path, bytecode) else {
+        let Ok(_) = std::fs::write(&code_path, bytecode) else {
             eprintln!("Failed to write bytecode file for module {}", source_path);
-            return Err(None);
+            return Err(CliError::Handled);
+        };
+
+        let Ok(_) = std::fs::write(&sign_path, sign_bytecode) else {
+            eprintln!("Failed to write signiture file for module {}", source_path);
+            return Err(CliError::Handled);
         };
 
         module_meta_storage.update_hash(&source_path, &content);
-        compiled_modules.insert(source_module.to_string(), module);
+        module_code_manager.add(source_module.to_string(), mod_code);
     } else {
         // load from cached bytecode
-        let Ok(bytecode) = std::fs::read(&bytecode_path) else {
+        let Ok(bytecode) = std::fs::read(&code_path) else {
             eprintln!("Failed to read bytecode file for module {}", source_path);
-            return Err(None);
+            return Err(CliError::Handled);
         };
 
-        let module = Module::from_bytecode_bytes(&bytecode).map_err(|e| {
-            eprintln!("Failed to load module {} from bytecode: {}", source_path, e);
-            None
-        })?;
+        let mod_code = ModuleCode::deserialize(&bytecode)?;
 
-        compiled_modules.insert(source_module.to_string(), module);
+        let Ok(sign_bytecode) = std::fs::read(&sign_path) else {
+            eprintln!("Failed to read signiture file for module {}", source_path);
+            return Err(CliError::Handled);
+        };
+
+        let mod_sign = ModuleSigniture::deserialize(&sign_bytecode)?;
+
+        module_code_manager.add(source_module.to_string(), mod_code);
+        dependencies.insert(source_module.to_string(), mod_sign);
     }
 
     parent_stack.pop();

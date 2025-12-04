@@ -1,6 +1,8 @@
+use bincode::{Decode, Encode};
+
 pub type FileId = usize;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Encode, Decode)]
 pub struct Span {
     pub file: FileId,
     pub lo: usize,

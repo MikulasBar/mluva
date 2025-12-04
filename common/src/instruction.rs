@@ -1,6 +1,9 @@
+use bincode::{Decode, Encode};
+
 use crate::word::Word;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Encode, Decode)]
+#[repr(u8)]
 pub enum Instruction {
     Store { slot: u32 },
     LoadLocal { slot: u32 },

@@ -6,10 +6,11 @@ use common::ast::{
     StatementKind, UnaryOp,
 };
 use common::compile_error::CompileError;
-use common::function::FunctionSource;
-use common::function_signiture_manager::FunctionSignitureManager;
+use common::function_code::FunctionCode;
 use common::instruction::Instruction;
-use common::module::module_source::ModuleSource;
+use common::module::module_ast::ModuleAST;
+use common::module::module_code::ModuleCode;
+use common::module::module_signiture::ModuleSigniture;
 use common::type_manager::{
     BOOL_TYPE_ID, F32_TYPE_ID, I32_TYPE_ID, PRIMITIVE_TYPES_COUNT, TypeManager, TypeSpec,
 };
@@ -18,114 +19,87 @@ use common::word::Word;
 use crate::local_slot::LocalSlot;
 
 pub struct Compiler<'a> {
-    sources: Vec<FunctionSource>,
-    string_pool: HashMap<String, usize>,
-    type_manager: &'a TypeManager,
-    function_manager: FunctionSignitureManager,
-    dependencies: &'a HashMap<String, FunctionSignitureManager>,
-    next_string_slot: usize,
+    ast: &'a ModuleAST,
+    dependencies: &'a HashMap<String, ModuleSigniture>,
+    code: ModuleCode,
+    string_slots: HashMap<String, u32>,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(
-        type_manager: &'a TypeManager,
-        function_manager: FunctionSignitureManager,
-        dependencies: &'a HashMap<String, FunctionSignitureManager>,
-    ) -> Self {
-        let count = function_manager.count();
-
+    pub fn new(ast: &'a ModuleAST, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
         Self {
-            type_manager,
-            function_manager,
-            sources: Vec::with_capacity(count),
-            string_pool: HashMap::new(),
+            ast,
             dependencies,
-            next_string_slot: 0,
+            code: ModuleCode::empty(),
+            string_slots: HashMap::new(),
         }
     }
 
-    pub fn compile(mut self) -> Result<ModuleSource, CompileError> {
-        for slot in 0..self.function_manager.count() as u32 {
+    pub fn compile(mut self) -> Result<ModuleCode, CompileError> {
+        for slot in 0..self.ast.fn_count() {
             self.compile_function(slot)?;
         }
 
         let Compiler {
-            sources,
-            string_pool,
-            function_manager,
-            next_string_slot,
+            mut code,
+            ast,
+            dependencies: _,
             ..
         } = self;
 
-        let string_pool_vec = {
-            let mut vec = vec![String::new(); next_string_slot];
-            for (string, slot) in string_pool {
-                vec[slot] = string;
-            }
-            vec
-        };
+        let main_slot = ast.get_fn_slot("main");
+        code.set_main_slot(main_slot);
 
-        let main_slot = function_manager.get_slot("main");
-        let FunctionSignitureManager { slots, .. } = function_manager;
-
-        Ok(ModuleSource::new(
-            string_pool_vec,
-            main_slot,
-            slots,
-            sources,
-        ))
+        Ok(code)
     }
 
     fn compile_function(&mut self, slot: u32) -> Result<(), CompileError> {
         let signiture = self
-            .function_manager
-            .get_signiture(slot)
+            .ast
+            .get_sign(slot)
             .expect("Function signiture should exist");
 
-        let body = self
-            .function_manager
-            .get_body(slot)
-            .expect("Function body should exist");
+        let body = self.ast.get_body(slot).expect("Function body should exist");
 
-        let function_compiler = FunctionCompiler::new(
+        let code = FunctionCompiler::new(
             self.dependencies,
-            self.function_manager.slots(),
+            self.ast.get_fn_map(),
             body,
             signiture,
-            self.type_manager,
-            &mut self.string_pool,
-            &mut self.next_string_slot,
-        );
+            self.ast.tm(),
+            &mut self.string_slots,
+            &mut self.code,
+        )
+        .compile()?;
 
-        let function_source = function_compiler.compile()?;
-        self.sources.push(function_source);
+        self.code.add_code(code);
 
         Ok(())
     }
 }
 
 struct FunctionCompiler<'b> {
-    dependencies: &'b HashMap<String, FunctionSignitureManager>,
+    dependencies: &'b HashMap<String, ModuleSigniture>,
     function_map: &'b HashMap<String, u32>,
     body: &'b [Statement],
     signiture: &'b FunctionSigniture,
     type_manager: &'b TypeManager,
-    string_pool: &'b mut HashMap<String, usize>,
-    instructions: Vec<Instruction>,
+    string_slots: &'b mut HashMap<String, u32>,
     locals: HashMap<String, LocalSlot>,
-    next_local_index: usize,
-    next_string_slot: &'b mut usize,
+    next_local_index: u32,
+    code: FunctionCode,
+    mod_code: &'b mut ModuleCode,
 }
 
 impl<'b> FunctionCompiler<'b> {
     fn new(
-        dependencies: &'b HashMap<String, FunctionSignitureManager>,
+        dependencies: &'b HashMap<String, ModuleSigniture>,
         function_map: &'b HashMap<String, u32>,
         body: &'b [Statement],
         signiture: &'b FunctionSigniture,
         type_manager: &'b TypeManager,
-        string_pool: &'b mut HashMap<String, usize>,
-        next_string_slot: &'b mut usize,
+        string_slots: &'b mut HashMap<String, u32>,
+        mod_code: &'b mut ModuleCode,
     ) -> Self {
         Self {
             dependencies,
@@ -134,15 +108,15 @@ impl<'b> FunctionCompiler<'b> {
             signiture,
             type_manager,
             locals: HashMap::new(),
-            instructions: Vec::new(),
-            string_pool,
+            code: FunctionCode::empty(),
+            string_slots,
+            mod_code,
             next_local_index: 0,
-            next_string_slot,
         }
     }
 
     fn emit(&mut self, instr: Instruction) {
-        self.instructions.push(instr);
+        self.code.emit_instr(instr);
     }
 
     fn emit_load_local(&mut self, slot: LocalSlot) {
@@ -170,13 +144,12 @@ impl<'b> FunctionCompiler<'b> {
         }
     }
 
-    fn get_string_slot(&mut self, string: &str) -> usize {
+    fn get_string_slot(&mut self, string: &str) -> u32 {
         *self
-            .string_pool
+            .string_slots
             .entry(string.to_string())
             .or_insert_with(|| {
-                let slot = *self.next_string_slot;
-                *self.next_string_slot += 1;
+                let slot = self.mod_code.add_string(string.to_string());
                 slot
             })
     }
@@ -192,16 +165,16 @@ impl<'b> FunctionCompiler<'b> {
         })
     }
 
-    fn update_instruction_at(&mut self, index: usize, inst: Instruction) {
-        let len = self.instructions.len();
+    fn update_instruction_at(&mut self, index: usize, instr: Instruction) {
+        let len = self.code.len();
         if index >= len {
             panic!("Index out of bounds :{}, length: {}", index, len);
         }
 
-        self.instructions[index] = inst;
+        self.code.set_instr_at(index, instr);
     }
 
-    fn compile(mut self) -> Result<FunctionSource, CompileError> {
+    fn compile(mut self) -> Result<FunctionCode, CompileError> {
         self.setup_parameters();
         self.compile_statements(&self.body)?;
 
@@ -211,7 +184,9 @@ impl<'b> FunctionCompiler<'b> {
             self.emit(Instruction::Return);
         }
 
-        Ok(FunctionSource::new(self.locals.len(), self.instructions))
+        self.code.slot_count = self.next_local_index as usize;
+
+        Ok(self.code)
     }
 
     fn setup_parameters(&mut self) {
@@ -278,7 +253,7 @@ impl<'b> FunctionCompiler<'b> {
         self.compile_expr(cond)?;
 
         // Store the index of the jump instruction for the "if" block
-        let cond_jump_index = self.instructions.len();
+        let cond_jump_index = self.code.len();
         self.emit(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the statements in the "if" block
@@ -286,11 +261,11 @@ impl<'b> FunctionCompiler<'b> {
 
         if let Some(else_stmts) = else_stmts {
             // Store the index of the jump instruction for the "else" block
-            let if_jump_index = self.instructions.len();
+            let if_jump_index = self.code.len();
             self.emit(Instruction::Jump(0)); // Placeholder instruction
 
             // Store the index of else block
-            let post_if_index = self.instructions.len();
+            let post_if_index = self.code.len();
             // jump from the if condition to the else block
             // we should jump over the whole if-else block, only if block
             self.update_instruction_at(
@@ -302,11 +277,11 @@ impl<'b> FunctionCompiler<'b> {
             self.compile_statements(else_stmts)?;
 
             // Update the jump instruction to skip over the "else" block
-            let post_else_index = self.instructions.len();
+            let post_else_index = self.code.len();
             self.update_instruction_at(if_jump_index, Instruction::Jump(post_else_index as u32));
         } else {
             // If there is no "else" block, we can just jump over the "if" block
-            let post_if_index = self.instructions.len();
+            let post_if_index = self.code.len();
             self.update_instruction_at(
                 cond_jump_index,
                 Instruction::JumpIfFalse(post_if_index as u32),
@@ -324,10 +299,10 @@ impl<'b> FunctionCompiler<'b> {
         // Store the index of the start of the "while" block
         // this includes the condition evaluation and check
         // because every iteration we need to check the condition
-        let start_index = self.instructions.len();
+        let start_index = self.code.len();
         self.compile_expr(cond)?;
         // Store the index of the jump instruction so we can update it later
-        let cond_jump_index = self.instructions.len();
+        let cond_jump_index = self.code.len();
         self.emit(Instruction::JumpIfFalse(0)); // Placeholder instruction
 
         // Compile the instructions in the "while" block
@@ -337,7 +312,7 @@ impl<'b> FunctionCompiler<'b> {
         self.emit(Instruction::Jump(start_index as u32));
 
         // Index of the end of the "while" block
-        let end_index = self.instructions.len();
+        let end_index = self.code.len();
 
         // Update the jump instruction for the "while" block to skip over the body and the end jump
         self.update_instruction_at(cond_jump_index, Instruction::JumpIfFalse(end_index as u32));
@@ -354,7 +329,7 @@ impl<'b> FunctionCompiler<'b> {
             PatternKind::Index { callee, index } => {
                 self.compile_expr(&*index)?;
                 self.compile_pattern(&*callee);
-                if let Some(instr @ Instruction::ListSet) = self.instructions.last_mut() {
+                if let Some(instr @ Instruction::ListSet) = self.code.last_instr_mut() {
                     *instr = Instruction::ListGet;
                 }
 
@@ -452,7 +427,7 @@ impl<'b> FunctionCompiler<'b> {
                 let Some(call_slot) = self
                     .dependencies
                     .get(module_name)
-                    .and_then(|module| module.get_slot(func_name))
+                    .and_then(|module| module.get_fn_slot(func_name))
                 else {
                     return Err(CompileError::unknown_foreign_function_at(
                         module_name,

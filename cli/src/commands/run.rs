@@ -1,11 +1,10 @@
-use mluva::runtime::Runtime;
-
 use crate::commands;
+use vm::Vm;
 
 pub fn command() -> Result<(), ()> {
     let (config, modules) = commands::build::command()?;
     let main_module_name = &config.root_module;
-    let Some(main_module) = modules.get(main_module_name) else {
+    let Some(_) = modules.get_slot(&main_module_name) else {
         eprintln!(
             "Root module '{}' not found in compiled modules",
             main_module_name
@@ -15,8 +14,8 @@ pub fn command() -> Result<(), ()> {
 
     println!("Running the Mluva project...\n");
 
-    let runtime = Runtime::new(main_module, &modules);
-    let result = runtime.execute();
+    let mut vm = Vm::new(modules);
+    let result = vm.execute();
 
     match result {
         Ok(_) => (),

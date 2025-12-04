@@ -4,12 +4,14 @@ use std::{collections::HashMap, path::Path};
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct ModuleMetadataStorage {
     #[serde(default = "default_hashes")]
+    #[serde(flatten)]
     pub map: HashMap<String, ModuleMetadata>, // source_path -> content_hash (for change detection)
 }
 
 impl ModuleMetadataStorage {
     pub const FILE_PATH: &'static str = ".mluva/modules.yaml";
-    pub const MODULES_DIR: &'static str = ".mluva/modules";
+    pub const CODE_DIR: &'static str = ".mluva/code";
+    pub const SIGNITURE_DIR: &'static str = ".mluva/signature";
 
     pub fn save_to_file(&self) -> Result<(), ()> {
         let path = Path::new(Self::FILE_PATH);
@@ -56,10 +58,9 @@ impl ModuleMetadataStorage {
     /// Update hash for a module
     pub fn update_hash(&mut self, source_path: &str, content: &[u8]) {
         let hash = ModuleMetadata::calculate_content_hash(content);
-        self.map.insert(
-            source_path.to_string(),
-            ModuleMetadata { content_hash: hash },
-        );
+        self.map.insert(source_path.to_string(), ModuleMetadata {
+            content_hash: hash,
+        });
     }
 }
 
@@ -87,10 +88,18 @@ impl ModuleMetadata {
         self.content_hash != current_hash
     }
 
-    pub fn source_to_bytecode_path(source_path: &str) -> String {
+    pub fn source_to_code_path(source_path: &str) -> String {
         format!(
-            "{}/{}.mvb",
-            ModuleMetadataStorage::MODULES_DIR,
+            "{}/{}.mvc",
+            ModuleMetadataStorage::CODE_DIR,
+            Self::encode_path(source_path)
+        )
+    }
+
+    pub fn source_to_signiture_path(source_path: &str) -> String {
+        format!(
+            "{}/{}.mvs",
+            ModuleMetadataStorage::SIGNITURE_DIR,
             Self::encode_path(source_path)
         )
     }

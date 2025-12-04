@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use bincode::{Decode, Encode};
+
 pub const PRIMITIVE_TYPES_COUNT: u32 = 4;
 pub const VOID_TYPE_ID: u32 = 0;
 pub const I32_TYPE_ID: u32 = 1;
@@ -8,6 +10,7 @@ pub const BOOL_TYPE_ID: u32 = 3;
 pub const STRING_TYPE_ID: u32 = 4;
 pub const LIST_TYPE_ID: u32 = 5;
 
+#[derive(Debug, Clone, Encode, Decode)]
 pub struct TypeManager {
     slots: HashMap<String, u32>,
     types: Vec<Type>,
@@ -21,23 +24,25 @@ impl TypeManager {
         }
     }
 
-    pub fn add(&mut self, name: impl Into<String>, ty: Type) {
+    pub fn add(&mut self, name: impl Into<String>, ty: Type) -> u32 {
         let slot = self.types.len() as u32;
         self.slots.insert(name.into(), slot);
         self.types.push(ty);
+
+        slot
     }
 
     pub fn builtin() -> Self {
-        let mut m = Self::empty();
+        let mut tm = Self::empty();
 
-        m.add("Void", Type::new(0));
-        m.add("I32", Type::new(0));
-        m.add("F32", Type::new(0));
-        m.add("Bool", Type::new(0));
-        m.add("String", Type::new(0));
-        m.add("List", Type::new(1));
+        tm.add("Void", Type::new(0));
+        tm.add("I32", Type::new(0));
+        tm.add("F32", Type::new(0));
+        tm.add("Bool", Type::new(0));
+        tm.add("String", Type::new(0));
+        tm.add("List", Type::new(1));
 
-        m
+        tm
     }
 
     pub fn get_id(&self, name: &str) -> Option<u32> {
@@ -49,6 +54,7 @@ impl TypeManager {
     }
 }
 
+#[derive(Debug, Clone, Encode, Decode)]
 pub struct Type {
     generic_count: u32,
     method_slots: HashMap<String, u32>,
@@ -67,7 +73,7 @@ impl Type {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub struct TypeSpec {
     pub id: u32,
     pub generics: Vec<TypeSpec>,

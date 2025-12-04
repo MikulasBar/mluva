@@ -6,25 +6,20 @@ use crate::bin_op_pat;
 use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
 use common::compile_error::CompileError;
 use common::diagnostics::Span;
-use common::function_signiture_manager::FunctionSignitureManager;
-use common::type_manager::{TypeManager, TypeSpec};
+use common::module::module_ast::ModuleAST;
+use common::module::module_signiture::ModuleSigniture;
+use common::type_manager::TypeSpec;
 
 pub struct TypeChecker<'a> {
-    type_manager: &'a TypeManager,
-    function_manager: &'a mut FunctionSignitureManager,
-    dependencies: &'a HashMap<String, FunctionSignitureManager>,
+    ast: &'a mut ModuleAST,
+    dependencies: &'a HashMap<String, ModuleSigniture>,
     scope: TypeScope,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(
-        type_manager: &'a TypeManager,
-        function_manager: &'a mut FunctionSignitureManager,
-        dependencies: &'a HashMap<String, FunctionSignitureManager>,
-    ) -> Self {
+    pub fn new(ast: &'a mut ModuleAST, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
         Self {
-            type_manager,
-            function_manager,
+            ast,
             dependencies,
             scope: TypeScope::new(),
         }
@@ -35,10 +30,10 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_functions(&mut self) -> Result<(), CompileError> {
-        for slot in 0..self.function_manager.count() {
+        for slot in 0..self.ast.fn_count() {
             self.scope.enter();
 
-            let signiture = self.function_manager.get_signiture(slot as u32).unwrap();
+            let signiture = self.ast.get_sign(slot as u32).unwrap();
 
             signiture.params.iter().try_for_each(|p| {
                 self.scope
@@ -50,12 +45,11 @@ impl<'a> TypeChecker<'a> {
             // Take the body out to avoid borrowing issues
             // This shouldn't break anything, because we this only once,
             // so no one else will use the body when we have it taken out
-            let mut statements =
-                mem::take(self.function_manager.get_body_mut(slot as u32).unwrap());
+            let mut statements = mem::take(self.ast.get_body_mut(slot as u32).unwrap());
 
             self.check_statements(&mut statements, &return_type)?;
 
-            let body = self.function_manager.get_body_mut(slot as u32).unwrap();
+            let body = self.ast.get_body_mut(slot as u32).unwrap();
             *body = statements;
 
             self.scope.exit();
@@ -93,7 +87,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::bool(),
                         cond,
                         statement.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -121,7 +115,7 @@ impl<'a> TypeChecker<'a> {
                             var_type.clone(),
                             val_type,
                             expr_span,
-                            self.type_manager,
+                            self.ast.tm(),
                         ));
                     }
                     (None, ty) if ty == TypeSpec::unknown_list() => {
@@ -144,7 +138,7 @@ impl<'a> TypeChecker<'a> {
                         assignee_type,
                         expr_type,
                         statement.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
             }
@@ -156,7 +150,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::bool(),
                         cond,
                         statement.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -174,7 +168,7 @@ impl<'a> TypeChecker<'a> {
                         return_type.clone(),
                         expr_type,
                         statement.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
             }
@@ -212,7 +206,7 @@ impl<'a> TypeChecker<'a> {
                                 first_type.clone(),
                                 element_type,
                                 expr.span,
-                                self.type_manager,
+                                self.ast.tm(),
                             ));
                         }
                     }
@@ -230,7 +224,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::i32(),
                         index_type,
                         expr.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -274,7 +268,7 @@ impl<'a> TypeChecker<'a> {
         func_name: &str,
         args: &mut [Expr],
     ) -> Result<TypeSpec, CompileError> {
-        let Some(signiture) = self.function_manager.get_signiture_by_name(&func_name) else {
+        let Some(sign) = self.ast.get_sign_by_name(&func_name) else {
             return Err(CompileError::function_not_found_at(func_name, span));
         };
 
@@ -283,9 +277,9 @@ impl<'a> TypeChecker<'a> {
             .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
             .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
 
-        signiture.check_argument_types(&arg_types, span, self.type_manager)?;
+        sign.check_argument_types(&arg_types, span, self.ast.tm())?;
 
-        Ok(signiture.return_type.clone())
+        Ok(sign.return_type.clone())
     }
 
     fn check_foreign_call_expr(
@@ -299,7 +293,7 @@ impl<'a> TypeChecker<'a> {
             .dependencies
             .get(module_name)
             .ok_or_else(|| CompileError::module_not_found_at(module_name, span))?
-            .get_signiture_by_name(&func_name)
+            .get_sign_by_name(&func_name)
             .ok_or_else(|| CompileError::function_not_found_at(func_name, span))?;
 
         let arg_types: Vec<(TypeSpec, Span)> = args
@@ -307,7 +301,7 @@ impl<'a> TypeChecker<'a> {
             .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
             .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
 
-        signiture.check_argument_types(&arg_types, span, self.type_manager)?;
+        signiture.check_argument_types(&arg_types, span, self.ast.tm())?;
 
         Ok(signiture.return_type.clone())
     }
@@ -327,7 +321,7 @@ impl<'a> TypeChecker<'a> {
             .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
 
         let ty = self
-            .type_manager
+            .ast
             .get_type(callee_type.id)
             .expect("Internal Typechecker error, not recovering");
 
@@ -337,11 +331,11 @@ impl<'a> TypeChecker<'a> {
                     callee_type,
                     method_name,
                     span,
-                    self.type_manager,
+                    self.ast.tm(),
                 ))?;
 
-        let method = self.function_manager.get_signiture(method_slot).unwrap();
-        method.check_argument_types(&arg_types, span, self.type_manager)?;
+        let method = self.ast.get_sign(method_slot).unwrap();
+        method.check_argument_types(&arg_types, span, self.ast.tm())?;
 
         Ok(method.return_type.clone())
     }
@@ -362,7 +356,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::i32(),
                         lhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -371,7 +365,7 @@ impl<'a> TypeChecker<'a> {
                         lhs_type,
                         rhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -384,7 +378,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::i32(),
                         lhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -393,7 +387,7 @@ impl<'a> TypeChecker<'a> {
                         lhs_type,
                         rhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -406,7 +400,7 @@ impl<'a> TypeChecker<'a> {
                         lhs_type,
                         rhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -419,7 +413,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::bool(),
                         lhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -428,7 +422,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::bool(),
                         rhs_type,
                         span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -446,7 +440,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::bool(),
                         expr_type,
                         expr.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
 
@@ -461,7 +455,7 @@ impl<'a> TypeChecker<'a> {
                         TypeSpec::i32(),
                         expr_type,
                         expr.span,
-                        self.type_manager,
+                        self.ast.tm(),
                     ));
                 }
             },

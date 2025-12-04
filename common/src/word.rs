@@ -1,6 +1,8 @@
+use bincode::{Decode, Encode};
+
 use crate::heap_handle::HeapHandle;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Encode, Decode)]
 pub struct Word {
     pub data: u64,
 }

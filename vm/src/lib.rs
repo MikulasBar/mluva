@@ -6,3 +6,5 @@ mod string_object;
 mod value_stack;
 mod vm;
 mod vtable;
+
+pub use vm::Vm;

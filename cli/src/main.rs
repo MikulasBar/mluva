@@ -4,6 +4,7 @@ use crate::{cli::Cli, commands::Commands};
 mod cli;
 mod commands;
 mod config;
+mod error;
 mod module_metadata;
 
 fn main() {

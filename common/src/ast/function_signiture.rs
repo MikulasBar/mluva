@@ -1,10 +1,12 @@
+use bincode::{Decode, Encode};
+
 use crate::{
     compile_error::CompileError,
     diagnostics::Span,
     type_manager::{TypeManager, TypeSpec},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub struct FunctionSigniture {
     pub return_type: TypeSpec,
     pub params: Vec<Parameter>,
@@ -50,7 +52,7 @@ impl FunctionSigniture {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub struct Parameter {
     pub name: String,
     pub ty: TypeSpec,
