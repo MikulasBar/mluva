@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{FunctionSigniture, Path, Statement},
+    ast::{Path, Statement},
+    function::FunctionSigniture,
     module::module_signiture::ModuleSigniture,
     type_manager::{Type, TypeManager},
 };

@@ -8,9 +8,7 @@ use codespan_reporting::{
     },
 };
 use common::module::{
-    module_code::{self, ModuleCode},
-    module_code_manager::{self, ModuleCodeManager},
-    module_signiture::ModuleSigniture,
+    module_code::ModuleCode, module_manager::ModuleCodeManager, module_signiture::ModuleSigniture,
 };
 use compiler::compiler::Compiler;
 use typechecker::TypeChecker;
@@ -160,7 +158,7 @@ fn compile_module(
     let needs_compilation = module_meta_storage.needs_recompilation(&source_path, &content);
 
     if needs_compilation || !code_path.exists() || !sign_path.exists() {
-        TypeChecker::new(&mut module_ast, dependencies).check();
+        TypeChecker::new(&mut module_ast, dependencies).check()?;
         let mod_code = Compiler::new(&module_ast, dependencies).compile()?;
         let mod_sign = module_ast.to_signiture();
         let bytecode = mod_code.serialize()?;

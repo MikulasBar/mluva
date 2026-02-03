@@ -32,19 +32,6 @@ impl TypeManager {
         slot
     }
 
-    pub fn builtin() -> Self {
-        let mut tm = Self::empty();
-
-        tm.add("Void", Type::new(0));
-        tm.add("I32", Type::new(0));
-        tm.add("F32", Type::new(0));
-        tm.add("Bool", Type::new(0));
-        tm.add("String", Type::new(0));
-        tm.add("List", Type::new(1));
-
-        tm
-    }
-
     pub fn get_id(&self, name: &str) -> Option<u32> {
         self.slots.get(name).copied()
     }
@@ -57,6 +44,7 @@ impl TypeManager {
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct Type {
     generic_count: u32,
+    /// Maps method names to their slots in local module's function table
     method_slots: HashMap<String, u32>,
 }
 

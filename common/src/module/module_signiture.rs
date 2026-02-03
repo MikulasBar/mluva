@@ -5,7 +5,7 @@ use bincode::{
     error::{DecodeError, EncodeError},
 };
 
-use crate::{ast::FunctionSigniture, serde_header::SerdeHeader, type_manager::TypeManager};
+use crate::{function::FunctionSigniture, serde_header::SerdeHeader, type_manager::TypeManager};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct ModuleSigniture {

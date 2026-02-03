@@ -1,5 +1,5 @@
-use crate::runtime_error::RuntimeError;
-use common::word::Word;
+use super::runtime_error::RuntimeError;
+use crate::word::Word;
 
 pub struct ListObject {
     items: Vec<Word>,

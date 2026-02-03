@@ -3,11 +3,11 @@ use bincode::{
     error::{DecodeError, EncodeError},
 };
 
-use crate::{function_code::FunctionCode, serde_header::SerdeHeader};
+use crate::{function::FunctionCode, module::lcp::LCP, serde_header::SerdeHeader};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct ModuleCode {
-    string_pool: Vec<String>,
+    lcp: LCP,
     main_slot: Option<u32>,
     function_codes: Vec<FunctionCode>,
 }
@@ -15,19 +15,19 @@ pub struct ModuleCode {
 impl ModuleCode {
     pub fn empty() -> Self {
         Self {
-            string_pool: vec![],
+            lcp: LCP::new(),
             main_slot: None,
             function_codes: vec![],
         }
     }
 
     pub fn new(
-        string_pool: Vec<String>,
+        lcp: LCP,
         main_slot: Option<u32>,
         function_codes: Vec<FunctionCode>,
     ) -> Self {
         Self {
-            string_pool,
+            lcp,
             main_slot,
             function_codes,
         }

@@ -436,10 +436,14 @@ impl<'b> FunctionCompiler<'b> {
                     ));
                 };
 
+                self.string_slots
+                    .insert(module_name.clone(), self.next_local_index);
+
                 self.emit(Instruction::ForeignCall {
-                    module_name: module_name.clone(),
+                    module_name_slot: self.next_local_index,
                     call_slot,
                 });
+                self.next_local_index += 1;
             }
 
             ExprKind::MethodCall {

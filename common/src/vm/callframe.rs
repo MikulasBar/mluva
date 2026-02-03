@@ -1,4 +1,4 @@
-use common::word::Word;
+use crate::word::Word;
 
 pub struct CallFrame {
     pub locals: Vec<Word>,

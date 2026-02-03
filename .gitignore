@@ -1,2 +1,6 @@
 /target
 /.vscode
+**/.mluva
+**/*.mv
+**/mluva.yaml
+!/examples/**/*.mv

@@ -1,12 +1,10 @@
-use crate::{
-    arena::Arena, callframe::CallFrame, list_object::ListObject, runtime_error::RuntimeError,
-    string_object::StringObject, value_stack::ValueStack, vtable::VTable,
-};
+use common::module::Module;
+use common::vm::{Arena, CallFrame, ListObject, RuntimeError, StringObject, ValueStack};
 
 use common::{
-    function_code::FunctionCode,
+    function::FunctionCode,
     instruction::Instruction,
-    module::module_code_manager::ModuleCodeManager,
+    module::module_manager::ModuleManager,
     type_manager::{LIST_TYPE_ID, STRING_TYPE_ID},
     word::Word,
 };
@@ -14,17 +12,15 @@ use common::{
 pub struct Vm {
     pub value_stack: ValueStack,
     pub arena: Arena,
-    pub vtables: Vec<VTable>,
     pub callstack: Vec<CallFrame>,
-    pub modules: ModuleCodeManager,
+    pub modules: ModuleManager,
 }
 
 impl Vm {
-    pub fn new(modules: ModuleCodeManager) -> Self {
+    pub fn new(modules: ModuleManager) -> Self {
         Self {
             value_stack: ValueStack::new(),
             arena: Arena::new(),
-            vtables: vec![],
             callstack: vec![],
             modules: modules,
         }
@@ -36,31 +32,35 @@ impl Vm {
             .get_main_slot()
             .ok_or(RuntimeError::other("main module not found"))?;
 
-        let main_code = self
+        match self
             .modules
             .get_by_slot(main_module_slot)
             .ok_or(RuntimeError::other("main module not found"))?
-            .get_main_code()
-            .ok_or(RuntimeError::other("Main function not found"))?;
+        {
+            Module::Compiled(m) => {
+                let main_func = m
+                    .get_main_code()
+                    .ok_or(RuntimeError::other("main function not found"))?;
+                FunctionInterpreter::new(
+                    &self.modules,
+                    &mut self.arena,
+                    &mut self.value_stack,
+                    main_func,
+                    &mut self.callstack,
+                    main_module_slot,
+                )
+                .execute()
+            }
 
-        FunctionInterpreter::new(
-            &self.modules,
-            &mut self.arena,
-            &mut self.value_stack,
-            &mut self.vtables,
-            main_code,
-            &mut self.callstack,
-            main_module_slot,
-        )
-        .execute()
+            Module::Native(_) => Err(RuntimeError::other("main module cannot be native")),
+        }
     }
 }
 
 struct FunctionInterpreter<'a> {
-    modules: &'a ModuleCodeManager,
+    modules: &'a ModuleManager,
     arena: &'a mut Arena,
     value_stack: &'a mut ValueStack,
-    vtables: &'a Vec<VTable>,
     code: &'a FunctionCode,
     callstack: &'a mut Vec<CallFrame>,
     current_module_slot: u32,
@@ -69,10 +69,9 @@ struct FunctionInterpreter<'a> {
 
 impl<'a> FunctionInterpreter<'a> {
     pub fn new(
-        modules: &'a ModuleCodeManager,
+        modules: &'a ModuleManager,
         arena: &'a mut Arena,
         value_stack: &'a mut ValueStack,
-        vtables: &'a Vec<VTable>,
         code: &'a FunctionCode,
         callstack: &'a mut Vec<CallFrame>,
         current_module_slot: u32,
@@ -84,7 +83,6 @@ impl<'a> FunctionInterpreter<'a> {
             modules,
             arena,
             value_stack,
-            vtables,
             code,
             callstack,
             current_module_slot,
@@ -188,8 +186,12 @@ impl<'a> FunctionInterpreter<'a> {
                 }
                 Instruction::RcDec => {
                     let handle = self.pop()?.as_hhandle();
-                    self.arena
-                        .decrement_rc(&handle, self.value_stack, &self.vtables)?;
+                    self.arena.decrement_rc(
+                        &handle,
+                        self.callstack.last_mut().unwrap(),
+                        self.value_stack,
+                        self.modules,
+                    )?;
                 }
                 Instruction::LocalCall { slot } => {
                     let func = self
@@ -203,7 +205,6 @@ impl<'a> FunctionInterpreter<'a> {
                         self.modules,
                         self.arena,
                         self.value_stack,
-                        self.vtables,
                         func,
                         self.callstack,
                         self.current_module_slot,
@@ -211,12 +212,17 @@ impl<'a> FunctionInterpreter<'a> {
                     .execute()?;
                 }
                 Instruction::ForeignCall {
-                    module_name,
+                    module_name_slot,
                     call_slot,
                 } => {
+                    let mod_name = self
+                        .modules
+                        .get_string_from_pool(self.current_module_slot, *module_name_slot)
+                        .ok_or(RuntimeError::Unknown)?;
+
                     let module_slot = self
                         .modules
-                        .get_slot(module_name)
+                        .get_slot(mod_name)
                         .ok_or(RuntimeError::other("Module doesn't exists"))?;
 
                     let func = self
@@ -230,29 +236,32 @@ impl<'a> FunctionInterpreter<'a> {
                         self.modules,
                         self.arena,
                         self.value_stack,
-                        self.vtables,
                         func,
                         self.callstack,
                         module_slot,
                     )
                     .execute()?;
                 }
-                Instruction::MethodCall { type_id, slot } => {
-                    let callee = self.pop()?;
-                    let method = self.vtables[*type_id as usize]
-                        .methods
-                        .get(*slot as usize)
-                        .ok_or(RuntimeError::Unknown)?;
+                // Instruction::MethodCall { type_id, slot } => {
+                //     let callee = self.pop()?;
+                //     let method = self.vtables[*type_id as usize]
+                //         .methods
+                //         .get(*slot as usize)
+                //         .ok_or(RuntimeError::Unknown)?;
 
-                    method.execute(callee, self.value_stack, self.arena, self.vtables);
-                }
+                //     method.execute(callee, self.value_stack, self.arena, self.vtables);
+                // }
                 Instruction::ListGet => {
                     let index = self.pop()?.as_u32();
                     let handle = self.pop()?.as_hhandle();
                     let list = self.arena.get_mut::<ListObject>(&handle)?;
                     let item = list.get_item(index)?;
-                    self.arena
-                        .decrement_rc(&handle, self.value_stack, self.vtables)?;
+                    self.arena.decrement_rc(
+                        &handle,
+                        self.callstack.last_mut().unwrap(),
+                        self.value_stack,
+                        self.modules,
+                    )?;
                     self.push(item);
                 }
                 Instruction::ListSet => {
@@ -261,13 +270,12 @@ impl<'a> FunctionInterpreter<'a> {
                     let handle = self.pop()?.as_hhandle();
                     let list = self.arena.get_mut::<ListObject>(&handle)?;
                     list.set_item(index, value)?;
-                    self.arena
-                        .decrement_rc(&handle, self.value_stack, self.vtables)?;
-                }
-                Instruction::IntrinsicPrint => {
-                    let handle = self.pop()?.as_hhandle();
-                    let string = self.arena.get::<StringObject>(&handle)?;
-                    print!("{}", string.as_str());
+                    self.arena.decrement_rc(
+                        &handle,
+                        self.callstack.last_mut().unwrap(),
+                        self.value_stack,
+                        self.modules,
+                    )?;
                 }
                 Instruction::BoolAnd => {
                     let rhs = self.pop()?;
