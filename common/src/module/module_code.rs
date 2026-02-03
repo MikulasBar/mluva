@@ -9,7 +9,7 @@ use crate::{function::FunctionCode, module::lcp::LCP, serde_header::SerdeHeader}
 pub struct ModuleCode {
     lcp: LCP,
     main_slot: Option<u32>,
-    function_codes: Vec<FunctionCode>,
+    function_codes: Vec<Function>,
 }
 
 impl ModuleCode {
@@ -56,16 +56,6 @@ impl ModuleCode {
 
     pub fn get_code_by_slot(&self, slot: u32) -> Option<&FunctionCode> {
         self.function_codes.get(slot as usize)
-    }
-
-    pub fn get_string_from_pool(&self, slot: u32) -> Option<&str> {
-        self.string_pool.get(slot as usize).map(|s| s.as_str())
-    }
-
-    pub fn add_string(&mut self, s: String) -> u32 {
-        let slot = self.string_pool.len() as u32;
-        self.string_pool.push(s);
-        slot
     }
 
     pub fn add_code(&mut self, code: FunctionCode) -> u32 {

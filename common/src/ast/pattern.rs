@@ -1,14 +1,14 @@
-use crate::{ast::Expr, diagnostics::Span, type_manager::TypeSpec};
+use crate::{Type, ast::Expr, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pattern {
     pub kind: PatternKind,
     pub span: Span,
-    pub ty: Option<TypeSpec>,
+    pub ty: Option<Type>,
 }
 
 impl Pattern {
-    pub fn set_type(&mut self, ty: TypeSpec) {
+    pub fn set_type(&mut self, ty: Type) {
         self.ty = Some(ty);
     }
 

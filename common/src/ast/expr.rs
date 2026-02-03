@@ -1,15 +1,15 @@
 use super::{UnaryOp, binary_op::BinaryOp};
-use crate::{diagnostics::Span, type_manager::TypeSpec};
+use crate::{Type, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
-    pub ty: Option<TypeSpec>,
+    pub ty: Option<Type>,
 }
 
 impl Expr {
-    pub fn set_type(&mut self, ty: TypeSpec) {
+    pub fn set_type(&mut self, ty: Type) {
         self.ty = Some(ty);
     }
 
@@ -41,8 +41,8 @@ impl Expr {
         Self::new(ExprKind::StringLiteral(value), span)
     }
 
-    pub fn list_literal(list: Vec<Self>, span: Span) -> Self {
-        Self::new(ExprKind::ListLiteral(list), span)
+    pub fn array_literal(list: Vec<Self>, span: Span) -> Self {
+        Self::new(ExprKind::ArrayLiteral(list), span)
     }
 
     pub fn var(name: String, span: Span) -> Self {
@@ -106,7 +106,7 @@ pub enum ExprKind {
     F32Literal(f32),
     BoolLiteral(bool),
     StringLiteral(String),
-    ListLiteral(Vec<Expr>),
+    ArrayLiteral(Vec<Expr>),
     Var(String),
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),

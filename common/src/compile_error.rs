@@ -2,9 +2,9 @@ use std::fmt;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
+use crate::Type;
 use crate::diagnostics::{FileId, Span};
 use crate::token::TokenKind;
-use crate::type_manager::{TypeManager, TypeSpec};
 
 /// CLI / top-level runner can convert this into a codespan_reporting Diagnostic
 /// using `to_diagnostic` and then render it.
@@ -76,19 +76,16 @@ impl CompileError {
         .with_span(span)
     }
 
-    pub fn wrong_type_at(
-        expected: TypeSpec,
-        found: TypeSpec,
-        span: Span,
-        tm: &TypeManager,
-    ) -> Self {
-        let message = format!(
-            "wrong type: expected {}, found {}",
-            expected.format(tm),
-            found.format(tm)
-        );
-        Self::new(CompileErrorKind::WrongType { expected, found }, message).with_span(span)
-    }
+    // pub fn wrong_type_at(
+    //     span: Span,
+    // ) -> Self {
+    //     let message = format!(
+    //         "wrong type: expected {}, found {}",
+    //         expected.format(tm),
+    //         found.format(tm)
+    //     );
+    //     Self::new(CompileErrorKind::WrongType { expected, found }, message).with_span(span)
+    // }
 
     pub fn variable_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
         Self::new(
@@ -161,20 +158,19 @@ impl CompileError {
     }
 
     pub fn method_not_found_at(
-        ty: TypeSpec,
+        ty: Type,
         method_name: impl Into<String> + Clone,
         span: Span,
-        tm: &TypeManager,
     ) -> Self {
         let message = format!(
             "method '{}' not found for type {}",
             method_name.clone().into(),
-            ty.format(tm)
+            ty
         );
 
         Self::new(
             CompileErrorKind::MethodNotFound {
-                type_name: ty.format(tm),
+                type_name: ty,
                 method_name: method_name.clone().into(),
             },
             message,
@@ -263,8 +259,8 @@ pub enum CompileErrorKind {
     UnterminatedString,
     UnexpectedEndOfFile,
     WrongType {
-        expected: TypeSpec,
-        found: TypeSpec,
+        expected: Type,
+        found: Type,
     },
     WrongNumberOfArguments {
         expected: usize,
@@ -282,7 +278,7 @@ pub enum CompileErrorKind {
     },
     ReservedFunctionName(String),
     MethodNotFound {
-        type_name: String,
+        type_name: Type,
         method_name: String,
     },
     CannotInferType,

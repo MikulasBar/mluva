@@ -5,14 +5,13 @@ use bincode::{
     error::{DecodeError, EncodeError},
 };
 
-use crate::{function::FunctionSigniture, serde_header::SerdeHeader, type_manager::TypeManager};
+use crate::{function::FunctionSigniture, serde_header::SerdeHeader};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct ModuleSigniture {
     dependency_pool: Vec<String>,
     fn_slots: HashMap<String, u32>,
     signitures: Vec<FunctionSigniture>,
-    pub tm: TypeManager,
 }
 
 impl ModuleSigniture {
@@ -21,7 +20,6 @@ impl ModuleSigniture {
             dependency_pool: vec![],
             fn_slots: HashMap::new(),
             signitures: vec![],
-            tm: TypeManager::empty(),
         }
     }
 
@@ -29,13 +27,11 @@ impl ModuleSigniture {
         dependency_pool: Vec<String>,
         fn_slots: HashMap<String, u32>,
         signitures: Vec<FunctionSigniture>,
-        tm: TypeManager,
     ) -> Self {
         Self {
             dependency_pool,
             fn_slots,
             signitures,
-            tm,
         }
     }
 

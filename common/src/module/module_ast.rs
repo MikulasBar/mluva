@@ -4,7 +4,6 @@ use crate::{
     ast::{Path, Statement},
     function::FunctionSigniture,
     module::module_signiture::ModuleSigniture,
-    type_manager::{Type, TypeManager},
 };
 
 pub struct ModuleAST {
@@ -38,10 +37,6 @@ impl ModuleAST {
         }
 
         sign_slot
-    }
-
-    pub fn get_type_id(&self, name: &str) -> Option<u32> {
-        self.signiture.tm.get_id(name)
     }
 
     pub fn fn_count(&self) -> u32 {

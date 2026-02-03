@@ -3,18 +3,17 @@ use bincode::{Decode, Encode};
 use crate::{
     compile_error::CompileError,
     diagnostics::Span,
-    type_manager::{TypeManager, TypeSpec},
 };
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub struct FunctionSigniture {
-    pub return_type: TypeSpec,
+    pub return_type: String,
     pub params: Vec<Parameter>,
     pub span: Span,
 }
 
 impl FunctionSigniture {
-    pub fn new(return_type: TypeSpec, params: Vec<Parameter>, span: Span) -> Self {
+    pub fn new(return_type: String, params: Vec<Parameter>, span: Span) -> Self {
         Self {
             return_type,
             params,
@@ -24,9 +23,8 @@ impl FunctionSigniture {
 
     pub fn check_argument_types(
         &self,
-        args: &[(TypeSpec, Span)],
+        args: &[(String, Span)],
         call_span: Span,
-        tm: &TypeManager,
     ) -> Result<(), CompileError> {
         if self.params.len() != args.len() {
             return Err(CompileError::wrong_number_of_arguments_at(
@@ -43,7 +41,6 @@ impl FunctionSigniture {
                     param.ty.clone(),
                     arg_type.clone(),
                     *arg_span,
-                    tm,
                 ));
             }
         }

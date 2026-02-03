@@ -46,14 +46,6 @@ impl ModuleManager {
         }
     }
 
-    pub fn get_string_from_pool(&self, module_slot: u32, string_slot: u32) -> Option<&str> {
-        if let Module::Code(m) = self.codes.get(module_slot as usize)? {
-            m.get_string_from_pool(string_slot)
-        } else {
-            None
-        }
-    }
-
     pub fn get_main_slot(&self) -> Option<u32> {
         let main = self.get_main_code()?;
 

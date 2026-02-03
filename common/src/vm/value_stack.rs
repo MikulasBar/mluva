@@ -2,7 +2,7 @@ use super::runtime_error::RuntimeError;
 use crate::word::Word;
 
 pub struct ValueStack {
-    stack: Vec<Word>,
+    pub(crate) stack: Vec<Word>,
 }
 
 impl ValueStack {
