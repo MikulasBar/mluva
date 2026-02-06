@@ -1,10 +1,11 @@
-use crate::module::{module_code::ModuleCode};
-
-pub mod module_ast;
-pub mod module_code;
-pub mod module_manager;
-pub mod module_signiture;
+mod ast;
+mod code;
+mod signiture;
 mod lcp;
+
+pub use ast::ModuleAST;
+pub use code::ModuleCode;
+pub use signiture::ModuleSigniture;
 
 pub enum Module {
     Code(ModuleCode),

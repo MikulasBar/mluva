@@ -14,3 +14,10 @@ pub enum BinaryOp {
     And,
     Or,
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum UnaryOp {
+    Not,
+    Negate,
+}

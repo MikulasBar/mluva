@@ -3,7 +3,7 @@ use common::ast::*;
 use common::compile_error::CompileError;
 use common::diagnostics::{FileId, Span};
 use common::function::{FunctionSigniture, Parameter};
-use common::module::module_ast::ModuleAST;
+use common::module::ast::ModuleAST;
 use common::token::{Token, TokenKind};
 use common::type_manager::TypeSpec;
 

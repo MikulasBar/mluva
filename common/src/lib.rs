@@ -1,3 +1,5 @@
+use crate::descriptor::Descriptor;
+
 pub mod ast;
 pub mod compile_error;
 pub mod diagnostics;
@@ -9,6 +11,4 @@ pub mod token;
 pub mod vm;
 pub mod word;
 pub mod class;
-
-
-pub type Type = String;
+mod descriptor;

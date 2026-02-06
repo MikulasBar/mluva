@@ -1,13 +1,9 @@
-mod binary_op;
 mod expr;
-mod path;
 mod pattern;
 mod statement;
-mod unary_op;
+mod operators;
 
-pub use binary_op::BinaryOp;
+pub use operators::{BinaryOp, UnaryOp};
 pub use expr::{Expr, ExprKind};
-pub use path::Path;
 pub use pattern::{Pattern, PatternKind};
 pub use statement::{Statement, StatementKind};
-pub use unary_op::UnaryOp;

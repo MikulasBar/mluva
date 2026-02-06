@@ -7,7 +7,7 @@ use crate::function::FunctionCode;
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct FunctionEntity {
     kind: FunctionEntityKind,
-    parent_module: Arc<ModuleEntity>,
+    // parent_module: Arc<ModuleEntity>,
 }
 
 #[derive(Debug, Clone, Encode, Decode)]

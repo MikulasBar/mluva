@@ -1,15 +1,15 @@
-use super::{UnaryOp, binary_op::BinaryOp};
-use crate::{Type, diagnostics::Span};
+use super::{UnaryOp, BinaryOp};
+use crate::{Descriptor, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Expr {
     pub kind: ExprKind,
     pub span: Span,
-    pub ty: Option<Type>,
+    pub ty: Option<Descriptor>,
 }
 
 impl Expr {
-    pub fn set_type(&mut self, ty: Type) {
+    pub fn set_type(&mut self, ty: Descriptor) {
         self.ty = Some(ty);
     }
 
@@ -45,7 +45,7 @@ impl Expr {
         Self::new(ExprKind::ArrayLiteral(list), span)
     }
 
-    pub fn var(name: String, span: Span) -> Self {
+    pub fn var(name: Descriptor, span: Span) -> Self {
         Self::new(ExprKind::Var(name), span)
     }
 
@@ -57,45 +57,8 @@ impl Expr {
         Self::new(ExprKind::UnaryOp(op, Box::new(expr)), span)
     }
 
-    pub fn function_call(func_name: String, args: Vec<Self>, span: Span) -> Self {
-        Self::new(ExprKind::FunctionCall { func_name, args }, span)
-    }
-
-    pub fn foreign_function_call(
-        module_name: String,
-        func_name: String,
-        args: Vec<Self>,
-        span: Span,
-    ) -> Self {
-        Self::new(
-            ExprKind::ForeignFunctionCall {
-                module_name,
-                func_name,
-                args,
-            },
-            span,
-        )
-    }
-
-    pub fn method_call(callee: Self, method_name: String, args: Vec<Self>, span: Span) -> Self {
-        Self::new(
-            ExprKind::MethodCall {
-                callee: Box::new(callee),
-                method_name,
-                args,
-            },
-            span,
-        )
-    }
-
-    pub fn index_get(callee: Self, index: Self, span: Span) -> Self {
-        Self::new(
-            ExprKind::IndexGet {
-                callee: Box::new(callee),
-                index: Box::new(index),
-            },
-            span,
-        )
+    pub fn function_call(function: Descriptor, args: Vec<Self>, span: Span) -> Self {
+        Self::new(ExprKind::FunctionCall { function, args }, span)
     }
 }
 
@@ -107,25 +70,11 @@ pub enum ExprKind {
     BoolLiteral(bool),
     StringLiteral(String),
     ArrayLiteral(Vec<Expr>),
-    Var(String),
+    Var(Descriptor),
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall {
-        func_name: String,
+        function: Descriptor,
         args: Vec<Expr>,
-    },
-    ForeignFunctionCall {
-        module_name: String,
-        func_name: String,
-        args: Vec<Expr>,
-    },
-    MethodCall {
-        callee: Box<Expr>,
-        method_name: String,
-        args: Vec<Expr>,
-    },
-    IndexGet {
-        callee: Box<Expr>,
-        index: Box<Expr>,
     },
 }

@@ -2,7 +2,7 @@ use std::fmt;
 
 use codespan_reporting::diagnostic::{Diagnostic, Label, Severity};
 
-use crate::Type;
+use crate::Descriptor;
 use crate::diagnostics::{FileId, Span};
 use crate::token::TokenKind;
 
@@ -60,10 +60,10 @@ impl CompileError {
         .with_span(Span::new(file, 0, 0))
     }
 
-    pub fn reserved_function_name_at(name: impl Into<String> + Clone, span: Span) -> Self {
+    pub fn reserved_function_at(function: Descriptor, span: Span) -> Self {
         Self::new(
-            CompileErrorKind::ReservedFunctionName(name.clone().into()),
-            format!("use of reserved function name {}", name.into()),
+            CompileErrorKind::ReservedFunction(function.clone()),
+            format!("use of reserved function name {}", function),
         )
         .with_span(span)
     }
@@ -76,16 +76,18 @@ impl CompileError {
         .with_span(span)
     }
 
-    // pub fn wrong_type_at(
-    //     span: Span,
-    // ) -> Self {
-    //     let message = format!(
-    //         "wrong type: expected {}, found {}",
-    //         expected.format(tm),
-    //         found.format(tm)
-    //     );
-    //     Self::new(CompileErrorKind::WrongType { expected, found }, message).with_span(span)
-    // }
+    pub fn wrong_type_at(
+        expected: Descriptor,
+        found: Descriptor,
+        span: Span,
+    ) -> Self {
+        let message = format!(
+            "wrong type: expected {}, found {}",
+            expected,
+            found
+        );
+        Self::new(CompileErrorKind::WrongType { expected, found }, message).with_span(span)
+    }
 
     pub fn variable_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
         Self::new(
@@ -95,18 +97,18 @@ impl CompileError {
         .with_span(span)
     }
 
-    pub fn function_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
+    pub fn function_not_found_at(function: Descriptor, span: Span) -> Self {
         Self::new(
-            CompileErrorKind::FunctionNotFound(name.clone().into()),
-            format!("function not found: {}", name.into()),
+            CompileErrorKind::FunctionNotFound(function.clone()),
+            format!("function not found: {}", function),
         )
         .with_span(span)
     }
 
-    pub fn module_not_found_at(name: impl Into<String> + Clone, span: Span) -> Self {
+    pub fn module_not_found_at(module: Descriptor, span: Span) -> Self {
         Self::new(
-            CompileErrorKind::ModuleNotFound(name.clone().into()),
-            format!("module not found: {}", name.into()),
+            CompileErrorKind::ModuleNotFound(module.clone()),
+            format!("module not found: {}", module),
         )
         .with_span(span)
     }
@@ -130,50 +132,10 @@ impl CompileError {
         .with_span(span)
     }
 
-    pub fn unknown_foreign_function_at(
-        module: impl Into<String> + Clone,
-        name: impl Into<String> + Clone,
-        span: Span,
-    ) -> Self {
+    pub fn unknown_type_at(ty: Descriptor, span: Span) -> Self {
         Self::new(
-            CompileErrorKind::UnknownForeignFunction {
-                module: module.clone().into(),
-                name: name.clone().into(),
-            },
-            format!(
-                "unknown foreign function: {}:{}",
-                module.into(),
-                name.into()
-            ),
-        )
-        .with_span(span)
-    }
-
-    pub fn unknown_type_at(name: impl Into<String> + Clone, span: Span) -> Self {
-        Self::new(
-            CompileErrorKind::UnknownType(name.clone().into()),
-            format!("unknown type: {}", name.into()),
-        )
-        .with_span(span)
-    }
-
-    pub fn method_not_found_at(
-        ty: Type,
-        method_name: impl Into<String> + Clone,
-        span: Span,
-    ) -> Self {
-        let message = format!(
-            "method '{}' not found for type {}",
-            method_name.clone().into(),
-            ty
-        );
-
-        Self::new(
-            CompileErrorKind::MethodNotFound {
-                type_name: ty,
-                method_name: method_name.clone().into(),
-            },
-            message,
+            CompileErrorKind::UnknownType(ty.clone()),
+            format!("unknown type: {}", ty),
         )
         .with_span(span)
     }
@@ -259,28 +221,20 @@ pub enum CompileErrorKind {
     UnterminatedString,
     UnexpectedEndOfFile,
     WrongType {
-        expected: Type,
-        found: Type,
+        expected: Descriptor,
+        found: Descriptor,
     },
     WrongNumberOfArguments {
         expected: usize,
         found: usize,
     },
-    UnknownType(String),
+    UnknownType(Descriptor),
     VariableNotFound(String),
-    FunctionNotFound(String),
-    FunctionAlreadyDefined(String),
+    FunctionNotFound(Descriptor),
+    FunctionAlreadyDefined(Descriptor),
     VarRedeclaration(String),
-    ModuleNotFound(String),
-    UnknownForeignFunction {
-        module: String,
-        name: String,
-    },
-    ReservedFunctionName(String),
-    MethodNotFound {
-        type_name: Type,
-        method_name: String,
-    },
+    ModuleNotFound(Descriptor),
+    ReservedFunction(Descriptor),
     CannotInferType,
     InvalidPattern,
     InvalidIndexing,

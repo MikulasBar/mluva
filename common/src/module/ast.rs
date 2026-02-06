@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use crate::{
-    ast::{Path, Statement},
+    Descriptor,
+    ast::Statement,
     function::FunctionSigniture,
-    module::module_signiture::ModuleSigniture,
+    module::signiture::ModuleSigniture,
 };
 
 pub struct ModuleAST {
-    imports: Vec<Path>,
+    imports: Vec<Descriptor>,
     function_bodies: Vec<Vec<Statement>>,
     signiture: ModuleSigniture,
 }
@@ -21,7 +22,7 @@ impl ModuleAST {
         }
     }
 
-    pub fn add_import(&mut self, import: Path) -> u32 {
+    pub fn add_import(&mut self, import: Descriptor) -> u32 {
         let slot = self.imports.len() as u32;
         self.imports.push(import);
         slot
@@ -63,15 +64,7 @@ impl ModuleAST {
         self.function_bodies.get_mut(slot as usize)
     }
 
-    pub fn get_type(&self, slot: u32) -> Option<&Type> {
-        self.signiture.tm.get_type(slot)
-    }
-
-    pub fn tm(&self) -> &'_ TypeManager {
-        &self.signiture.tm
-    }
-
-    pub fn imports(&self) -> &'_ [Path] {
+    pub fn imports(&self) -> &'_ [Descriptor] {
         &self.imports
     }
 

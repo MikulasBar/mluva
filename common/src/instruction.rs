@@ -19,29 +19,6 @@ pub enum Instruction {
     JumpIfFalse(u32),
     Return,
 
-    LocalCall {
-        slot: u32,
-    },
-    ForeignCall {
-        module_name_slot: u32,
-        call_slot: u32,
-    },
-    MethodCall {
-        type_id: u32,
-        slot: u32,
-    },
-    CreateString {
-        pool_slot: u32,
-    },
-    CreateList {
-        item_count: u32,
-        type_id: u32,
-    },
-    ListGet,
-    ListSet,
-    RcInc, // Increment reference count of the top value
-    RcDec, // Decrement reference count of the top value
-
     NewObject(u32),
     FunctionCall(u32),
     InterfaceCall {

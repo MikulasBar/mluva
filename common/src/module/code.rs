@@ -9,7 +9,7 @@ use crate::{function::FunctionCode, module::lcp::LCP, serde_header::SerdeHeader}
 pub struct ModuleCode {
     lcp: LCP,
     main_slot: Option<u32>,
-    function_codes: Vec<Function>,
+    function_codes: Vec<FunctionCode>,
 }
 
 impl ModuleCode {

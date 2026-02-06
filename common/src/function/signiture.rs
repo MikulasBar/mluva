@@ -1,19 +1,18 @@
 use bincode::{Decode, Encode};
 
 use crate::{
-    compile_error::CompileError,
-    diagnostics::Span,
+    Descriptor, compile_error::CompileError, diagnostics::Span
 };
 
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub struct FunctionSigniture {
-    pub return_type: String,
+    pub return_type: Descriptor,
     pub params: Vec<Parameter>,
     pub span: Span,
 }
 
 impl FunctionSigniture {
-    pub fn new(return_type: String, params: Vec<Parameter>, span: Span) -> Self {
+    pub fn new(return_type: Descriptor, params: Vec<Parameter>, span: Span) -> Self {
         Self {
             return_type,
             params,
@@ -23,7 +22,7 @@ impl FunctionSigniture {
 
     pub fn check_argument_types(
         &self,
-        args: &[(String, Span)],
+        args: &[(Descriptor, Span)],
         call_span: Span,
     ) -> Result<(), CompileError> {
         if self.params.len() != args.len() {
@@ -52,12 +51,12 @@ impl FunctionSigniture {
 #[derive(Debug, Clone, PartialEq, Encode, Decode)]
 pub struct Parameter {
     pub name: String,
-    pub ty: TypeSpec,
+    pub ty: Descriptor,
     pub span: Span,
 }
 
 impl Parameter {
-    pub fn new(name: String, ty: TypeSpec, span: Span) -> Self {
+    pub fn new(name: String, ty: Descriptor, span: Span) -> Self {
         Self { name, ty, span }
     }
 }
