@@ -51,6 +51,7 @@ pub enum TokenKind {
     While,
     Return,
     Import,
+    Fn,
 
     Ident(String),
     StringLiteral(String),
@@ -85,6 +86,7 @@ impl Display for TokenKind {
             TokenKind::While => write!(f, "'while'"),
             TokenKind::Return => write!(f, "'return'"),
             TokenKind::Import => write!(f, "'import'"),
+            TokenKind::Fn => write!(f, "'fn'"),
             TokenKind::ParenL => write!(f, "'('"),
             TokenKind::ParenR => write!(f, "')'"),
             TokenKind::BracketL => write!(f, "'['"),

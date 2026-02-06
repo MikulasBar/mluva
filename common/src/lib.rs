@@ -1,4 +1,4 @@
-use crate::descriptor::Descriptor;
+pub use crate::descriptor::Descriptor;
 
 pub mod ast;
 pub mod compile_error;

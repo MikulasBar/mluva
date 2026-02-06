@@ -1,4 +1,4 @@
-use common::{compile_error::CompileError, module::module_ast::ModuleAST};
+use common::{compile_error::CompileError, module::ModuleAST};
 
 use crate::{lexer::tokenize, parser::Parser};
 

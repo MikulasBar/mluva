@@ -18,6 +18,10 @@ impl Descriptor {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.segments.len()
+    }
+
     pub fn get_tail(&self) -> Option<&String> {
         self.segments.last()
     }

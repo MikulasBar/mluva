@@ -1,11 +1,10 @@
 use crate::expect_token;
-use common::ast::*;
+use common::{Descriptor, ast::*};
 use common::compile_error::CompileError;
 use common::diagnostics::{FileId, Span};
 use common::function::{FunctionSigniture, Parameter};
-use common::module::ast::ModuleAST;
+use common::module::ModuleAST;
 use common::token::{Token, TokenKind};
-use common::type_manager::TypeSpec;
 
 pub struct Parser<'a> {
     file_id: FileId,
@@ -73,33 +72,32 @@ impl<'a> Parser<'a> {
                     continue;
                 }
 
-                TokenKind::Ident(_) => {
-                    let (return_type, _) = self.parse_type()?;
-                    expect_token!(TokenKind::Ident(name), name_span in self);
+                TokenKind::Fn => {
+                    expect_token!(TokenKind::Fn in self);
+                    expect_token!(TokenKind::Ident(name) in self);
                     expect_token!(TokenKind::ParenL in self);
 
                     let params = self.parse_named_parameters()?;
 
                     expect_token!(TokenKind::ParenR, paren_r_span in self);
+
+                    let (ret_ty, _) = self.parse_type()?;
+
                     expect_token!(TokenKind::BraceL in self);
-
                     let body = self.parse_statements(TokenKind::BraceR)?;
-
                     expect_token!(TokenKind::BraceR in self);
 
-                    let signiture =
-                        FunctionSigniture::new(return_type, params, token_span.join(paren_r_span));
+                    let signiture = FunctionSigniture::new(ret_ty, params, token_span.join(paren_r_span));
 
                     self.ast.add_fn(name, signiture, body);
                 }
 
                 TokenKind::Import => {
                     expect_token!(TokenKind::Import in self);
-                    expect_token!(TokenKind::Ident(module_name) in self);
+                    let (import, span) = self.parse_descriptor()?;
                     expect_token!(TokenKind::EOL in self);
 
-                    let import_path = Path::single(module_name);
-                    self.ast.add_import(import_path);
+                    self.ast.add_import(import);
                 }
 
                 _ => {
@@ -256,21 +254,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_postfix_pattern(&mut self) -> Result<Pattern, CompileError> {
-        let mut pattern = self.parse_atom_pattern()?;
-
-        loop {
-            match self.peek_kind() {
-                Some(TokenKind::BracketL) => {
-                    expect_token!(TokenKind::BracketL in self);
-                    let index_expr = self.parse_expr()?;
-                    expect_token!(TokenKind::BracketR, end_span in self);
-                    let span = pattern.span.join(end_span);
-                    pattern = Pattern::index(pattern, index_expr, span);
-                }
-
-                _ => break,
-            }
-        }
+        let pattern = self.parse_atom_pattern()?;
 
         Ok(pattern)
     }
@@ -427,32 +411,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_postfix_expr(&mut self) -> Result<Expr, CompileError> {
-        let mut expr = self.parse_atom_expr()?;
-
-        loop {
-            match self.peek_kind() {
-                Some(TokenKind::Dot) => {
-                    self.skip();
-                    expect_token!(TokenKind::Ident(method_name) in self);
-                    expect_token!(TokenKind::ParenL in self);
-                    let args = self.parse_args(TokenKind::ParenR)?;
-                    expect_token!(TokenKind::ParenR, end_span in self);
-                    let span = expr.span.join(end_span);
-                    expr = Expr::method_call(expr, method_name, args, span);
-                }
-
-                Some(TokenKind::BracketL) => {
-                    self.skip();
-                    let index = self.parse_expr()?;
-                    expect_token!(TokenKind::BracketR, end_span in self);
-                    let span = expr.span.join(end_span);
-                    expr = Expr::index_get(expr, index, span);
-                }
-
-                _ => break,
-            }
-        }
-
+        let expr = self.parse_atom_expr()?;
         Ok(expr)
     }
     /// Parse atom expr such as Ident, Num, Bool, not ops.
@@ -493,14 +452,6 @@ impl<'a> Parser<'a> {
                 inner
             }
 
-            TokenKind::BracketL => {
-                expect_token!(TokenKind::BracketL in self);
-                let elements = self.parse_args(TokenKind::BracketR)?;
-                expect_token!(TokenKind::BracketR, end_span in self);
-
-                Ok(Expr::list_literal(elements, token_span.join(end_span)))
-            }
-
             _ => {
                 return Err(CompileError::unexpected_token_at(
                     self.next().unwrap().kind,
@@ -511,7 +462,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_ident_expr(&mut self) -> Result<Expr, CompileError> {
-        expect_token!(TokenKind::Ident(ident), ident_span in self);
+        let (descriptor, span) = self.parse_descriptor()?;
 
         match self.peek_kind() {
             Some(TokenKind::ParenL) => {
@@ -519,26 +470,10 @@ impl<'a> Parser<'a> {
                 let args = self.parse_args(TokenKind::ParenR)?;
                 expect_token!(TokenKind::ParenR, end_span in self);
 
-                Ok(Expr::function_call(ident, args, ident_span.join(end_span)))
+                Ok(Expr::function_call(descriptor, args, span.join(end_span)))
             }
 
-            Some(TokenKind::Colon) => {
-                expect_token!(TokenKind::Colon in self);
-                expect_token!(TokenKind::Ident(func_name) in self);
-
-                expect_token!(TokenKind::ParenL in self);
-                let args = self.parse_args(TokenKind::ParenR)?;
-                expect_token!(TokenKind::ParenR, end_span in self);
-
-                Ok(Expr::foreign_function_call(
-                    ident,
-                    func_name,
-                    args,
-                    ident_span.join(end_span),
-                ))
-            }
-
-            _ => Ok(Expr::var(ident, ident_span)),
+            _ => Ok(Expr::path(descriptor, span)),
         }
     }
 
@@ -562,42 +497,37 @@ impl<'a> Parser<'a> {
         Ok(args)
     }
 
-    fn parse_type(&mut self) -> Result<(TypeSpec, Span), CompileError> {
-        expect_token!(TokenKind::Ident(ident), ident_span in self);
-
-        let type_id = if let Some(type_id) = self.ast.get_type_id(&ident) {
-            type_id
-        } else {
-            return Err(CompileError::unknown_type_at(ident, ident_span));
-        };
-
-        match self.peek_kind() {
-            Some(TokenKind::ArrowL) => {
-                self.skip();
-                let generics = self.parse_type_args()?;
-                expect_token!(TokenKind::ArrowR, end_span in self);
-                Ok((TypeSpec::new(type_id, generics), ident_span.join(end_span)))
-            }
-
-            _ => Ok((TypeSpec::new(type_id, vec![]), ident_span)),
-        }
+    fn parse_type(&mut self) -> Result<(Descriptor, Span), CompileError> {
+        self.parse_descriptor()
     }
 
-    fn parse_type_args(&mut self) -> Result<Vec<TypeSpec>, CompileError> {
-        let mut type_args = vec![];
+    fn parse_descriptor(&mut self) -> Result<(Descriptor, Span), CompileError> {
+        let mut segments = vec![];
+        let mut span = Span::new(self.file_id, 0, 0);
 
-        loop {
-            let (ty, _) = self.parse_type()?;
-            type_args.push(ty);
+        if let Some(TokenKind::Ident(_)) = self.peek_kind() {
+            expect_token!(TokenKind::Ident(ident), ident_span in self);
+            segments.push(ident);
+            span = ident_span;
+        }
 
-            if let Some(&TokenKind::Comma) = self.peek_kind() {
-                self.skip();
+        while let Some(TokenKind::Dot) = self.peek_kind() {
+            self.skip();
+            
+            if let Some(TokenKind::Ident(_)) = self.peek_kind() {
+                expect_token!(TokenKind::Ident(ident), ident_span in self);
+                segments.push(ident);
+                span = span.join(ident_span)
             } else {
                 break;
             }
         }
 
-        Ok(type_args)
+        if segments.is_empty() {
+            panic!()
+        }
+
+        Ok((Descriptor::new(segments), span))
     }
 }
 

@@ -353,6 +353,7 @@ fn match_kw(ident: String) -> TokenKind {
         "while" => TokenKind::While,
         "return" => TokenKind::Return,
         "import" => TokenKind::Import,
+        "fn" => TokenKind::Fn,
 
         _ => TokenKind::Ident(ident),
     }

@@ -45,8 +45,8 @@ impl Expr {
         Self::new(ExprKind::ArrayLiteral(list), span)
     }
 
-    pub fn var(name: Descriptor, span: Span) -> Self {
-        Self::new(ExprKind::Var(name), span)
+    pub fn path(path: Descriptor, span: Span) -> Self {
+        Self::new(ExprKind::Path(path), span)
     }
 
     pub fn binary_op(op: BinaryOp, lhs: Self, rhs: Self, span: Span) -> Self {
@@ -70,7 +70,7 @@ pub enum ExprKind {
     BoolLiteral(bool),
     StringLiteral(String),
     ArrayLiteral(Vec<Expr>),
-    Var(Descriptor),
+    Path(Descriptor),
     BinaryOp(BinaryOp, Box<Expr>, Box<Expr>),
     UnaryOp(UnaryOp, Box<Expr>),
     FunctionCall {
