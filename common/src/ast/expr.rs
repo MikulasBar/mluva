@@ -21,10 +21,6 @@ impl Expr {
         }
     }
 
-    pub fn void_literal(span: Span) -> Self {
-        Self::new(ExprKind::VoidLiteral, span)
-    }
-
     pub fn i32_literal(value: i32, span: Span) -> Self {
         Self::new(ExprKind::I32Literal(value), span)
     }
@@ -64,7 +60,6 @@ impl Expr {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExprKind {
-    VoidLiteral,
     I32Literal(i32),
     F32Literal(f32),
     BoolLiteral(bool),

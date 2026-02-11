@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, ops::Deref};
 
 use crate::{
     Descriptor,
@@ -9,7 +9,7 @@ use crate::{
 
 pub struct ModuleAST {
     imports: Vec<Descriptor>,
-    function_bodies: Vec<Vec<Statement>>,
+    function_bodies: HashMap<String, Vec<Statement>>,
     signiture: ModuleSigniture,
 }
 
@@ -17,7 +17,7 @@ impl ModuleAST {
     pub fn empty() -> Self {
         Self {
             imports: vec![],
-            function_bodies: vec![],
+            function_bodies: HashMap::new(),
             signiture: ModuleSigniture::empty(),
         }
     }
@@ -28,48 +28,34 @@ impl ModuleAST {
         slot
     }
 
-    pub fn add_fn(&mut self, name: String, sign: FunctionSigniture, body: Vec<Statement>) -> u32 {
-        let body_slot = self.function_bodies.len() as u32;
-        self.function_bodies.push(body);
-        let sign_slot = self.signiture.add_fn(name, sign);
-
-        if sign_slot != body_slot {
-            panic!("Function signiture slot and body slot do not match");
-        }
-
-        sign_slot
+    pub fn add_function(&mut self, name: String, sig: FunctionSigniture, body: Vec<Statement>) {
+        self.signiture.add_function(name.clone(), sig);
+        self.function_bodies.insert(name, body);
     }
 
     pub fn fn_count(&self) -> u32 {
         self.function_bodies.len() as u32
     }
 
-    pub fn get_fn_slot(&self, name: &str) -> Option<u32> {
-        self.signiture.get_fn_slot(name)
+    pub fn get_function_sig(&self, name: &str) -> Option<&FunctionSigniture> {
+        self.signiture.get_function(name)
     }
 
-    pub fn get_sign(&self, slot: u32) -> Option<&FunctionSigniture> {
-        self.signiture.get_sign(slot)
+    pub fn get_function_body(&self, name: &str) -> Option<&Vec<Statement>> {
+        self.function_bodies.get(name)
     }
 
-    pub fn get_sign_by_name(&self, name: &str) -> Option<&FunctionSigniture> {
-        self.signiture.get_sign_by_name(name)
+    pub fn get_function_body_mut(&mut self, name: &str) -> Option<&mut Vec<Statement>> {
+        self.function_bodies.get_mut(name)
     }
 
-    pub fn get_body(&self, slot: u32) -> Option<&Vec<Statement>> {
-        self.function_bodies.get(slot as usize)
+    pub fn function_names(&self) -> impl Iterator<Item = &str> {
+        self.function_bodies.keys().map(|s| (*s).as_str())
     }
 
-    pub fn get_body_mut(&mut self, slot: u32) -> Option<&mut Vec<Statement>> {
-        self.function_bodies.get_mut(slot as usize)
-    }
 
     pub fn imports(&self) -> &'_ [Descriptor] {
         &self.imports
-    }
-
-    pub fn get_fn_map(&self) -> &'_ HashMap<String, u32> {
-        &self.signiture.get_fn_map()
     }
 
     pub fn to_signiture(self) -> ModuleSigniture {

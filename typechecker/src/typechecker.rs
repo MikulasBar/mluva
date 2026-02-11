@@ -3,12 +3,12 @@ use std::mem;
 
 use super::type_scope::TypeScope;
 use crate::bin_op_pat;
+use common::{Descriptor, descriptor};
 use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
 use common::compile_error::CompileError;
 use common::diagnostics::Span;
-use common::module::module_ast::ModuleAST;
-use common::module::module_signiture::ModuleSigniture;
-use common::type_manager::TypeSpec;
+use common::module::ModuleAST;
+use common::module::ModuleSigniture;
 
 pub struct TypeChecker<'a> {
     ast: &'a mut ModuleAST,
@@ -30,10 +30,10 @@ impl<'a> TypeChecker<'a> {
     }
 
     fn check_functions(&mut self) -> Result<(), CompileError> {
-        for slot in 0..self.ast.fn_count() {
+        for name in self.ast.function_names() {
             self.scope.enter();
 
-            let signiture = self.ast.get_sign(slot as u32).unwrap();
+            let signiture = self.ast.get_function_sig(name).unwrap();
 
             signiture.params.iter().try_for_each(|p| {
                 self.scope
@@ -45,11 +45,11 @@ impl<'a> TypeChecker<'a> {
             // Take the body out to avoid borrowing issues
             // This shouldn't break anything, because we this only once,
             // so no one else will use the body when we have it taken out
-            let mut statements = mem::take(self.ast.get_body_mut(slot as u32).unwrap());
+            let mut statements = mem::take(self.ast.get_function_body_mut(name).unwrap());
 
             self.check_statements(&mut statements, &return_type)?;
 
-            let body = self.ast.get_body_mut(slot as u32).unwrap();
+            let body = self.ast.get_function_body_mut(name).unwrap();
             *body = statements;
 
             self.scope.exit();
@@ -61,7 +61,7 @@ impl<'a> TypeChecker<'a> {
     fn check_statements(
         &mut self,
         statements: &mut [Statement],
-        return_type: &TypeSpec,
+        return_type: &Descriptor,
     ) -> Result<(), CompileError> {
         for statement in statements {
             self.check_statement(statement, return_type)?;
@@ -73,7 +73,7 @@ impl<'a> TypeChecker<'a> {
     fn check_statement(
         &mut self,
         statement: &mut Statement,
-        return_type: &TypeSpec,
+        return_type: Option<&Descriptor>,
     ) -> Result<(), CompileError> {
         match &mut statement.kind {
             StatementKind::If {
@@ -82,12 +82,11 @@ impl<'a> TypeChecker<'a> {
                 else_block,
             } => {
                 let cond = self.check_expr(condition)?;
-                if !cond.is_bool() {
+                if !cond.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::bool(),
+                        descriptor!("Bool"),
                         cond,
                         statement.span,
-                        self.ast.tm(),
                     ));
                 }
 
@@ -115,11 +114,7 @@ impl<'a> TypeChecker<'a> {
                             var_type.clone(),
                             val_type,
                             expr_span,
-                            self.ast.tm(),
                         ));
-                    }
-                    (None, ty) if ty == TypeSpec::unknown_list() => {
-                        return Err(CompileError::cannot_infer_type_at(expr_span));
                     }
                     (Some(var_type), _) => var_type.clone(),
                     (None, val_type) => val_type,
@@ -138,19 +133,17 @@ impl<'a> TypeChecker<'a> {
                         assignee_type,
                         expr_type,
                         statement.span,
-                        self.ast.tm(),
                     ));
                 }
             }
 
             StatementKind::While { condition, block } => {
                 let cond = self.check_expr(condition)?;
-                if !cond.is_bool() {
+                if !cond.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::bool(),
+                        descriptor!("Bool"),
                         cond,
                         statement.span,
-                        self.ast.tm(),
                     ));
                 }
 
@@ -162,13 +155,17 @@ impl<'a> TypeChecker<'a> {
             }
 
             StatementKind::Return(expr) => {
+                match (expr, return_type) {
+                    (Some(e), Some(r)) => {
+                        
+                    },
+                }
                 let expr_type = self.check_expr(expr)?;
                 if expr_type != *return_type {
                     return Err(CompileError::wrong_type_at(
                         return_type.clone(),
                         expr_type,
                         statement.span,
-                        self.ast.tm(),
                     ));
                 }
             }
@@ -177,9 +174,9 @@ impl<'a> TypeChecker<'a> {
         Ok(())
     }
 
-    fn check_expr(&self, expr: &mut Expr) -> Result<TypeSpec, CompileError> {
+    fn check_expr(&self, expr: &mut Expr) -> Result<Descriptor, CompileError> {
         let expr_ty = match &mut expr.kind {
-            ExprKind::Var(ident) => {
+            ExprKind::Path(ident) => {
                 let Some(ty) = self.scope.get(&ident) else {
                     return Err(CompileError::variable_not_found_at(
                         ident.clone(),
@@ -189,67 +186,14 @@ impl<'a> TypeChecker<'a> {
 
                 ty.clone()
             }
-            ExprKind::VoidLiteral => TypeSpec::void(),
-            ExprKind::I32Literal(_) => TypeSpec::i32(),
-            ExprKind::F32Literal(_) => TypeSpec::f32(),
-            ExprKind::BoolLiteral(_) => TypeSpec::bool(),
-            ExprKind::StringLiteral(_) => TypeSpec::string(),
-            ExprKind::ListLiteral(list) => {
-                if list.is_empty() {
-                    TypeSpec::unknown_list()
-                } else {
-                    let first_type = self.check_expr(&mut list[0])?;
-                    for element in list.iter_mut().skip(1) {
-                        let element_type = self.check_expr(element)?;
-                        if element_type != first_type {
-                            return Err(CompileError::wrong_type_at(
-                                first_type.clone(),
-                                element_type,
-                                expr.span,
-                                self.ast.tm(),
-                            ));
-                        }
-                    }
+            ExprKind::I32Literal(_) => Descriptor::i32_type(),
+            ExprKind::F32Literal(_) => Descriptor::f32_type(),
+            ExprKind::BoolLiteral(_) => Descriptor::bool_type(),
+            // ExprKind::StringLiteral(_) => Descriptor::string_type(),
 
-                    TypeSpec::list_of(first_type)
-                }
+            ExprKind::FunctionCall { function, args } => {
+                self.check_call_expr(expr.span, function, args)?
             }
-
-            ExprKind::IndexGet { callee, index } => {
-                let callee_type = self.check_expr(callee)?;
-                let index_type = self.check_expr(index)?;
-
-                if index_type != TypeSpec::i32() {
-                    return Err(CompileError::wrong_type_at(
-                        TypeSpec::i32(),
-                        index_type,
-                        expr.span,
-                        self.ast.tm(),
-                    ));
-                }
-
-                if let Some(item_type) = callee_type.get_index_type() {
-                    item_type
-                } else {
-                    return Err(CompileError::invalid_indexing_at(expr.span));
-                }
-            }
-
-            ExprKind::FunctionCall { func_name, args } => {
-                self.check_call_expr(expr.span, func_name, args)?
-            }
-
-            ExprKind::ForeignFunctionCall {
-                module_name,
-                func_name,
-                args,
-            } => self.check_foreign_call_expr(expr.span, module_name, func_name, args)?,
-
-            ExprKind::MethodCall {
-                callee,
-                method_name,
-                args,
-            } => self.check_method_call_expr(expr.span, callee, method_name, args)?,
 
             ExprKind::BinaryOp(op, lhs, rhs) => {
                 self.check_binary_op_expr(expr.span, op, lhs, rhs)?
@@ -267,17 +211,17 @@ impl<'a> TypeChecker<'a> {
         span: Span,
         func_name: &str,
         args: &mut [Expr],
-    ) -> Result<TypeSpec, CompileError> {
-        let Some(sign) = self.ast.get_sign_by_name(&func_name) else {
+    ) -> Result<Descriptor, CompileError> {
+        let Some(sign) = self.ast.get_function_sig(&func_name) else {
             return Err(CompileError::function_not_found_at(func_name, span));
         };
 
-        let arg_types: Vec<(TypeSpec, Span)> = args
+        let arg_types: Vec<(Descriptor, Span)> = args
             .iter_mut()
             .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-            .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
+            .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
 
-        sign.check_argument_types(&arg_types, span, self.ast.tm())?;
+        sign.check_argument_types(&arg_types, span)?;
 
         Ok(sign.return_type.clone())
     }
@@ -288,18 +232,18 @@ impl<'a> TypeChecker<'a> {
         module_name: &str,
         func_name: &str,
         args: &mut [Expr],
-    ) -> Result<TypeSpec, CompileError> {
+    ) -> Result<Descriptor, CompileError> {
         let signiture = self
             .dependencies
             .get(module_name)
             .ok_or_else(|| CompileError::module_not_found_at(module_name, span))?
-            .get_sign_by_name(&func_name)
+            .get_function(&func_name)
             .ok_or_else(|| CompileError::function_not_found_at(func_name, span))?;
 
-        let arg_types: Vec<(TypeSpec, Span)> = args
+        let arg_types: Vec<(Descriptor, Span)> = args
             .iter_mut()
             .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-            .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
+            .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
 
         signiture.check_argument_types(&arg_types, span, self.ast.tm())?;
 
@@ -312,17 +256,17 @@ impl<'a> TypeChecker<'a> {
         callee: &mut Expr,
         method_name: &str,
         args: &mut [Expr],
-    ) -> Result<TypeSpec, CompileError> {
+    ) -> Result<Descriptor, CompileError> {
         let callee_type = self.check_expr(callee)?;
 
-        let arg_types: Vec<(TypeSpec, Span)> = args
+        let arg_types: Vec<(Descriptor, Span)> = args
             .iter_mut()
             .map(|arg| self.check_expr(arg).map(|t| (t, arg.span)))
-            .collect::<Result<Vec<(TypeSpec, Span)>, CompileError>>()?;
+            .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
 
         let ty = self
             .ast
-            .get_type(callee_type.id)
+            .get_type(callee_type)
             .expect("Internal Typechecker error, not recovering");
 
         let method_slot =
@@ -331,11 +275,10 @@ impl<'a> TypeChecker<'a> {
                     callee_type,
                     method_name,
                     span,
-                    self.ast.tm(),
                 ))?;
 
-        let method = self.ast.get_sign(method_slot).unwrap();
-        method.check_argument_types(&arg_types, span, self.ast.tm())?;
+        let method = self.ast.get_function_sig(method_slot).unwrap();
+        method.check_argument_types(&arg_types, span)?;
 
         Ok(method.return_type.clone())
     }
@@ -346,17 +289,16 @@ impl<'a> TypeChecker<'a> {
         op: &BinaryOp,
         lhs: &mut Expr,
         rhs: &mut Expr,
-    ) -> Result<TypeSpec, CompileError> {
+    ) -> Result<Descriptor, CompileError> {
         let lhs_type = self.check_expr(lhs)?;
         let rhs_type = self.check_expr(rhs)?;
         match op {
             bin_op_pat!(NUMERIC) => {
-                if !lhs_type.is_i32() && !lhs_type.is_f32() {
+                if !lhs_type.is_i32_type() && !lhs_type.is_f32_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::i32(),
+                        descriptor!("numeric"),
                         lhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
@@ -365,7 +307,6 @@ impl<'a> TypeChecker<'a> {
                         lhs_type,
                         rhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
@@ -373,12 +314,11 @@ impl<'a> TypeChecker<'a> {
             }
 
             bin_op_pat!(NUMERIC_COMPARISON) => {
-                if !lhs_type.is_i32() && !lhs_type.is_f32() {
+                if !lhs_type.is_i32_type() && !lhs_type.is_f32_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::i32(),
+                        descriptor!("numeric"),
                         lhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
@@ -387,11 +327,10 @@ impl<'a> TypeChecker<'a> {
                         lhs_type,
                         rhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
-                Ok(TypeSpec::bool())
+                Ok(Descriptor::bool_type())
             }
 
             bin_op_pat!(COMPARISON) => {
@@ -400,62 +339,57 @@ impl<'a> TypeChecker<'a> {
                         lhs_type,
                         rhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
-                Ok(TypeSpec::bool())
+                Ok(Descriptor::bool_type())
             }
 
             bin_op_pat!(LOGICAL) => {
-                if !lhs_type.is_bool() {
+                if !lhs_type.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::bool(),
+                        Descriptor::bool_type(),
                         lhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
-                if !rhs_type.is_bool() {
+                if !rhs_type.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::bool(),
+                        Descriptor::bool_type(),
                         rhs_type,
                         span,
-                        self.ast.tm(),
                     ));
                 }
 
-                Ok(TypeSpec::bool())
+                Ok(Descriptor::bool_type())
             }
         }
     }
 
-    fn check_unary_op_expr(&self, expr: &mut Expr, op: &UnaryOp) -> Result<TypeSpec, CompileError> {
+    fn check_unary_op_expr(&self, expr: &mut Expr, op: &UnaryOp) -> Result<Descriptor, CompileError> {
         let expr_type = self.check_expr(expr)?;
         match op {
             UnaryOp::Not => {
-                if !expr_type.is_bool() {
+                if !expr_type.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::bool(),
+                        Descriptor::bool_type(),
                         expr_type,
                         expr.span,
-                        self.ast.tm(),
                     ));
                 }
 
-                Ok(TypeSpec::bool())
+                Ok(Descriptor::bool_type())
             }
 
             UnaryOp::Negate => match expr_type {
-                t if t == TypeSpec::i32() => Ok(TypeSpec::i32()),
-                t if t == TypeSpec::f32() => Ok(TypeSpec::f32()),
+                t if t.is_i32_type() => Ok(Descriptor::i32_type()),
+                t if t.is_f32_type() => Ok(Descriptor::f32_type()),
                 _ => {
                     return Err(CompileError::wrong_type_at(
-                        TypeSpec::i32(),
+                        descriptor!("numeric"),
                         expr_type,
                         expr.span,
-                        self.ast.tm(),
                     ));
                 }
             },

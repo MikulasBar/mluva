@@ -89,7 +89,7 @@ impl<'a> Parser<'a> {
 
                     let signiture = FunctionSigniture::new(ret_ty, params, token_span.join(paren_r_span));
 
-                    self.ast.add_fn(name, signiture, body);
+                    self.ast.add_function(name, signiture, body);
                 }
 
                 TokenKind::Import => {
@@ -159,11 +159,11 @@ impl<'a> Parser<'a> {
                     expect_token!(TokenKind::Return in self);
                     if let Some(TokenKind::EOL) = self.peek_kind() {
                         self.skip();
-                        Statement::return_statement(Expr::void_literal(token_span), token_span)
+                        Statement::return_statement(None, token_span)
                     } else {
                         let expr = self.parse_expr()?;
                         expect_token!(TokenKind::EOL in self);
-                        Statement::return_statement(expr, token_span)
+                        Statement::return_statement(Some(expr), token_span)
                     }
                 }
 

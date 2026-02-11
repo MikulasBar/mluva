@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
+use common::Descriptor;
 use common::ast::{Pattern, PatternKind};
-use common::type_manager::TypeSpec;
 use common::{compile_error::CompileError, diagnostics::Span};
 
 pub struct TypeScope {
-    scopes: Vec<HashMap<String, TypeSpec>>,
+    scopes: Vec<HashMap<String, Descriptor>>,
 }
 
 impl TypeScope {
@@ -33,13 +33,10 @@ impl TypeScope {
     pub fn insert_new_pattern(
         &mut self,
         assignee: Pattern,
-        ty: TypeSpec,
+        ty: Descriptor,
         span: Span,
     ) -> Result<(), CompileError> {
         match assignee.kind {
-            PatternKind::Index { .. } => {
-                return Err(CompileError::invalid_pattern_at(assignee.span));
-            }
             PatternKind::Variable(var) => self.insert_new_var(var, ty, span),
         }
     }
@@ -47,7 +44,7 @@ impl TypeScope {
     pub fn insert_new_var(
         &mut self,
         name: String,
-        data_type: TypeSpec,
+        ty: Descriptor,
         span: Span,
     ) -> Result<(), CompileError> {
         if self.contains(&name) {
@@ -57,27 +54,21 @@ impl TypeScope {
         self.scopes
             .last_mut()
             .expect("There is no scope")
-            .insert(name, data_type);
+            .insert(name, ty);
 
         Ok(())
     }
 
-    pub fn get_pattern(&self, pattern: &Pattern) -> Result<TypeSpec, CompileError> {
+    pub fn get_pattern(&self, pattern: &Pattern) -> Result<Descriptor, CompileError> {
         match &pattern.kind {
             PatternKind::Variable(name) => self
                 .get(name)
                 .cloned()
-                .ok_or_else(|| CompileError::variable_not_found_at(name.clone(), pattern.span)),
-            PatternKind::Index { callee, index } => {
-                let callee_type = self.get_pattern(callee)?;
-                callee_type
-                    .get_index_type()
-                    .ok_or_else(|| CompileError::invalid_indexing_at(index.span))
-            }
+                .ok_or_else(|| CompileError::variable_not_found_at(name.clone(), pattern.span))
         }
     }
 
-    pub fn get(&self, key: &str) -> Option<&TypeSpec> {
+    pub fn get(&self, key: &str) -> Option<&Descriptor> {
         for scope in self.scopes.iter().rev() {
             if let Some(value) = scope.get(key) {
                 return Some(value);

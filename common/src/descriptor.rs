@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use bincode::{Decode, Encode};
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Hash)]
 pub struct Descriptor {
     segments: Vec<String>,
 }
@@ -12,18 +12,45 @@ impl Descriptor {
         Self { segments }
     }
 
-    pub fn single(segment: String) -> Self {
-        Self {
-            segments: vec![segment],
-        }
-    }
-
     pub fn len(&self) -> usize {
         self.segments.len()
     }
 
-    pub fn get_tail(&self) -> Option<&String> {
-        self.segments.last()
+    pub fn tail(&self) -> Option<&str> {
+        self.segments.last().map(|s| s.as_str())
+    }
+
+    pub fn matches(&self, other: &Descriptor) -> bool {
+        self.len() == other.len()
+            && self
+                .segments
+                .iter()
+                .zip(other.segments.iter())
+                .all(|(a, b)| a == b)
+    }
+
+    pub fn is_bool_type(&self) -> bool {
+        self.matches(&Self::bool_type())
+    }
+
+    pub fn is_i32_type(&self) -> bool {
+        self.matches(&Self::i32_type())
+    }
+
+    pub fn is_f32_type(&self) -> bool {
+        self.matches(&Self::f32_type())
+    }
+
+    pub fn bool_type() -> Self {
+        descriptor!("Bool")
+    }
+
+    pub fn i32_type() -> Self {
+        descriptor!("I32")
+    }
+
+    pub fn f32_type() -> Self {
+        descriptor!("F32")
     }
 }
 
@@ -33,3 +60,12 @@ impl Display for Descriptor {
         write!(f, "{}", string)
     }
 }
+
+#[macro_export]
+macro_rules! descriptor {
+    ($($rest:expr),*) => {
+        Descriptor::new(vec![$($rest.to_string(),)*])
+    };
+}
+
+use descriptor;

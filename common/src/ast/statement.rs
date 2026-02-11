@@ -60,7 +60,7 @@ impl Statement {
         }
     }
 
-    pub fn return_statement(expr: Expr, span: Span) -> Self {
+    pub fn return_statement(expr: Option<Expr>, span: Span) -> Self {
         Self {
             kind: StatementKind::Return(expr),
             span,
@@ -89,5 +89,5 @@ pub enum StatementKind {
         block: Vec<Statement>,
     },
     Expr(Expr),
-    Return(Expr),
+    Return(Option<Expr>),
 }

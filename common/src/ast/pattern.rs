@@ -27,20 +27,9 @@ impl Pattern {
     pub fn var(name: String, span: Span) -> Self {
         Self::new(PatternKind::Variable(name), span)
     }
-
-    pub fn index(callee: Self, index: Expr, span: Span) -> Self {
-        Self::new(
-            PatternKind::Index {
-                callee: Box::new(callee),
-                index,
-            },
-            span,
-        )
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PatternKind {
     Variable(String),
-    Index { callee: Box<Pattern>, index: Expr },
 }
