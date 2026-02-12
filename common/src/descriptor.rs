@@ -20,6 +20,10 @@ impl Descriptor {
         self.segments.last().map(|s| s.as_str())
     }
 
+    pub fn pop_tail_unchecked(&mut self) -> String {
+        self.segments.pop().unwrap()
+    }
+
     pub fn matches(&self, other: &Descriptor) -> bool {
         self.len() == other.len()
             && self
@@ -27,6 +31,10 @@ impl Descriptor {
                 .iter()
                 .zip(other.segments.iter())
                 .all(|(a, b)| a == b)
+    }
+
+    pub fn is_void_type(&self) -> bool {
+        self.matches(&Self::void_type())
     }
 
     pub fn is_bool_type(&self) -> bool {
@@ -39,6 +47,10 @@ impl Descriptor {
 
     pub fn is_f32_type(&self) -> bool {
         self.matches(&Self::f32_type())
+    }
+
+    pub fn void_type() -> Self {
+        descriptor!("Void")
     }
 
     pub fn bool_type() -> Self {

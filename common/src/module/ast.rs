@@ -49,10 +49,9 @@ impl ModuleAST {
         self.function_bodies.get_mut(name)
     }
 
-    pub fn function_names(&self) -> impl Iterator<Item = &str> {
-        self.function_bodies.keys().map(|s| (*s).as_str())
+    pub fn function_names(&self) -> Vec<String> {
+        self.function_bodies.keys().map(|s| s.clone()).collect()
     }
-
 
     pub fn imports(&self) -> &'_ [Descriptor] {
         &self.imports

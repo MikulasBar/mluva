@@ -12,12 +12,12 @@ use common::module::ModuleSigniture;
 
 pub struct TypeChecker<'a> {
     ast: &'a mut ModuleAST,
-    dependencies: &'a HashMap<String, ModuleSigniture>,
+    dependencies: &'a HashMap<Descriptor, ModuleSigniture>,
     scope: TypeScope,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(ast: &'a mut ModuleAST, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
+    pub fn new(ast: &'a mut ModuleAST, dependencies: &'a HashMap<Descriptor, ModuleSigniture>) -> Self {
         Self {
             ast,
             dependencies,
@@ -33,7 +33,7 @@ impl<'a> TypeChecker<'a> {
         for name in self.ast.function_names() {
             self.scope.enter();
 
-            let signiture = self.ast.get_function_sig(name).unwrap();
+            let signiture = self.ast.get_function_sig(&name).unwrap();
 
             signiture.params.iter().try_for_each(|p| {
                 self.scope
@@ -43,18 +43,18 @@ impl<'a> TypeChecker<'a> {
             let return_type = signiture.return_type.clone();
 
             // Take the body out to avoid borrowing issues
-            // This shouldn't break anything, because we this only once,
+            // This shouldn't break anything, because we do this only once,
             // so no one else will use the body when we have it taken out
-            let mut statements = mem::take(self.ast.get_function_body_mut(name).unwrap());
+            let mut statements = mem::take(self.ast.get_function_body_mut(&name).unwrap());
 
             self.check_statements(&mut statements, &return_type)?;
 
-            let body = self.ast.get_function_body_mut(name).unwrap();
+            let body = self.ast.get_function_body_mut(&name).unwrap();
             *body = statements;
 
             self.scope.exit();
         }
-
+    
         Ok(())
     }
 
@@ -73,7 +73,7 @@ impl<'a> TypeChecker<'a> {
     fn check_statement(
         &mut self,
         statement: &mut Statement,
-        return_type: Option<&Descriptor>,
+        return_type: &Descriptor,
     ) -> Result<(), CompileError> {
         match &mut statement.kind {
             StatementKind::If {
@@ -84,7 +84,7 @@ impl<'a> TypeChecker<'a> {
                 let cond = self.check_expr(condition)?;
                 if !cond.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        descriptor!("Bool"),
+                        Descriptor::bool_type(),
                         cond,
                         statement.span,
                     ));
@@ -141,7 +141,7 @@ impl<'a> TypeChecker<'a> {
                 let cond = self.check_expr(condition)?;
                 if !cond.is_bool_type() {
                     return Err(CompileError::wrong_type_at(
-                        descriptor!("Bool"),
+                        Descriptor::bool_type(),
                         cond,
                         statement.span,
                     ));
@@ -156,17 +156,15 @@ impl<'a> TypeChecker<'a> {
 
             StatementKind::Return(expr) => {
                 match (expr, return_type) {
-                    (Some(e), Some(r)) => {
-                        
+                    (Some(e), r) => {
+                        let e = self.check_expr(e)?;
+
+                        if !e.matches(r) {
+                            return Err(CompileError::wrong_type_at(e, r.clone(), statement.span))
+                        }
                     },
-                }
-                let expr_type = self.check_expr(expr)?;
-                if expr_type != *return_type {
-                    return Err(CompileError::wrong_type_at(
-                        return_type.clone(),
-                        expr_type,
-                        statement.span,
-                    ));
+                    (None, r) if !r.is_void_type() => return Err(CompileError::wrong_type_at(Descriptor::void_type(), r.clone(), statement.span)),
+                    _ => (),
                 }
             }
         }
@@ -177,9 +175,11 @@ impl<'a> TypeChecker<'a> {
     fn check_expr(&self, expr: &mut Expr) -> Result<Descriptor, CompileError> {
         let expr_ty = match &mut expr.kind {
             ExprKind::Path(ident) => {
+                // TODO: solve other paths that are not variables
+                let ident = ident.tail().unwrap();
                 let Some(ty) = self.scope.get(&ident) else {
                     return Err(CompileError::variable_not_found_at(
-                        ident.clone(),
+                        ident,
                         expr.span,
                     ));
                 };
@@ -189,7 +189,8 @@ impl<'a> TypeChecker<'a> {
             ExprKind::I32Literal(_) => Descriptor::i32_type(),
             ExprKind::F32Literal(_) => Descriptor::f32_type(),
             ExprKind::BoolLiteral(_) => Descriptor::bool_type(),
-            // ExprKind::StringLiteral(_) => Descriptor::string_type(),
+            ExprKind::StringLiteral(_) => todo!(),
+            ExprKind::ArrayLiteral(_) => todo!(),
 
             ExprKind::FunctionCall { function, args } => {
                 self.check_call_expr(expr.span, function, args)?
@@ -209,79 +210,85 @@ impl<'a> TypeChecker<'a> {
     fn check_call_expr(
         &self,
         span: Span,
-        func_name: &str,
+        function: &Descriptor,
         args: &mut [Expr],
     ) -> Result<Descriptor, CompileError> {
-        let Some(sign) = self.ast.get_function_sig(&func_name) else {
-            return Err(CompileError::function_not_found_at(func_name, span));
+        let mut path = function.clone();
+        let tail = path.pop_tail_unchecked();
+        let Some(module) = self.dependencies.get(&path) else {
+            return Err(CompileError::module_not_found_at(path, span))
         };
 
-        let arg_types: Vec<(Descriptor, Span)> = args
-            .iter_mut()
-            .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-            .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
-
-        sign.check_argument_types(&arg_types, span)?;
-
-        Ok(sign.return_type.clone())
-    }
-
-    fn check_foreign_call_expr(
-        &self,
-        span: Span,
-        module_name: &str,
-        func_name: &str,
-        args: &mut [Expr],
-    ) -> Result<Descriptor, CompileError> {
-        let signiture = self
-            .dependencies
-            .get(module_name)
-            .ok_or_else(|| CompileError::module_not_found_at(module_name, span))?
-            .get_function(&func_name)
-            .ok_or_else(|| CompileError::function_not_found_at(func_name, span))?;
-
-        let arg_types: Vec<(Descriptor, Span)> = args
-            .iter_mut()
-            .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-            .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
-
-        signiture.check_argument_types(&arg_types, span, self.ast.tm())?;
-
-        Ok(signiture.return_type.clone())
-    }
-
-    fn check_method_call_expr(
-        &self,
-        span: Span,
-        callee: &mut Expr,
-        method_name: &str,
-        args: &mut [Expr],
-    ) -> Result<Descriptor, CompileError> {
-        let callee_type = self.check_expr(callee)?;
-
+        let Some(sig) = module.get_function(&tail) else {
+            return Err(CompileError::function_not_found_at(function.clone(), span))
+        };
+        
         let arg_types: Vec<(Descriptor, Span)> = args
             .iter_mut()
             .map(|arg| self.check_expr(arg).map(|t| (t, arg.span)))
             .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
 
-        let ty = self
-            .ast
-            .get_type(callee_type)
-            .expect("Internal Typechecker error, not recovering");
+        sig.check_argument_types(&arg_types, span)?;
 
-        let method_slot =
-            ty.get_method_slot(method_name)
-                .ok_or(CompileError::method_not_found_at(
-                    callee_type,
-                    method_name,
-                    span,
-                ))?;
-
-        let method = self.ast.get_function_sig(method_slot).unwrap();
-        method.check_argument_types(&arg_types, span)?;
-
-        Ok(method.return_type.clone())
+        Ok(sig.return_type.clone())
     }
+
+    // fn check_foreign_call_expr(
+    //     &self,
+    //     span: Span,
+    //     module_name: &str,
+    //     func_name: &str,
+    //     args: &mut [Expr],
+    // ) -> Result<Descriptor, CompileError> {
+    //     let signiture = self
+    //         .dependencies
+    //         .get(module_name)
+    //         .ok_or_else(|| CompileError::module_not_found_at(module_name, span))?
+    //         .get_function(&func_name)
+    //         .ok_or_else(|| CompileError::function_not_found_at(func_name, span))?;
+
+    //     let arg_types: Vec<(Descriptor, Span)> = args
+    //         .iter_mut()
+    //         .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
+    //         .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
+
+    //     signiture.check_argument_types(&arg_types, span, self.ast.tm())?;
+
+    //     Ok(signiture.return_type.clone())
+    // }
+
+    // fn check_method_call_expr(
+    //     &self,
+    //     span: Span,
+    //     callee: &mut Expr,
+    //     method_name: &str,
+    //     args: &mut [Expr],
+    // ) -> Result<Descriptor, CompileError> {
+    //     let callee_type = self.check_expr(callee)?;
+
+    //     let arg_types: Vec<(Descriptor, Span)> = args
+    //         .iter_mut()
+    //         .map(|arg| self.check_expr(arg).map(|t| (t, arg.span)))
+    //         .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
+
+    //     let ty = self
+    //         .ast
+    //         .get_type(callee_type)
+    //         .expect("Internal Typechecker error, not recovering");
+
+    //     let method_slot =
+    //         ty.get_method_slot(method_name)
+    //             .ok_or(CompileError::method_not_found_at(
+    //                 callee_type,
+    //                 method_name,
+    //                 span,
+    //             ))?;
+
+    //     let method = self.ast.get_function_sig(method_slot).unwrap();
+    //     method.check_argument_types(&arg_types, span)?;
+
+    //     Ok(method.return_type.clone())
+    // }
 
     fn check_binary_op_expr(
         &self,

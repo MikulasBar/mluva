@@ -81,13 +81,17 @@ impl<'a> Parser<'a> {
 
                     expect_token!(TokenKind::ParenR, paren_r_span in self);
 
-                    let (ret_ty, _) = self.parse_type()?;
-
+                    let return_ty = if let Some(TokenKind::BraceL) = self.peek_kind() {
+                        Descriptor::void_type()
+                    } else {
+                        self.parse_type()?.0
+                    };
+                    
                     expect_token!(TokenKind::BraceL in self);
                     let body = self.parse_statements(TokenKind::BraceR)?;
                     expect_token!(TokenKind::BraceR in self);
 
-                    let signiture = FunctionSigniture::new(ret_ty, params, token_span.join(paren_r_span));
+                    let signiture = FunctionSigniture::new(return_ty, params, token_span.join(paren_r_span));
 
                     self.ast.add_function(name, signiture, body);
                 }
