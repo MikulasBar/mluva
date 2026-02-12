@@ -1,4 +1,4 @@
-use crate::{Descriptor, ast::Expr, diagnostics::Span};
+use crate::{Descriptor, diagnostics::Span};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pattern {

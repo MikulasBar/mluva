@@ -1,9 +1,9 @@
 use std::iter::Peekable;
 use std::str::CharIndices;
 
-use common::compile_error::CompileError;
+use common::CompileError;
 use common::diagnostics::Span;
-use common::token::{Token, TokenKind};
+use common::{Token, TokenKind};
 /// Tokenize input and attach byte-span info to each token.
 /// Returns Vec<Token> where each token carries a Span { file, lo, hi }.
 /// `file_id` should come from your SimpleFiles / SourceMap (codespan-reporting).

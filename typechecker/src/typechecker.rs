@@ -5,7 +5,7 @@ use super::type_scope::TypeScope;
 use crate::bin_op_pat;
 use common::{Descriptor, descriptor};
 use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
-use common::compile_error::CompileError;
+use common::CompileError;
 use common::diagnostics::Span;
 use common::module::ModuleAST;
 use common::module::ModuleSigniture;

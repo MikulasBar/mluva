@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::{collections::HashMap};
 
 use crate::{
     Descriptor,
@@ -50,7 +50,7 @@ impl ModuleAST {
     }
 
     pub fn function_names(&self) -> Vec<String> {
-        self.function_bodies.keys().map(|s| s.clone()).collect()
+        self.function_bodies.keys().cloned().collect()
     }
 
     pub fn imports(&self) -> &'_ [Descriptor] {

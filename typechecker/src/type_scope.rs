@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common::Descriptor;
 use common::ast::{Pattern, PatternKind};
-use common::{compile_error::CompileError, diagnostics::Span};
+use common::{CompileError, diagnostics::Span};
 
 pub struct TypeScope {
     scopes: Vec<HashMap<String, Descriptor>>,

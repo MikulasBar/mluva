@@ -2,31 +2,23 @@ use core::panic;
 use std::collections::HashMap;
 
 use common::ast::{
-    BinaryOp, Expr, ExprKind, FunctionSigniture, Parameter, Pattern, PatternKind, Statement,
-    StatementKind, UnaryOp,
+    BinaryOp, Expr, ExprKind, Pattern, PatternKind, Statement, StatementKind, UnaryOp,
 };
-use common::compile_error::CompileError;
-use common::function_code::FunctionCode;
-use common::instruction::Instruction;
-use common::module::module_ast::ModuleAST;
-use common::module::module_code::ModuleCode;
-use common::module::module_signiture::ModuleSigniture;
-use common::type_manager::{
-    BOOL_TYPE_ID, F32_TYPE_ID, I32_TYPE_ID, PRIMITIVE_TYPES_COUNT, TypeManager, TypeSpec,
-};
-use common::word::Word;
+use common::function::{FunctionCode, FunctionSigniture, Parameter};
+use common::module::{ModuleAST, ModuleCode, ModuleSigniture};
+use common::{CompileError, Descriptor, Instruction, Word};
 
 use crate::local_slot::LocalSlot;
 
 pub struct Compiler<'a> {
     ast: &'a ModuleAST,
-    dependencies: &'a HashMap<String, ModuleSigniture>,
+    dependencies: &'a HashMap<Descriptor, ModuleSigniture>,
     code: ModuleCode,
     string_slots: HashMap<String, u32>,
 }
 
 impl<'a> Compiler<'a> {
-    pub fn new(ast: &'a ModuleAST, dependencies: &'a HashMap<String, ModuleSigniture>) -> Self {
+    pub fn new(ast: &'a ModuleAST, dependencies: &'a HashMap<Descriptor, ModuleSigniture>) -> Self {
         Self {
             ast,
             dependencies,
@@ -36,54 +28,45 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(mut self) -> Result<ModuleCode, CompileError> {
-        for slot in 0..self.ast.fn_count() {
-            self.compile_function(slot)?;
+        for name in self.ast.function_names() {
+            self.compile_function(name)?;
         }
 
         let Compiler {
-            mut code,
-            ast,
-            dependencies: _,
+            code,
             ..
         } = self;
-
-        let main_slot = ast.get_fn_slot("main");
-        code.set_main_slot(main_slot);
 
         Ok(code)
     }
 
-    fn compile_function(&mut self, slot: u32) -> Result<(), CompileError> {
+    fn compile_function(&mut self, name: String) -> Result<(), CompileError> {
         let signiture = self
             .ast
-            .get_sign(slot)
+            .get_function_sig(&name)
             .expect("Function signiture should exist");
 
-        let body = self.ast.get_body(slot).expect("Function body should exist");
+        let body = self.ast.get_function_body(&name).expect("Function body should exist");
 
         let code = FunctionCompiler::new(
             self.dependencies,
-            self.ast.get_fn_map(),
             body,
             signiture,
-            self.ast.tm(),
             &mut self.string_slots,
             &mut self.code,
         )
         .compile()?;
 
-        self.code.add_code(code);
+        self.code.add_code(name, code);
 
         Ok(())
     }
 }
 
 struct FunctionCompiler<'b> {
-    dependencies: &'b HashMap<String, ModuleSigniture>,
-    function_map: &'b HashMap<String, u32>,
+    dependencies: &'b HashMap<Descriptor, ModuleSigniture>,
     body: &'b [Statement],
     signiture: &'b FunctionSigniture,
-    type_manager: &'b TypeManager,
     string_slots: &'b mut HashMap<String, u32>,
     locals: HashMap<String, LocalSlot>,
     next_local_index: u32,
@@ -93,20 +76,16 @@ struct FunctionCompiler<'b> {
 
 impl<'b> FunctionCompiler<'b> {
     fn new(
-        dependencies: &'b HashMap<String, ModuleSigniture>,
-        function_map: &'b HashMap<String, u32>,
+        dependencies: &'b HashMap<Descriptor, ModuleSigniture>,
         body: &'b [Statement],
         signiture: &'b FunctionSigniture,
-        type_manager: &'b TypeManager,
         string_slots: &'b mut HashMap<String, u32>,
         mod_code: &'b mut ModuleCode,
     ) -> Self {
         Self {
             dependencies,
-            function_map,
             body,
             signiture,
-            type_manager,
             locals: HashMap::new(),
             code: FunctionCode::empty(),
             string_slots,
@@ -121,27 +100,10 @@ impl<'b> FunctionCompiler<'b> {
 
     fn emit_load_local(&mut self, slot: LocalSlot) {
         self.emit(Instruction::LoadLocal { slot: slot.index });
-        if slot.type_id >= PRIMITIVE_TYPES_COUNT {
-            self.emit(Instruction::RcInc);
-        }
     }
 
-    fn emit_drop(&mut self, type_id: u32) {
-        if type_id >= PRIMITIVE_TYPES_COUNT {
-            self.emit(Instruction::RcDec);
-        }
+    fn emit_drop(&mut self) {
         self.emit(Instruction::Drop);
-    }
-
-    fn emit_locals_drop(&mut self) {
-        let slots = self.locals.values().copied().collect::<Vec<LocalSlot>>();
-        for s in slots {
-            if s.type_id >= PRIMITIVE_TYPES_COUNT {
-                self.emit(Instruction::LoadLocal { slot: s.index });
-                self.emit(Instruction::RcDec);
-                self.emit(Instruction::Drop);
-            }
-        }
     }
 
     fn get_string_slot(&mut self, string: &str) -> u32 {
@@ -154,13 +116,12 @@ impl<'b> FunctionCompiler<'b> {
             })
     }
 
-    fn get_local_slot(&mut self, name: &str, ty: Option<u32>) -> LocalSlot {
+    fn get_local_slot(&mut self, name: &str) -> LocalSlot {
         *self.locals.entry(name.to_string()).or_insert_with(|| {
             let i = self.next_local_index;
             self.next_local_index += 1;
             LocalSlot {
                 index: i as u32,
-                type_id: ty.expect("var should be already known."),
             }
         })
     }
@@ -179,7 +140,7 @@ impl<'b> FunctionCompiler<'b> {
         self.compile_statements(&self.body)?;
 
         // implicit return at the end of Void functions
-        if self.signiture.return_type == TypeSpec::void() {
+        if self.signiture.return_type.is_void_type() {
             self.emit(Instruction::LoadConst(Word::void()));
             self.emit(Instruction::Return);
         }
@@ -190,8 +151,8 @@ impl<'b> FunctionCompiler<'b> {
     }
 
     fn setup_parameters(&mut self) {
-        for Parameter { name, ty, .. } in &self.signiture.params {
-            let slot = self.get_local_slot(&name, Some(ty.id));
+        for Parameter { name, .. } in &self.signiture.params {
+            let slot = self.get_local_slot(&name);
             self.emit(Instruction::Store { slot: slot.index });
         }
     }
@@ -234,8 +195,10 @@ impl<'b> FunctionCompiler<'b> {
             }
 
             StatementKind::Return(expr) => {
-                self.compile_expr(&expr)?;
-                self.emit_locals_drop();
+                if let Some(expr) = expr {
+                    self.compile_expr(&expr)?;
+                }
+
                 self.emit(Instruction::Return);
             }
         }
@@ -323,17 +286,8 @@ impl<'b> FunctionCompiler<'b> {
     fn compile_pattern(&mut self, pattern: &Pattern) -> Result<(), CompileError> {
         match &pattern.kind {
             PatternKind::Variable(var) => {
-                let slot = self.get_local_slot(&var, pattern.ty.as_ref().map(|t| t.id));
+                let slot = self.get_local_slot(&var);
                 self.emit(Instruction::Store { slot: slot.index });
-            }
-            PatternKind::Index { callee, index } => {
-                self.compile_expr(&*index)?;
-                self.compile_pattern(&*callee);
-                if let Some(instr @ Instruction::ListSet) = self.code.last_instr_mut() {
-                    *instr = Instruction::ListGet;
-                }
-
-                self.emit(Instruction::ListSet);
             }
         }
 
@@ -342,10 +296,6 @@ impl<'b> FunctionCompiler<'b> {
 
     fn compile_expr(&mut self, expr: &Expr) -> Result<(), CompileError> {
         match &expr.kind {
-            ExprKind::VoidLiteral => {
-                self.emit(Instruction::LoadConst(Word::void()));
-            }
-
             ExprKind::I32Literal(val) => {
                 self.emit(Instruction::LoadConst(Word::from_i32(*val)));
             }
@@ -358,23 +308,8 @@ impl<'b> FunctionCompiler<'b> {
                 self.emit(Instruction::LoadConst(Word::from_bool(*val)));
             }
 
-            ExprKind::StringLiteral(val) => {
-                let slot = self.get_string_slot(val) as u32;
-                self.emit(Instruction::CreateString { pool_slot: slot });
-            }
-
-            ExprKind::ListLiteral(list) => {
-                for element in list {
-                    self.compile_expr(element)?;
-                }
-
-                let el_type = expr.ty.as_ref().unwrap().get_index_type().unwrap();
-
-                self.emit(Instruction::CreateList {
-                    item_count: list.len() as u32,
-                    type_id: el_type.id,
-                });
-            }
+            ExprKind::StringLiteral(_) => todo!(),
+            ExprKind::ArrayLiteral(_) => todo!()
 
             ExprKind::Var(name) => {
                 let slot = self.get_local_slot(name, None);
@@ -394,25 +329,12 @@ impl<'b> FunctionCompiler<'b> {
                 self.emit(op_instruction);
             }
 
-            ExprKind::IndexGet { callee, index } => {
-                self.compile_expr(callee)?;
-                self.compile_expr(index)?;
-                self.emit(Instruction::ListGet);
-            }
-
-            ExprKind::FunctionCall { func_name, args } => {
+            ExprKind::FunctionCall { function, args } => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
 
-                let Some(slot) = self.function_map.get(func_name).copied() else {
-                    panic!(
-                        "Function {} not found, should be handled in typechecker",
-                        func_name
-                    );
-                };
-
-                self.emit(Instruction::LocalCall { slot });
+                self.emit(Instruction::FunctionCall());
             }
 
             ExprKind::ForeignFunctionCall {
@@ -445,71 +367,49 @@ impl<'b> FunctionCompiler<'b> {
                 });
                 self.next_local_index += 1;
             }
-
-            ExprKind::MethodCall {
-                callee,
-                method_name,
-                args,
-            } => {
-                for arg in args {
-                    self.compile_expr(arg)?;
-                }
-
-                let type_id = callee.ty.as_ref().unwrap().id;
-                let slot = self
-                    .type_manager
-                    .get_type(type_id)
-                    .unwrap()
-                    .get_method_slot(&method_name)
-                    .expect("Method should exist, should be handled in typechecker");
-
-                self.compile_expr(callee)?;
-
-                self.emit(Instruction::MethodCall { type_id, slot });
-            }
         }
 
         Ok(())
     }
 }
 
-fn bin_op_to_instruction(op: &BinaryOp, result_type: u32) -> Instruction {
-    match (op, result_type) {
-        (BinaryOp::Add, I32_TYPE_ID) => Instruction::I32Add,
-        (BinaryOp::Sub, I32_TYPE_ID) => Instruction::I32Sub,
-        (BinaryOp::Mul, I32_TYPE_ID) => Instruction::I32Mul,
-        (BinaryOp::Div, I32_TYPE_ID) => Instruction::I32Div,
-        (BinaryOp::Modulo, I32_TYPE_ID) => Instruction::I32Mod,
-        (BinaryOp::Less, I32_TYPE_ID) => Instruction::I32Less,
-        (BinaryOp::LessEqual, I32_TYPE_ID) => Instruction::I32LessEqual,
-        (BinaryOp::Greater, I32_TYPE_ID) => Instruction::I32Greater,
-        (BinaryOp::GreaterEqual, I32_TYPE_ID) => Instruction::I32GreaterEqual,
+fn bin_op_to_instruction(op: &BinaryOp, result_type: Descriptor) -> Instruction {
+    match op {
+        BinaryOp::Add if result_type.is_i32_type() => Instruction::I32Add,
+        BinaryOp::Sub if result_type.is_i32_type() => Instruction::I32Sub,
+        BinaryOp::Mul if result_type.is_i32_type() => Instruction::I32Mul,
+        BinaryOp::Div if result_type.is_i32_type() => Instruction::I32Div,
+        BinaryOp::Modulo if result_type.is_i32_type() => Instruction::I32Mod,
+        BinaryOp::Less if result_type.is_i32_type() => Instruction::I32Less,
+        BinaryOp::LessEqual if result_type.is_i32_type() => Instruction::I32LessEqual,
+        BinaryOp::Greater if result_type.is_i32_type() => Instruction::I32Greater,
+        BinaryOp::GreaterEqual if result_type.is_i32_type() => Instruction::I32GreaterEqual,
 
-        (BinaryOp::Add, F32_TYPE_ID) => Instruction::F32Add,
-        (BinaryOp::Sub, F32_TYPE_ID) => Instruction::F32Sub,
-        (BinaryOp::Mul, F32_TYPE_ID) => Instruction::F32Mul,
-        (BinaryOp::Div, F32_TYPE_ID) => Instruction::F32Div,
-        (BinaryOp::Modulo, F32_TYPE_ID) => Instruction::F32Mod,
-        (BinaryOp::Less, F32_TYPE_ID) => Instruction::F32Less,
-        (BinaryOp::LessEqual, F32_TYPE_ID) => Instruction::F32LessEqual,
-        (BinaryOp::Greater, F32_TYPE_ID) => Instruction::F32Greater,
-        (BinaryOp::GreaterEqual, F32_TYPE_ID) => Instruction::F32GreaterEqual,
+        BinaryOp::Add if result_type.is_f32_type() => Instruction::F32Add,
+        BinaryOp::Sub if result_type.is_f32_type() => Instruction::F32Sub,
+        BinaryOp::Mul if result_type.is_f32_type() => Instruction::F32Mul,
+        BinaryOp::Div if result_type.is_f32_type() => Instruction::F32Div,
+        BinaryOp::Modulo if result_type.is_f32_type() => Instruction::F32Mod,
+        BinaryOp::Less if result_type.is_f32_type() => Instruction::F32Less,
+        BinaryOp::LessEqual if result_type.is_f32_type() => Instruction::F32LessEqual,
+        BinaryOp::Greater if result_type.is_f32_type() => Instruction::F32Greater,
+        BinaryOp::GreaterEqual if result_type.is_f32_type() => Instruction::F32GreaterEqual,
 
-        (BinaryOp::And, BOOL_TYPE_ID) => Instruction::BoolAnd,
-        (BinaryOp::Or, BOOL_TYPE_ID) => Instruction::BoolOr,
+        BinaryOp::And if result_type.is_bool_type() => Instruction::BoolAnd,
+        BinaryOp::Or if result_type.is_bool_type() => Instruction::BoolOr,
 
-        (BinaryOp::Equal, _) => Instruction::WordEqual,
-        (BinaryOp::NotEqual, _) => Instruction::WordNotEqual,
+        BinaryOp::Equal => Instruction::WordEqual,
+        BinaryOp::NotEqual => Instruction::WordNotEqual,
 
         _ => panic!("Unsupported binary operation"),
     }
 }
 
-fn un_op_to_instruction(op: &UnaryOp, result_type: u32) -> Instruction {
-    match (op, result_type) {
-        (UnaryOp::Negate, I32_TYPE_ID) => Instruction::I32Negate,
-        (UnaryOp::Negate, F32_TYPE_ID) => Instruction::F32Negate,
-        (UnaryOp::Not, BOOL_TYPE_ID) => Instruction::BoolNot,
+fn un_op_to_instruction(op: &UnaryOp, result_type: Descriptor) -> Instruction {
+    match op {
+        UnaryOp::Negate if result_type.is_i32_type() => Instruction::I32Negate,
+        UnaryOp::Negate if result_type.is_i32_type() => Instruction::F32Negate,
+        UnaryOp::Not if result_type.is_bool_type() => Instruction::BoolNot,
         _ => panic!("Unsupported unary operation"),
     }
 }

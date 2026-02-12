@@ -1,4 +1,4 @@
-use common::{compile_error::CompileError, module::ModuleAST};
+use common::{CompileError, module::ModuleAST};
 
 use crate::{lexer::tokenize, parser::Parser};
 
@@ -21,7 +21,7 @@ macro_rules! expect_token {
                             .map(|t| t.span)
                     })
                     .unwrap_or_else(|| common::diagnostics::Span::new(0, 0, 0));
-                return Err(common::compile_error::CompileError::unexpected_end_of_file(
+                return Err(common::CompileError::unexpected_end_of_file(
                     __span.file,
                 ));
             }
@@ -33,7 +33,7 @@ macro_rules! expect_token {
         } = __token;
 
         let $pattern = __kind else {
-            return Err(common::compile_error::CompileError::unexpected_token_at(
+            return Err(common::CompileError::unexpected_token_at(
                 __kind, __span,
             ));
         };

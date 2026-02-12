@@ -1,10 +1,10 @@
 use crate::expect_token;
 use common::{Descriptor, ast::*};
-use common::compile_error::CompileError;
+use common::CompileError;
 use common::diagnostics::{FileId, Span};
 use common::function::{FunctionSigniture, Parameter};
 use common::module::ModuleAST;
-use common::token::{Token, TokenKind};
+use common::{Token, TokenKind};
 
 pub struct Parser<'a> {
     file_id: FileId,
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
 
                 TokenKind::Import => {
                     expect_token!(TokenKind::Import in self);
-                    let (import, span) = self.parse_descriptor()?;
+                    let (import, _) = self.parse_descriptor()?;
                     expect_token!(TokenKind::EOL in self);
 
                     self.ast.add_import(import);
