@@ -8,3 +8,5 @@ mod object;
 pub use callframe::CallFrame;
 pub use runtime_error::RuntimeError;
 pub use value_stack::ValueStack;
+pub use heap::Heap;
+pub use entity_table::EntityTable;

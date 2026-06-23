@@ -1,65 +1,71 @@
 use common::module::Module;
-use common::vm::{Arena, CallFrame, ListObject, RuntimeError, StringObject, ValueStack};
+use common::vm::{CallFrame, EntityTable, Heap, RuntimeError, ValueStack};
 
 use common::{
     function::FunctionCode,
-    instruction::Instruction,
-    module::module_manager::ModuleManager,
-    type_manager::{LIST_TYPE_ID, STRING_TYPE_ID},
-    word::Word,
+    Instruction,
+    Word,
 };
 
 pub struct Vm {
     pub value_stack: ValueStack,
-    pub arena: Arena,
+    pub heap: Heap,
+    pub entity_table: EntityTable,
     pub callstack: Vec<CallFrame>,
-    pub modules: ModuleManager,
 }
 
 impl Vm {
-    pub fn new(modules: ModuleManager) -> Self {
+    pub fn new() -> Self {
         Self {
             value_stack: ValueStack::new(),
-            arena: Arena::new(),
             callstack: vec![],
-            modules: modules,
+            heap: Heap::new(),
+            entity_table: EntityTable::empty(),
         }
     }
 
+
+    pub fn load_module(&mut self, module: ) {
+
+    }
+
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
-        let main_module_slot = self
-            .modules
-            .get_main_slot()
-            .ok_or(RuntimeError::other("main module not found"))?;
 
-        match self
-            .modules
-            .get_by_slot(main_module_slot)
-            .ok_or(RuntimeError::other("main module not found"))?
-        {
-            Module::Compiled(m) => {
-                let main_func = m
-                    .get_main_code()
-                    .ok_or(RuntimeError::other("main function not found"))?;
-                FunctionInterpreter::new(
-                    &self.modules,
-                    &mut self.arena,
-                    &mut self.value_stack,
-                    main_func,
-                    &mut self.callstack,
-                    main_module_slot,
-                )
-                .execute()
-            }
 
-            Module::Native(_) => Err(RuntimeError::other("main module cannot be native")),
+
+        // let main_module_slot = self
+        //     .modules
+        //     .get_main_slot()
+        //     .ok_or(RuntimeError::other("main module not found"))?;
+
+        // match self
+        //     .modules
+        //     .get_by_slot(main_module_slot)
+        //     .ok_or(RuntimeError::other("main module not found"))?
+        // {
+        //     Module::Code(m) => {
+        //         let main_func = m
+        //             .get_main_code()
+        //             .ok_or(RuntimeError::other("main function not found"))?;
+        //         FunctionInterpreter::new(
+        //             &self.modules,
+        //             &mut self.heap,
+        //             &mut self.value_stack,
+        //             main_func,
+        //             &mut self.callstack,
+        //             main_module_slot,
+        //         )
+        //         .execute()
+        //     }
+
+            // Module::Native(_) => Err(RuntimeError::other("main module cannot be native")),
         }
     }
 }
 
 struct FunctionInterpreter<'a> {
     modules: &'a ModuleManager,
-    arena: &'a mut Arena,
+    heap: &'a mut Heap,
     value_stack: &'a mut ValueStack,
     code: &'a FunctionCode,
     callstack: &'a mut Vec<CallFrame>,
@@ -70,7 +76,7 @@ struct FunctionInterpreter<'a> {
 impl<'a> FunctionInterpreter<'a> {
     pub fn new(
         modules: &'a ModuleManager,
-        arena: &'a mut Arena,
+        heap: &'a mut Heap,
         value_stack: &'a mut ValueStack,
         code: &'a FunctionCode,
         callstack: &'a mut Vec<CallFrame>,
@@ -81,7 +87,7 @@ impl<'a> FunctionInterpreter<'a> {
 
         Self {
             modules,
-            arena,
+            heap,
             value_stack,
             code,
             callstack,
@@ -159,40 +165,40 @@ impl<'a> FunctionInterpreter<'a> {
                         continue;
                     }
                 }
-                Instruction::CreateString { pool_slot } => {
-                    let str = self
-                        .modules
-                        .get_string_from_pool(self.current_module_slot, *pool_slot)
-                        .ok_or(RuntimeError::Unknown)?;
+                // Instruction::CreateString { pool_slot } => {
+                //     let str = self
+                //         .modules
+                //         .get_string_from_pool(self.current_module_slot, *pool_slot)
+                //         .ok_or(RuntimeError::Unknown)?;
 
-                    let string_object = StringObject::new(str);
-                    let handle = self.arena.alloc(STRING_TYPE_ID, string_object);
+                //     let string_object = StringObject::new(str);
+                //     let handle = self.arena.alloc(STRING_TYPE_ID, string_object);
 
-                    self.push(handle.as_word());
-                }
-                Instruction::CreateList {
-                    item_count,
-                    type_id,
-                } => {
-                    let count = *item_count as usize;
-                    let items = self.value_stack.split_off(self.value_stack.len() - count);
-                    let list_object = ListObject::from_values(*type_id, items);
-                    let handle = self.arena.alloc(LIST_TYPE_ID, list_object);
-                    self.push(handle.as_word());
-                }
-                Instruction::RcInc => {
-                    let handle = self.copy_last()?.as_hhandle();
-                    self.arena.increment_rc(&handle)?;
-                }
-                Instruction::RcDec => {
-                    let handle = self.pop()?.as_hhandle();
-                    self.arena.decrement_rc(
-                        &handle,
-                        self.callstack.last_mut().unwrap(),
-                        self.value_stack,
-                        self.modules,
-                    )?;
-                }
+                //     self.push(handle.as_word());
+                // }
+                // Instruction::CreateList {
+                //     item_count,
+                //     type_id,
+                // } => {
+                //     let count = *item_count as usize;
+                //     let items = self.value_stack.split_off(self.value_stack.len() - count);
+                //     let list_object = ListObject::from_values(*type_id, items);
+                //     let handle = self.arena.alloc(LIST_TYPE_ID, list_object);
+                //     self.push(handle.as_word());
+                // }
+                // Instruction::RcInc => {
+                //     let handle = self.copy_last()?.as_hhandle();
+                //     self.arena.increment_rc(&handle)?;
+                // }
+                // Instruction::RcDec => {
+                //     let handle = self.pop()?.as_hhandle();
+                //     self.arena.decrement_rc(
+                //         &handle,
+                //         self.callstack.last_mut().unwrap(),
+                //         self.value_stack,
+                //         self.modules,
+                //     )?;
+                // }
                 Instruction::LocalCall { slot } => {
                     let func = self
                         .modules
@@ -211,37 +217,37 @@ impl<'a> FunctionInterpreter<'a> {
                     )
                     .execute()?;
                 }
-                Instruction::ForeignCall {
-                    module_name_slot,
-                    call_slot,
-                } => {
-                    let mod_name = self
-                        .modules
-                        .get_string_from_pool(self.current_module_slot, *module_name_slot)
-                        .ok_or(RuntimeError::Unknown)?;
+                // Instruction::ForeignCall {
+                //     module_name_slot,
+                //     call_slot,
+                // } => {
+                //     let mod_name = self
+                //         .modules
+                //         .get_string_from_pool(self.current_module_slot, *module_name_slot)
+                //         .ok_or(RuntimeError::Unknown)?;
 
-                    let module_slot = self
-                        .modules
-                        .get_slot(mod_name)
-                        .ok_or(RuntimeError::other("Module doesn't exists"))?;
+                //     let module_slot = self
+                //         .modules
+                //         .get_slot(mod_name)
+                //         .ok_or(RuntimeError::other("Module doesn't exists"))?;
 
-                    let func = self
-                        .modules
-                        .get_by_slot(module_slot)
-                        .ok_or(RuntimeError::other("Module not found"))?
-                        .get_code_by_slot(*call_slot)
-                        .ok_or(RuntimeError::Unknown)?;
+                //     let func = self
+                //         .modules
+                //         .get_by_slot(module_slot)
+                //         .ok_or(RuntimeError::other("Module not found"))?
+                //         .get_code_by_slot(*call_slot)
+                //         .ok_or(RuntimeError::Unknown)?;
 
-                    FunctionInterpreter::new(
-                        self.modules,
-                        self.arena,
-                        self.value_stack,
-                        func,
-                        self.callstack,
-                        module_slot,
-                    )
-                    .execute()?;
-                }
+                //     FunctionInterpreter::new(
+                //         self.modules,
+                //         self.arena,
+                //         self.value_stack,
+                //         func,
+                //         self.callstack,
+                //         module_slot,
+                //     )
+                //     .execute()?;
+                // }
                 // Instruction::MethodCall { type_id, slot } => {
                 //     let callee = self.pop()?;
                 //     let method = self.vtables[*type_id as usize]
@@ -251,32 +257,32 @@ impl<'a> FunctionInterpreter<'a> {
 
                 //     method.execute(callee, self.value_stack, self.arena, self.vtables);
                 // }
-                Instruction::ListGet => {
-                    let index = self.pop()?.as_u32();
-                    let handle = self.pop()?.as_hhandle();
-                    let list = self.arena.get_mut::<ListObject>(&handle)?;
-                    let item = list.get_item(index)?;
-                    self.arena.decrement_rc(
-                        &handle,
-                        self.callstack.last_mut().unwrap(),
-                        self.value_stack,
-                        self.modules,
-                    )?;
-                    self.push(item);
-                }
-                Instruction::ListSet => {
-                    let value = self.pop()?;
-                    let index = self.pop()?.as_u32();
-                    let handle = self.pop()?.as_hhandle();
-                    let list = self.arena.get_mut::<ListObject>(&handle)?;
-                    list.set_item(index, value)?;
-                    self.arena.decrement_rc(
-                        &handle,
-                        self.callstack.last_mut().unwrap(),
-                        self.value_stack,
-                        self.modules,
-                    )?;
-                }
+                // Instruction::ListGet => {
+                //     let index = self.pop()?.as_u32();
+                //     let handle = self.pop()?.as_hhandle();
+                //     let list = self.arena.get_mut::<ListObject>(&handle)?;
+                //     let item = list.get_item(index)?;
+                //     self.arena.decrement_rc(
+                //         &handle,
+                //         self.callstack.last_mut().unwrap(),
+                //         self.value_stack,
+                //         self.modules,
+                //     )?;
+                //     self.push(item);
+                // }
+                // Instruction::ListSet => {
+                //     let value = self.pop()?;
+                //     let index = self.pop()?.as_u32();
+                //     let handle = self.pop()?.as_hhandle();
+                //     let list = self.arena.get_mut::<ListObject>(&handle)?;
+                //     list.set_item(index, value)?;
+                //     self.arena.decrement_rc(
+                //         &handle,
+                //         self.callstack.last_mut().unwrap(),
+                //         self.value_stack,
+                //         self.modules,
+                //     )?;
+                // }
                 Instruction::BoolAnd => {
                     let rhs = self.pop()?;
                     self.last_mut()?.bool_assign_and(rhs);

@@ -18,6 +18,18 @@ impl LCP {
         Self { pool: vec![] }
     }
 
+    // pub fn add_function(&mut self, function: Descriptor) -> LCPSlot {
+
+    // }
+
+    // pub fn add_module(&mut self, module: Descriptor) -> LCPSlot {
+    //     let path = module.to_string();
+    //     let path_slot = self.add_string(path);
+
+    //     let mod_slot = self.pool.push(LCPEntry::UnresolvedModule(path_slot));
+    //     let fn_name_slot = self.
+    // }
+
     pub fn add_string(&mut self, s: String) {
         self.pool.push(LCPEntry::String(s));
     }
@@ -33,7 +45,11 @@ type LCPSlot = Word;
 pub enum LCPEntry {
     String(String),
     UnresolvedClass(LCPSlot),
-    UnresolvedFunction(LCPSlot),
+    UnresolvedModule(LCPSlot),
+    UnresolvedFunction {
+        name_slot: LCPSlot,
+        module_slot: LCPSlot,
+    },
     UnresolvedInterface(LCPSlot),
     ResolvedClass(Arc<ClassEntity>),
     ResolvedFunction(Arc<FunctionEntity>),

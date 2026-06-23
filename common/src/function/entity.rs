@@ -2,13 +2,15 @@ use std::sync::Arc;
 
 use bincode::{Decode, Encode};
 
-use crate::function::FunctionCode;
+use crate::{function::FunctionCode, module::LCP};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct FunctionEntity {
     kind: FunctionEntityKind,
-    // parent_module: Arc<ModuleEntity>,
+    pool: Arc<LCP>,
 }
+
+
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub enum FunctionEntityKind {

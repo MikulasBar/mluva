@@ -106,16 +106,6 @@ impl<'b> FunctionCompiler<'b> {
         self.emit(Instruction::Drop);
     }
 
-    fn get_string_slot(&mut self, string: &str) -> u32 {
-        *self
-            .string_slots
-            .entry(string.to_string())
-            .or_insert_with(|| {
-                let slot = self.mod_code.add_string(string.to_string());
-                slot
-            })
-    }
-
     fn get_local_slot(&mut self, name: &str) -> LocalSlot {
         *self.locals.entry(name.to_string()).or_insert_with(|| {
             let i = self.next_local_index;
@@ -309,23 +299,27 @@ impl<'b> FunctionCompiler<'b> {
             }
 
             ExprKind::StringLiteral(_) => todo!(),
-            ExprKind::ArrayLiteral(_) => todo!()
+            ExprKind::ArrayLiteral(_) => todo!(),
 
-            ExprKind::Var(name) => {
-                let slot = self.get_local_slot(name, None);
+            ExprKind::Path(path) => {
+                if path.len() > 1 {
+                    return Err(CompileError::other_at("Path with multiple segments is not allowed", expr.span))
+                }
+
+                let slot = self.get_local_slot(path.tail().unwrap());
                 self.emit(Instruction::LoadLocal { slot: slot.index });
             }
 
             ExprKind::BinaryOp(op, lhs, rhs) => {
                 self.compile_expr(lhs)?;
                 self.compile_expr(rhs)?;
-                let op_instruction = bin_op_to_instruction(op, expr.ty.as_ref().unwrap().id);
+                let op_instruction = bin_op_to_instruction(op, expr.ty.as_ref().unwrap());
                 self.emit(op_instruction);
             }
 
             ExprKind::UnaryOp(op, expr) => {
                 self.compile_expr(expr)?;
-                let op_instruction = un_op_to_instruction(op, expr.ty.as_ref().unwrap().id);
+                let op_instruction = un_op_to_instruction(op, expr.ty.as_ref().unwrap());
                 self.emit(op_instruction);
             }
 
@@ -334,46 +328,46 @@ impl<'b> FunctionCompiler<'b> {
                     self.compile_expr(arg)?;
                 }
 
-                self.emit(Instruction::FunctionCall());
+                self.emit(Instruction::FunctionCall(todo!()));
             }
 
-            ExprKind::ForeignFunctionCall {
-                module_name,
-                func_name,
-                args,
-            } => {
-                for arg in args {
-                    self.compile_expr(arg)?;
-                }
+            // ExprKind::ForeignFunctionCall {
+            //     module_name,
+            //     func_name,
+            //     args,
+            // } => {
+            //     for arg in args {
+            //         self.compile_expr(arg)?;
+            //     }
 
-                let Some(call_slot) = self
-                    .dependencies
-                    .get(module_name)
-                    .and_then(|module| module.get_fn_slot(func_name))
-                else {
-                    return Err(CompileError::unknown_foreign_function_at(
-                        module_name,
-                        func_name,
-                        expr.span,
-                    ));
-                };
+            //     let Some(call_slot) = self
+            //         .dependencies
+            //         .get(module_name)
+            //         .and_then(|module| module.get_fn_slot(func_name))
+            //     else {
+            //         return Err(CompileError::unknown_foreign_function_at(
+            //             module_name,
+            //             func_name,
+            //             expr.span,
+            //         ));
+            //     };
 
-                self.string_slots
-                    .insert(module_name.clone(), self.next_local_index);
+            //     self.string_slots
+            //         .insert(module_name.clone(), self.next_local_index);
 
-                self.emit(Instruction::ForeignCall {
-                    module_name_slot: self.next_local_index,
-                    call_slot,
-                });
-                self.next_local_index += 1;
-            }
+            //     self.emit(Instruction::ForeignCall {
+            //         module_name_slot: self.next_local_index,
+            //         call_slot,
+            //     });
+            //     self.next_local_index += 1;
+            // }
         }
 
         Ok(())
     }
 }
 
-fn bin_op_to_instruction(op: &BinaryOp, result_type: Descriptor) -> Instruction {
+fn bin_op_to_instruction(op: &BinaryOp, result_type: &Descriptor) -> Instruction {
     match op {
         BinaryOp::Add if result_type.is_i32_type() => Instruction::I32Add,
         BinaryOp::Sub if result_type.is_i32_type() => Instruction::I32Sub,
@@ -405,7 +399,7 @@ fn bin_op_to_instruction(op: &BinaryOp, result_type: Descriptor) -> Instruction 
     }
 }
 
-fn un_op_to_instruction(op: &UnaryOp, result_type: Descriptor) -> Instruction {
+fn un_op_to_instruction(op: &UnaryOp, result_type: &Descriptor) -> Instruction {
     match op {
         UnaryOp::Negate if result_type.is_i32_type() => Instruction::I32Negate,
         UnaryOp::Negate if result_type.is_i32_type() => Instruction::F32Negate,
