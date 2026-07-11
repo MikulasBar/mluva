@@ -3,17 +3,6 @@ authors = ["Mikuláš Bartáček"]
 version = "0.1.0"
 edition = "2024"
 
-[package]
-name = "mluva"
-authors.workspace = true
-version.workspace = true
-edition.workspace = true
-
-# This is a virtual manifest
-# No source code in this crate
-[lib]
-path = ""
-
 [workspace]
 members = [
     "cli",
