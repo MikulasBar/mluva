@@ -123,8 +123,8 @@ impl<'a> Parser<'a> {
                 break;
             }
 
-            let (ty, ty_span) = self.parse_type()?;
             expect_token!(TokenKind::Ident(ident), ident_span in self);
+            let (ty, ty_span) = self.parse_type()?;
             let param = Parameter::new(ident, ty, ty_span.join(ident_span));
             params.push(param);
 
@@ -172,14 +172,26 @@ impl<'a> Parser<'a> {
                 }
 
                 TokenKind::Let => {
+                    println!("Let decl");
                     expect_token!(TokenKind::Let in self);
                     let pattern = self.parse_pattern()?;
+                    let mut ty = None;
+                    let saved_index = self.index;
+
+                    if let Ok((desc, _)) = self.parse_type() {
+                        println!("type acquired: {:?}", desc);
+                        ty = Some(desc);
+                    } else {
+                        self.index = saved_index;
+                    }
+
                     expect_token!(TokenKind::Assign in self);
+                    println!("= acquired");
                     let expr = self.parse_expr()?;
                     expect_token!(TokenKind::EOL in self);
 
                     let expr_span = expr.span;
-                    Statement::var_declare(None, pattern, expr, token_span.join(expr_span))
+                    Statement::var_declare(ty, pattern, expr, token_span.join(expr_span))
                 }
 
                 TokenKind::Ident(_) => self.parse_ident_statement()?,
@@ -212,45 +224,25 @@ impl<'a> Parser<'a> {
 
     fn parse_ident_statement(&mut self) -> Result<Statement, CompileError> {
         let saved_index = self.index;
-        let mut var_type = None;
-        let mut start_span = None;
-        let mut pattern = None;
 
-        // Try to parse as typed variable declaration first
-        if let Ok((ty, ty_span)) = self.parse_type() {
-            if let Ok(decl_pattern) = self.parse_pattern() {
-                pattern = Some(decl_pattern);
-                var_type = Some(ty);
-                start_span = Some(ty_span);
+        // Try to parse as assigning first
+        if let Ok(assignee) = self.parse_pattern() {
+            let start_span = assignee.span;
+
+            if let Some(TokenKind::Assign) = self.peek_kind() {
+                expect_token!(TokenKind::Assign in self);
+                let value = self.parse_expr()?;
+                expect_token!(TokenKind::EOL, end_span in self);
+                return Ok(Statement::var_assign(assignee, value, start_span.join(end_span)))
             }
         }
 
-        if pattern.is_none() {
-            self.index = saved_index;
-            pattern = Some(self.parse_pattern()?);
-        }
-
-        let pattern = pattern.unwrap();
-        let start_span = start_span.unwrap_or(pattern.span);
-
-        expect_token!(TokenKind::Assign in self);
+        // go back, try to parse it as expr
+        self.index = saved_index;
         let expr = self.parse_expr()?;
-        expect_token!(TokenKind::EOL, end_span in self);
+        let expr_span = expr.span;
 
-        if var_type.is_some() {
-            Ok(Statement::var_declare(
-                var_type,
-                pattern,
-                expr,
-                start_span.join(end_span),
-            ))
-        } else {
-            Ok(Statement::var_assign(
-                pattern,
-                expr,
-                start_span.join(end_span),
-            ))
-        }
+        Ok(Statement::expr_statement(expr, expr_span))
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern, CompileError> {
@@ -270,14 +262,18 @@ impl<'a> Parser<'a> {
 
         let token_span = token.span;
 
-        match token.kind {
-            TokenKind::Ident(_) => self.parse_pattern(),
+        match &token.kind {
+            TokenKind::Ident(ident) => {
+                let res = Ok(Pattern::var(ident.clone(), token_span));
+                self.skip();
+                res
+            },
 
             _ => {
-                return Err(CompileError::unexpected_token_at(
+                Err(CompileError::unexpected_token_at(
                     self.next().unwrap().kind,
                     token_span,
-                ));
+                ))
             }
         }
     }
@@ -528,7 +524,7 @@ impl<'a> Parser<'a> {
         }
 
         if segments.is_empty() {
-            panic!()
+            return Err(CompileError::other("Found empty descriptor, this is likely internal error of 'parse_descriptor' usage"));
         }
 
         Ok((Descriptor::new(segments), span))

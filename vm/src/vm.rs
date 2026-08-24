@@ -25,12 +25,12 @@ impl Vm {
     }
 
 
-    pub fn load_module(&mut self, module: ) {
-
+    pub fn load_module(&mut self, module: () ) {
+        todo!()
     }
 
     pub fn execute(&mut self) -> Result<(), RuntimeError> {
-
+        todo!()
 
 
         // let main_module_slot = self
@@ -59,12 +59,12 @@ impl Vm {
         //     }
 
             // Module::Native(_) => Err(RuntimeError::other("main module cannot be native")),
-        }
+        // }
     }
 }
 
 struct FunctionInterpreter<'a> {
-    modules: &'a ModuleManager,
+    // modules: &'a ModuleManager,
     heap: &'a mut Heap,
     value_stack: &'a mut ValueStack,
     code: &'a FunctionCode,
@@ -75,7 +75,7 @@ struct FunctionInterpreter<'a> {
 
 impl<'a> FunctionInterpreter<'a> {
     pub fn new(
-        modules: &'a ModuleManager,
+        // modules: &'a ModuleManager,
         heap: &'a mut Heap,
         value_stack: &'a mut ValueStack,
         code: &'a FunctionCode,
@@ -86,7 +86,7 @@ impl<'a> FunctionInterpreter<'a> {
         callstack.push(callframe);
 
         Self {
-            modules,
+            // modules,
             heap,
             value_stack,
             code,
@@ -132,258 +132,260 @@ impl<'a> FunctionInterpreter<'a> {
         }
     }
 
-    pub fn execute(&mut self) -> Result<(), RuntimeError> {
-        while self.ip < self.code.len() {
-            let instr = &self.code.get_instr(self.ip);
-            match instr {
-                Instruction::Store { slot } => {
-                    let w = self.pop()?;
-                    self.local_set(*slot, w)?;
-                }
-                Instruction::LoadConst(word) => {
-                    self.value_stack.push(*word);
-                }
-                Instruction::Drop => {
-                    self.pop()?;
-                }
-                Instruction::LoadLocal { slot } => {
-                    let value = self.local_get(*slot)?;
-                    self.value_stack.push(value);
-                }
-                Instruction::Return => {
-                    self.callstack.pop();
-                    return Ok(());
-                }
-                Instruction::Jump(target) => {
-                    self.ip = *target as usize;
-                    continue;
-                }
-                Instruction::JumpIfFalse(target) => {
-                    let condition = self.pop()?;
-                    if !condition.as_bool() {
-                        self.ip = *target as usize;
-                        continue;
-                    }
-                }
-                // Instruction::CreateString { pool_slot } => {
-                //     let str = self
-                //         .modules
-                //         .get_string_from_pool(self.current_module_slot, *pool_slot)
-                //         .ok_or(RuntimeError::Unknown)?;
+    // pub fn execute(&mut self) -> Result<(), RuntimeError> {
+    //     while self.ip < self.code.len() {
+    //         let instr = &self.code.get_instr(self.ip);
+    //         match instr {
+    //             Instruction::Store { slot } => {
+    //                 let w = self.pop()?;
+    //                 self.local_set(*slot, w)?;
+    //             }
+    //             Instruction::LoadConst(word) => {
+    //                 self.value_stack.push(*word);
+    //             }
+    //             Instruction::Drop => {
+    //                 self.pop()?;
+    //             }
+    //             Instruction::LoadLocal { slot } => {
+    //                 let value = self.local_get(*slot)?;
+    //                 self.value_stack.push(value);
+    //             }
+    //             Instruction::Return => {
+    //                 self.callstack.pop();
+    //                 return Ok(());
+    //             }
+    //             Instruction::Jump(target) => {
+    //                 self.ip = *target as usize;
+    //                 continue;
+    //             }
+    //             Instruction::JumpIfFalse(target) => {
+    //                 let condition = self.pop()?;
+    //                 if !condition.as_bool() {
+    //                     self.ip = *target as usize;
+    //                     continue;
+    //                 }
+    //             }
+    //             // Instruction::CreateString { pool_slot } => {
+    //             //     let str = self
+    //             //         .modules
+    //             //         .get_string_from_pool(self.current_module_slot, *pool_slot)
+    //             //         .ok_or(RuntimeError::Unknown)?;
 
-                //     let string_object = StringObject::new(str);
-                //     let handle = self.arena.alloc(STRING_TYPE_ID, string_object);
+    //             //     let string_object = StringObject::new(str);
+    //             //     let handle = self.arena.alloc(STRING_TYPE_ID, string_object);
 
-                //     self.push(handle.as_word());
-                // }
-                // Instruction::CreateList {
-                //     item_count,
-                //     type_id,
-                // } => {
-                //     let count = *item_count as usize;
-                //     let items = self.value_stack.split_off(self.value_stack.len() - count);
-                //     let list_object = ListObject::from_values(*type_id, items);
-                //     let handle = self.arena.alloc(LIST_TYPE_ID, list_object);
-                //     self.push(handle.as_word());
-                // }
-                // Instruction::RcInc => {
-                //     let handle = self.copy_last()?.as_hhandle();
-                //     self.arena.increment_rc(&handle)?;
-                // }
-                // Instruction::RcDec => {
-                //     let handle = self.pop()?.as_hhandle();
-                //     self.arena.decrement_rc(
-                //         &handle,
-                //         self.callstack.last_mut().unwrap(),
-                //         self.value_stack,
-                //         self.modules,
-                //     )?;
-                // }
-                Instruction::LocalCall { slot } => {
-                    let func = self
-                        .modules
-                        .get_by_slot(self.current_module_slot)
-                        .ok_or(RuntimeError::other("Module not found"))?
-                        .get_code_by_slot(*slot)
-                        .ok_or(RuntimeError::Unknown)?;
+    //             //     self.push(handle.as_word());
+    //             // }
+    //             // Instruction::CreateList {
+    //             //     item_count,
+    //             //     type_id,
+    //             // } => {
+    //             //     let count = *item_count as usize;
+    //             //     let items = self.value_stack.split_off(self.value_stack.len() - count);
+    //             //     let list_object = ListObject::from_values(*type_id, items);
+    //             //     let handle = self.arena.alloc(LIST_TYPE_ID, list_object);
+    //             //     self.push(handle.as_word());
+    //             // }
+    //             // Instruction::RcInc => {
+    //             //     let handle = self.copy_last()?.as_hhandle();
+    //             //     self.arena.increment_rc(&handle)?;
+    //             // }
+    //             // Instruction::RcDec => {
+    //             //     let handle = self.pop()?.as_hhandle();
+    //             //     self.arena.decrement_rc(
+    //             //         &handle,
+    //             //         self.callstack.last_mut().unwrap(),
+    //             //         self.value_stack,
+    //             //         self.modules,
+    //             //     )?;
+    //             // }
+    //             Instruction:: { slot } => {
+    //                 let func = self
+    //                     .modules
+    //                     .get_by_slot(self.current_module_slot)
+    //                     .ok_or(RuntimeError::other("Module not found"))?
+    //                     .get_code_by_slot(*slot)
+    //                     .ok_or(RuntimeError::Unknown)?;
 
-                    FunctionInterpreter::new(
-                        self.modules,
-                        self.arena,
-                        self.value_stack,
-                        func,
-                        self.callstack,
-                        self.current_module_slot,
-                    )
-                    .execute()?;
-                }
-                // Instruction::ForeignCall {
-                //     module_name_slot,
-                //     call_slot,
-                // } => {
-                //     let mod_name = self
-                //         .modules
-                //         .get_string_from_pool(self.current_module_slot, *module_name_slot)
-                //         .ok_or(RuntimeError::Unknown)?;
+    //                 FunctionInterpreter::new(
+    //                     self.modules,
+    //                     self.arena,
+    //                     self.value_stack,
+    //                     func,
+    //                     self.callstack,
+    //                     self.current_module_slot,
+    //                 )
+    //                 .execute()?;
+    //             }
+    //             // Instruction::ForeignCall {
+    //             //     module_name_slot,
+    //             //     call_slot,
+    //             // } => {
+    //             //     let mod_name = self
+    //             //         .modules
+    //             //         .get_string_from_pool(self.current_module_slot, *module_name_slot)
+    //             //         .ok_or(RuntimeError::Unknown)?;
 
-                //     let module_slot = self
-                //         .modules
-                //         .get_slot(mod_name)
-                //         .ok_or(RuntimeError::other("Module doesn't exists"))?;
+    //             //     let module_slot = self
+    //             //         .modules
+    //             //         .get_slot(mod_name)
+    //             //         .ok_or(RuntimeError::other("Module doesn't exists"))?;
 
-                //     let func = self
-                //         .modules
-                //         .get_by_slot(module_slot)
-                //         .ok_or(RuntimeError::other("Module not found"))?
-                //         .get_code_by_slot(*call_slot)
-                //         .ok_or(RuntimeError::Unknown)?;
+    //             //     let func = self
+    //             //         .modules
+    //             //         .get_by_slot(module_slot)
+    //             //         .ok_or(RuntimeError::other("Module not found"))?
+    //             //         .get_code_by_slot(*call_slot)
+    //             //         .ok_or(RuntimeError::Unknown)?;
 
-                //     FunctionInterpreter::new(
-                //         self.modules,
-                //         self.arena,
-                //         self.value_stack,
-                //         func,
-                //         self.callstack,
-                //         module_slot,
-                //     )
-                //     .execute()?;
-                // }
-                // Instruction::MethodCall { type_id, slot } => {
-                //     let callee = self.pop()?;
-                //     let method = self.vtables[*type_id as usize]
-                //         .methods
-                //         .get(*slot as usize)
-                //         .ok_or(RuntimeError::Unknown)?;
+    //             //     FunctionInterpreter::new(
+    //             //         self.modules,
+    //             //         self.arena,
+    //             //         self.value_stack,
+    //             //         func,
+    //             //         self.callstack,
+    //             //         module_slot,
+    //             //     )
+    //             //     .execute()?;
+    //             // }
+    //             // Instruction::MethodCall { type_id, slot } => {
+    //             //     let callee = self.pop()?;
+    //             //     let method = self.vtables[*type_id as usize]
+    //             //         .methods
+    //             //         .get(*slot as usize)
+    //             //         .ok_or(RuntimeError::Unknown)?;
 
-                //     method.execute(callee, self.value_stack, self.arena, self.vtables);
-                // }
-                // Instruction::ListGet => {
-                //     let index = self.pop()?.as_u32();
-                //     let handle = self.pop()?.as_hhandle();
-                //     let list = self.arena.get_mut::<ListObject>(&handle)?;
-                //     let item = list.get_item(index)?;
-                //     self.arena.decrement_rc(
-                //         &handle,
-                //         self.callstack.last_mut().unwrap(),
-                //         self.value_stack,
-                //         self.modules,
-                //     )?;
-                //     self.push(item);
-                // }
-                // Instruction::ListSet => {
-                //     let value = self.pop()?;
-                //     let index = self.pop()?.as_u32();
-                //     let handle = self.pop()?.as_hhandle();
-                //     let list = self.arena.get_mut::<ListObject>(&handle)?;
-                //     list.set_item(index, value)?;
-                //     self.arena.decrement_rc(
-                //         &handle,
-                //         self.callstack.last_mut().unwrap(),
-                //         self.value_stack,
-                //         self.modules,
-                //     )?;
-                // }
-                Instruction::BoolAnd => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.bool_assign_and(rhs);
-                }
-                Instruction::BoolOr => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.bool_assign_or(rhs);
-                }
-                Instruction::BoolNot => {
-                    self.last_mut()?.bool_assign_not();
-                }
-                Instruction::I32Add => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_add(rhs);
-                }
-                Instruction::I32Sub => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_sub(rhs);
-                }
-                Instruction::I32Mul => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_mul(rhs);
-                }
-                Instruction::I32Div => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_div(rhs);
-                }
-                Instruction::I32Mod => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_modulo(rhs);
-                }
-                Instruction::I32Negate => {
-                    self.last_mut()?.i32_assign_negate();
-                }
-                Instruction::I32Greater => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_greater(rhs);
-                }
-                Instruction::I32GreaterEqual => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_greater_equal(rhs);
-                }
-                Instruction::I32Less => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_less(rhs);
-                }
-                Instruction::I32LessEqual => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.i32_assign_less_equal(rhs);
-                }
-                Instruction::F32Add => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_add(rhs);
-                }
-                Instruction::F32Sub => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_sub(rhs);
-                }
-                Instruction::F32Mul => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_mul(rhs);
-                }
-                Instruction::F32Div => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_div(rhs);
-                }
-                Instruction::F32Mod => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_modulo(rhs);
-                }
-                Instruction::F32Negate => {
-                    self.last_mut()?.f32_assign_negate();
-                }
-                Instruction::F32Greater => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_greater(rhs);
-                }
-                Instruction::F32GreaterEqual => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_greater_equal(rhs);
-                }
-                Instruction::F32Less => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_less(rhs);
-                }
-                Instruction::F32LessEqual => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.f32_assign_less_equal(rhs);
-                }
-                Instruction::WordEqual => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.cmp_assign_equal(rhs);
-                }
-                Instruction::WordNotEqual => {
-                    let rhs = self.pop()?;
-                    self.last_mut()?.cmp_assign_not_equal(rhs);
-                }
-            }
-            self.ip += 1;
-        }
+    //             //     method.execute(callee, self.value_stack, self.arena, self.vtables);
+    //             // }
+    //             // Instruction::ListGet => {
+    //             //     let index = self.pop()?.as_u32();
+    //             //     let handle = self.pop()?.as_hhandle();
+    //             //     let list = self.arena.get_mut::<ListObject>(&handle)?;
+    //             //     let item = list.get_item(index)?;
+    //             //     self.arena.decrement_rc(
+    //             //         &handle,
+    //             //         self.callstack.last_mut().unwrap(),
+    //             //         self.value_stack,
+    //             //         self.modules,
+    //             //     )?;
+    //             //     self.push(item);
+    //             // }
+    //             // Instruction::ListSet => {
+    //             //     let value = self.pop()?;
+    //             //     let index = self.pop()?.as_u32();
+    //             //     let handle = self.pop()?.as_hhandle();
+    //             //     let list = self.arena.get_mut::<ListObject>(&handle)?;
+    //             //     list.set_item(index, value)?;
+    //             //     self.arena.decrement_rc(
+    //             //         &handle,
+    //             //         self.callstack.last_mut().unwrap(),
+    //             //         self.value_stack,
+    //             //         self.modules,
+    //             //     )?;
+    //             // }
+    //             Instruction::BoolAnd => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.bool_assign_and(rhs);
+    //             }
+    //             Instruction::BoolOr => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.bool_assign_or(rhs);
+    //             }
+    //             Instruction::BoolNot => {
+    //                 self.last_mut()?.bool_assign_not();
+    //             }
+    //             Instruction::I32Add => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_add(rhs);
+    //             }
+    //             Instruction::I32Sub => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_sub(rhs);
+    //             }
+    //             Instruction::I32Mul => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_mul(rhs);
+    //             }
+    //             Instruction::I32Div => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_div(rhs);
+    //             }
+    //             Instruction::I32Mod => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_modulo(rhs);
+    //             }
+    //             Instruction::I32Negate => {
+    //                 self.last_mut()?.i32_assign_negate();
+    //             }
+    //             Instruction::I32Greater => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_greater(rhs);
+    //             }
+    //             Instruction::I32GreaterEqual => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_greater_equal(rhs);
+    //             }
+    //             Instruction::I32Less => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_less(rhs);
+    //             }
+    //             Instruction::I32LessEqual => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.i32_assign_less_equal(rhs);
+    //             }
+    //             Instruction::F32Add => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_add(rhs);
+    //             }
+    //             Instruction::F32Sub => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_sub(rhs);
+    //             }
+    //             Instruction::F32Mul => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_mul(rhs);
+    //             }
+    //             Instruction::F32Div => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_div(rhs);
+    //             }
+    //             Instruction::F32Mod => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_modulo(rhs);
+    //             }
+    //             Instruction::F32Negate => {
+    //                 self.last_mut()?.f32_assign_negate();
+    //             }
+    //             Instruction::F32Greater => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_greater(rhs);
+    //             }
+    //             Instruction::F32GreaterEqual => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_greater_equal(rhs);
+    //             }
+    //             Instruction::F32Less => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_less(rhs);
+    //             }
+    //             Instruction::F32LessEqual => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.f32_assign_less_equal(rhs);
+    //             }
+    //             Instruction::WordEqual => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.cmp_assign_equal(rhs);
+    //             }
+    //             Instruction::WordNotEqual => {
+    //                 let rhs = self.pop()?;
+    //                 self.last_mut()?.cmp_assign_not_equal(rhs);
+    //             }
+    //         }
+    //         self.ip += 1;
+    //     }
 
-        Err(RuntimeError::FunctionDidNotReturn)
-    }
+    //     Err(RuntimeError::FunctionDidNotReturn)
+    // }
+
+
 }

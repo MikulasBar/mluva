@@ -5,7 +5,7 @@ use common::ast::{
     BinaryOp, Expr, ExprKind, Pattern, PatternKind, Statement, StatementKind, UnaryOp,
 };
 use common::function::{FunctionCode, FunctionSigniture, Parameter};
-use common::module::{ModuleAST, ModuleCode, ModuleSigniture};
+use common::module::{LCPEntry, ModuleAST, ModuleCode, ModuleSigniture};
 use common::{CompileError, Descriptor, Instruction, Word};
 
 use crate::local_slot::LocalSlot;
@@ -14,7 +14,7 @@ pub struct Compiler<'a> {
     ast: &'a ModuleAST,
     dependencies: &'a HashMap<Descriptor, ModuleSigniture>,
     code: ModuleCode,
-    string_slots: HashMap<String, u32>,
+    lcp_slots: HashMap<LCPEntry, u32>,
 }
 
 impl<'a> Compiler<'a> {
@@ -23,7 +23,7 @@ impl<'a> Compiler<'a> {
             ast,
             dependencies,
             code: ModuleCode::empty(),
-            string_slots: HashMap::new(),
+            lcp_slots: HashMap::new(),
         }
     }
 
@@ -52,7 +52,7 @@ impl<'a> Compiler<'a> {
             self.dependencies,
             body,
             signiture,
-            &mut self.string_slots,
+            &mut self.lcp_slots,
             &mut self.code,
         )
         .compile()?;
@@ -67,7 +67,7 @@ struct FunctionCompiler<'b> {
     dependencies: &'b HashMap<Descriptor, ModuleSigniture>,
     body: &'b [Statement],
     signiture: &'b FunctionSigniture,
-    string_slots: &'b mut HashMap<String, u32>,
+    lcp_slots: &'b mut HashMap<LCPEntry, u32>,
     locals: HashMap<String, LocalSlot>,
     next_local_index: u32,
     code: FunctionCode,
@@ -79,7 +79,7 @@ impl<'b> FunctionCompiler<'b> {
         dependencies: &'b HashMap<Descriptor, ModuleSigniture>,
         body: &'b [Statement],
         signiture: &'b FunctionSigniture,
-        string_slots: &'b mut HashMap<String, u32>,
+        lcp_slots: &'b mut HashMap<LCPEntry, u32>,
         mod_code: &'b mut ModuleCode,
     ) -> Self {
         Self {
@@ -88,7 +88,7 @@ impl<'b> FunctionCompiler<'b> {
             signiture,
             locals: HashMap::new(),
             code: FunctionCode::empty(),
-            string_slots,
+            lcp_slots,
             mod_code,
             next_local_index: 0,
         }

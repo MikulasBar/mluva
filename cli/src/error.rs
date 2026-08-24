@@ -1,5 +1,5 @@
 use bincode::error::{DecodeError, EncodeError};
-use common::compile_error::CompileError;
+use common::CompileError;
 
 pub enum CliError {
     Compile(CompileError),

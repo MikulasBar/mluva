@@ -6,3 +6,4 @@ edition.workspace = true
 
 [dependencies]
 common.workspace = true
+codespan-reporting.workspace = true

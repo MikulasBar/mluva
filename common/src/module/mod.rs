@@ -6,7 +6,7 @@ mod lcp;
 pub use ast::ModuleAST;
 pub use code::ModuleCode;
 pub use signiture::ModuleSigniture;
-pub use lcp::LCP;
+pub use lcp::{LCP, LCPEntry};
 
 
 pub enum Module {

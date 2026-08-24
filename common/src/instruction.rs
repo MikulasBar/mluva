@@ -19,14 +19,14 @@ pub enum Instruction {
     JumpIfFalse(u32),
     Return,
 
-    NewObject(u32),
-    FunctionCall(u32),
+    NewObject(u32), // references LCP slot (class)
+    FunctionCall(u32), // references LCP slot (function)
     InterfaceCall {
         interface: u32,
         function_slot: u32,
     },
-    FieldGet(u32),
-    FieldSet(u32),
+    FieldGet(u32), // Supports only word size fields
+    FieldSet(u32), // Supports only word size fields
 
 
     I32Add,

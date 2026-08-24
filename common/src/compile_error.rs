@@ -180,6 +180,10 @@ impl CompileError {
         Self::new(CompileErrorKind::Other, msg).with_span(span)
     }
 
+    pub fn other(msg: impl Into<String>) -> Self {
+        Self::new(CompileErrorKind::Other, msg)
+    }
+
     /// Convert into a codespan_reporting::diagnostic::Diagnostic using the supplied files map.
     /// Caller provides the `SimpleFiles<String, String>` instance that holds the source text(s).
     pub fn to_diagnostic(&self) -> Diagnostic<usize> {

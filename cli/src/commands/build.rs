@@ -8,7 +8,7 @@ use codespan_reporting::{
     },
 };
 use common::module::{
-    module_code::ModuleCode, module_manager::ModuleCodeManager, module_signiture::ModuleSigniture,
+    ModuleCode, ModuleSigniture,
 };
 use compiler::compiler::Compiler;
 use typechecker::TypeChecker;
@@ -19,6 +19,9 @@ use crate::{
     error::CliError,
     module_metadata::{ModuleMetadata, ModuleMetadataStorage},
 };
+
+
+type ModuleCodeManager = ();
 
 pub fn command() -> Result<(Config, ModuleCodeManager), ()> {
     println!("Building the Mluva project...");
@@ -32,7 +35,7 @@ pub fn command() -> Result<(Config, ModuleCodeManager), ()> {
     create_meta_storage()?;
 
     let mut module_meta_storage = ModuleMetadataStorage::load_from_file()?;
-    let mut module_code_manager = ModuleCodeManager::new();
+    let mut module_code_manager = todo!();
     let mut dependencies: HashMap<String, ModuleSigniture> = HashMap::new();
     let mut parent_stack: Vec<String> = vec![];
     let mut files = SimpleFiles::new();
@@ -98,9 +101,9 @@ fn compile_module(
         .to_string_lossy()
         .to_string();
 
-    if module_code_manager.contains_mod(source_module) {
-        return Ok(());
-    }
+    // if module_code_manager.contains_mod(source_module) {
+    //     return Ok(());
+    // }
 
     if parent_stack.iter().any(|p| p == source_module) {
         eprintln!(
@@ -128,7 +131,8 @@ fn compile_module(
 
     for import in module_ast.imports() {
         // TODO: resolve full path
-        let import_path_str = import.get_tail().unwrap();
+        // let import_path_str = import.get_tail().unwrap();
+        let import_path_str = todo!();
         let import_path = Path::new(import_path_str).with_extension("mv");
 
         if !import_path.exists() {
@@ -156,6 +160,10 @@ fn compile_module(
     let code_path = Path::new(&code_path_str);
 
     let needs_compilation = module_meta_storage.needs_recompilation(&source_path, &content);
+
+
+    
+
 
     if needs_compilation || !code_path.exists() || !sign_path.exists() {
         TypeChecker::new(&mut module_ast, dependencies).check()?;

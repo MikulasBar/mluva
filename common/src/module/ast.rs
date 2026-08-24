@@ -7,6 +7,7 @@ use crate::{
     module::signiture::ModuleSigniture,
 };
 
+#[derive(Debug)]
 pub struct ModuleAST {
     imports: Vec<Descriptor>,
     function_bodies: HashMap<String, Vec<Statement>>,

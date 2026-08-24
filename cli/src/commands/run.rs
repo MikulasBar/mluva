@@ -14,7 +14,8 @@ pub fn command() -> Result<(), ()> {
 
     println!("Running the Mluva project...\n");
 
-    let mut vm = Vm::new(modules);
+    todo!();
+    let mut vm = Vm::new();
     let result = vm.execute();
 
     match result {
