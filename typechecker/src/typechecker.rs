@@ -3,30 +3,54 @@ use std::mem;
 
 use super::type_scope::TypeScope;
 use crate::bin_op_pat;
-use common::{Descriptor, descriptor};
-use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
 use common::CompileError;
+use common::ast::{BinaryOp, Expr, ExprKind, Statement, StatementKind, UnaryOp};
 use common::diagnostics::Span;
 use common::module::ModuleAST;
 use common::module::ModuleSigniture;
+use common::{Descriptor, descriptor};
 
 pub struct TypeChecker<'a> {
     ast: &'a mut ModuleAST,
     dependencies: &'a HashMap<Descriptor, ModuleSigniture>,
     scope: TypeScope,
+    import_map: HashMap<String, Descriptor>,
 }
 
 impl<'a> TypeChecker<'a> {
-    pub fn new(ast: &'a mut ModuleAST, dependencies: &'a HashMap<Descriptor, ModuleSigniture>) -> Self {
+    pub fn new(
+        ast: &'a mut ModuleAST,
+        dependencies: &'a HashMap<Descriptor, ModuleSigniture>,
+    ) -> Self {
+        let import_map = ast
+            .imports()
+            .iter()
+            .map(|(desc, _)| (desc.last().unwrap().to_string(), desc.clone()))
+            .collect();
+
         Self {
             ast,
             dependencies,
+            import_map,
             scope: TypeScope::new(),
         }
     }
 
     pub fn check(mut self) -> Result<(), CompileError> {
-        self.check_functions()
+        self.check_imports()?;
+        self.check_functions()?;
+
+        Ok(())
+    }
+
+    fn check_imports(&mut self) -> Result<(), CompileError> {
+        for (path, span) in self.ast.imports() {
+            if !self.dependencies.contains_key(path) {
+                return Err(CompileError::module_not_found_at(path.clone(), *span));
+            }
+        }
+
+        Ok(())
     }
 
     fn check_functions(&mut self) -> Result<(), CompileError> {
@@ -54,7 +78,7 @@ impl<'a> TypeChecker<'a> {
 
             self.scope.exit();
         }
-    
+
         Ok(())
     }
 
@@ -154,19 +178,23 @@ impl<'a> TypeChecker<'a> {
                 self.check_expr(expr)?;
             }
 
-            StatementKind::Return(expr) => {
-                match (expr, return_type) {
-                    (Some(e), r) => {
-                        let e = self.check_expr(e)?;
+            StatementKind::Return(expr) => match (expr, return_type) {
+                (Some(e), r) => {
+                    let e = self.check_expr(e)?;
 
-                        if !e.matches(r) {
-                            return Err(CompileError::wrong_type_at(e, r.clone(), statement.span))
-                        }
-                    },
-                    (None, r) if !r.is_void_type() => return Err(CompileError::wrong_type_at(Descriptor::void_type(), r.clone(), statement.span)),
-                    _ => (),
+                    if !e.matches(r) {
+                        return Err(CompileError::wrong_type_at(e, r.clone(), statement.span));
+                    }
                 }
-            }
+                (None, r) if !r.is_void_type() => {
+                    return Err(CompileError::wrong_type_at(
+                        Descriptor::void_type(),
+                        r.clone(),
+                        statement.span,
+                    ));
+                }
+                _ => (),
+            },
         }
 
         Ok(())
@@ -178,10 +206,7 @@ impl<'a> TypeChecker<'a> {
                 // TODO: solve other paths that are not variables
                 let ident = ident.last().unwrap();
                 let Some(ty) = self.scope.get(&ident) else {
-                    return Err(CompileError::variable_not_found_at(
-                        ident,
-                        expr.span,
-                    ));
+                    return Err(CompileError::variable_not_found_at(ident, expr.span));
                 };
 
                 ty.clone()
@@ -207,22 +232,29 @@ impl<'a> TypeChecker<'a> {
         Ok(expr_ty)
     }
 
+    // TODO: optimize this
     fn check_call_expr(
         &self,
         span: Span,
-        function: &Descriptor,
+        function: &mut Descriptor,
         args: &mut [Expr],
     ) -> Result<Descriptor, CompileError> {
+        let Some(import) = self.import_map.get(function.first().unwrap()) else {
+            return Err(CompileError::module_not_found_at(function.clone(), span));
+        };
+
+        function.sub_first(import.segments.clone());
         let mut path = function.clone();
         let tail = path.pop_last_unchecked();
+
         let Some(module) = self.dependencies.get(&path) else {
-            return Err(CompileError::module_not_found_at(path, span))
+            return Err(CompileError::module_not_found_at(path, span));
         };
 
         let Some(sig) = module.get_function(&tail) else {
-            return Err(CompileError::function_not_found_at(function.clone(), span))
+            return Err(CompileError::function_not_found_at(function.clone(), span));
         };
-        
+
         let arg_types: Vec<(Descriptor, Span)> = args
             .iter_mut()
             .map(|arg| self.check_expr(arg).map(|t| (t, arg.span)))
@@ -232,63 +264,6 @@ impl<'a> TypeChecker<'a> {
 
         Ok(sig.return_type.clone())
     }
-
-    // fn check_foreign_call_expr(
-    //     &self,
-    //     span: Span,
-    //     module_name: &str,
-    //     func_name: &str,
-    //     args: &mut [Expr],
-    // ) -> Result<Descriptor, CompileError> {
-    //     let signiture = self
-    //         .dependencies
-    //         .get(module_name)
-    //         .ok_or_else(|| CompileError::module_not_found_at(module_name, span))?
-    //         .get_function(&func_name)
-    //         .ok_or_else(|| CompileError::function_not_found_at(func_name, span))?;
-
-    //     let arg_types: Vec<(Descriptor, Span)> = args
-    //         .iter_mut()
-    //         .map(|arg| self.check_expr(arg).map(|dt| (dt, arg.span)))
-    //         .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
-
-    //     signiture.check_argument_types(&arg_types, span, self.ast.tm())?;
-
-    //     Ok(signiture.return_type.clone())
-    // }
-
-    // fn check_method_call_expr(
-    //     &self,
-    //     span: Span,
-    //     callee: &mut Expr,
-    //     method_name: &str,
-    //     args: &mut [Expr],
-    // ) -> Result<Descriptor, CompileError> {
-    //     let callee_type = self.check_expr(callee)?;
-
-    //     let arg_types: Vec<(Descriptor, Span)> = args
-    //         .iter_mut()
-    //         .map(|arg| self.check_expr(arg).map(|t| (t, arg.span)))
-    //         .collect::<Result<Vec<(Descriptor, Span)>, CompileError>>()?;
-
-    //     let ty = self
-    //         .ast
-    //         .get_type(callee_type)
-    //         .expect("Internal Typechecker error, not recovering");
-
-    //     let method_slot =
-    //         ty.get_method_slot(method_name)
-    //             .ok_or(CompileError::method_not_found_at(
-    //                 callee_type,
-    //                 method_name,
-    //                 span,
-    //             ))?;
-
-    //     let method = self.ast.get_function_sig(method_slot).unwrap();
-    //     method.check_argument_types(&arg_types, span)?;
-
-    //     Ok(method.return_type.clone())
-    // }
 
     fn check_binary_op_expr(
         &self,
@@ -310,11 +285,7 @@ impl<'a> TypeChecker<'a> {
                 }
 
                 if rhs_type != lhs_type {
-                    return Err(CompileError::wrong_type_at(
-                        lhs_type,
-                        rhs_type,
-                        span,
-                    ));
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, span));
                 }
 
                 Ok(lhs_type)
@@ -330,11 +301,7 @@ impl<'a> TypeChecker<'a> {
                 }
 
                 if rhs_type != lhs_type {
-                    return Err(CompileError::wrong_type_at(
-                        lhs_type,
-                        rhs_type,
-                        span,
-                    ));
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, span));
                 }
 
                 Ok(Descriptor::bool_type())
@@ -342,11 +309,7 @@ impl<'a> TypeChecker<'a> {
 
             bin_op_pat!(COMPARISON) => {
                 if lhs_type != rhs_type {
-                    return Err(CompileError::wrong_type_at(
-                        lhs_type,
-                        rhs_type,
-                        span,
-                    ));
+                    return Err(CompileError::wrong_type_at(lhs_type, rhs_type, span));
                 }
 
                 Ok(Descriptor::bool_type())
@@ -374,7 +337,11 @@ impl<'a> TypeChecker<'a> {
         }
     }
 
-    fn check_unary_op_expr(&self, expr: &mut Expr, op: &UnaryOp) -> Result<Descriptor, CompileError> {
+    fn check_unary_op_expr(
+        &self,
+        expr: &mut Expr,
+        op: &UnaryOp,
+    ) -> Result<Descriptor, CompileError> {
         let expr_type = self.check_expr(expr)?;
         match op {
             UnaryOp::Not => {

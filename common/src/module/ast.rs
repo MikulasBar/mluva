@@ -1,15 +1,13 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use crate::{
-    Descriptor,
-    ast::Statement,
-    function::FunctionSigniture,
+    Descriptor, ast::Statement, diagnostics::Span, function::FunctionSigniture,
     module::signiture::ModuleSigniture,
 };
 
 #[derive(Debug)]
 pub struct ModuleAST {
-    imports: Vec<Descriptor>,
+    imports: Vec<(Descriptor, Span)>,
     function_bodies: HashMap<String, Vec<Statement>>,
     signiture: ModuleSigniture,
 }
@@ -23,9 +21,9 @@ impl ModuleAST {
         }
     }
 
-    pub fn add_import(&mut self, import: Descriptor) -> u32 {
+    pub fn add_import(&mut self, import: Descriptor, span: Span) -> u32 {
         let slot = self.imports.len() as u32;
-        self.imports.push(import);
+        self.imports.push((import, span));
         slot
     }
 
@@ -54,7 +52,7 @@ impl ModuleAST {
         self.function_bodies.keys().cloned().collect()
     }
 
-    pub fn imports(&self) -> &'_ [Descriptor] {
+    pub fn imports(&self) -> &'_ [(Descriptor, Span)] {
         &self.imports
     }
 

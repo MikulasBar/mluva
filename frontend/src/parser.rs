@@ -98,11 +98,11 @@ impl<'a> Parser<'a> {
                 }
 
                 TokenKind::Import => {
-                    expect_token!(TokenKind::Import in self);
-                    let (import, _) = self.parse_descriptor()?;
+                    expect_token!(TokenKind::Import, start_span in self);
+                    let (import, end_span) = self.parse_descriptor()?;
                     expect_token!(TokenKind::EOL in self);
 
-                    self.ast.add_import(import);
+                    self.ast.add_import(import, start_span.join(end_span));
                 }
 
                 _ => {

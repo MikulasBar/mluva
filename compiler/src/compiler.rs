@@ -17,24 +17,16 @@ pub struct Compiler<'a> {
     code: ModuleCode,
     lcp_slots: HashMap<LCPKey, u32>,
     next_lcp_slot: u32,
-    import_map: HashMap<String, Descriptor>,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(ast: &'a ModuleAST, dependencies: &'a HashMap<Descriptor, ModuleSigniture>) -> Self {
-        let import_map = ast
-            .imports()
-            .iter()
-            .map(|desc| (desc.last().unwrap().to_string(), desc.clone()))
-            .collect();
-
         Self {
             ast,
             dependencies,
             code: ModuleCode::empty(),
             lcp_slots: HashMap::new(),
             next_lcp_slot: 0,
-            import_map,
         }
     }
 
@@ -66,7 +58,6 @@ impl<'a> Compiler<'a> {
             self.code.get_lcp_mut(),
             &mut self.lcp_slots,
             &mut self.next_lcp_slot,
-            &mut self.import_map,
         )
         .compile()?;
 
@@ -85,7 +76,6 @@ struct FunctionCompiler<'b> {
     next_lcp_slot: &'b mut u32,
     locals: HashMap<String, LocalSlot>,
     next_local_index: u32,
-    import_map: &'b mut HashMap<String, Descriptor>,
     code: FunctionCode,
 }
 
@@ -97,7 +87,6 @@ impl<'b> FunctionCompiler<'b> {
         lcp: &'b mut LCP,
         lcp_slots: &'b mut HashMap<LCPKey, u32>,
         next_lcp_slot: &'b mut u32,
-        import_map: &'b mut HashMap<String, Descriptor>,
     ) -> Self {
         Self {
             dependencies,
@@ -109,20 +98,11 @@ impl<'b> FunctionCompiler<'b> {
             lcp_slots,
             next_lcp_slot,
             next_local_index: 0,
-            import_map,
         }
     }
 
     fn emit(&mut self, instr: Instruction) {
         self.code.emit_instr(instr);
-    }
-
-    fn emit_load_local(&mut self, slot: LocalSlot) {
-        self.emit(Instruction::LoadLocal { slot: slot.index });
-    }
-
-    fn emit_drop(&mut self) {
-        self.emit(Instruction::Drop);
     }
 
     fn get_lcp_slot(&mut self, entry: LCPEntry) -> u32 {
@@ -360,15 +340,6 @@ impl<'b> FunctionCompiler<'b> {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
-
-                let mut function = function.clone();
-
-                // substitute imported path
-                if function.len() > 1 {
-                    if let Some(path) = self.import_map.get(function.first().unwrap()) {
-                        function.sub_first(path.segments.clone());
-                    }
-                };
 
                 let function_entry = LCPEntry::UnresolvedFunction {
                     path: function.to_string(),
