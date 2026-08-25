@@ -5,7 +5,7 @@ use bincode::{Decode, Encode};
 use crate::{class::FieldInfo, function::FunctionEntity, word::Word};
 
 
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct ClassEntity {
     fields: Vec<FieldInfo>,
     itables: HashMap<String, ITable>,
@@ -21,7 +21,7 @@ impl ClassEntity {
     }
 }
 
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct ITable {
     functions: Vec<Arc<FunctionEntity>>
 }

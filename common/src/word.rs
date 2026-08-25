@@ -1,6 +1,6 @@
 use bincode::{Decode, Encode};
 
-#[derive(Debug, Clone, Copy, PartialEq, Encode, Decode)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Encode, Decode)]
 pub struct Word {
     pub data: u32,
 }

@@ -4,7 +4,7 @@ use bincode::{Decode, Encode};
 
 use crate::{function::FunctionCode, module::LCP};
 
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Encode, Decode)]
 pub struct FunctionEntity {
     kind: FunctionEntityKind,
     pool: Arc<LCP>,
@@ -12,7 +12,7 @@ pub struct FunctionEntity {
 
 
 
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode)]
 pub enum FunctionEntityKind {
     Code(FunctionCode),
 }

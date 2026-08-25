@@ -2,7 +2,7 @@ use bincode::{Decode, Encode};
 
 use crate::instruction::Instruction;
 
-#[derive(Debug, Clone, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode)]
 pub struct FunctionCode {
     pub slot_count: usize,
     body: Vec<Instruction>,

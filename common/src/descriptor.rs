@@ -4,7 +4,7 @@ use bincode::{Decode, Encode};
 
 #[derive(Debug, Clone, PartialEq, Eq, Encode, Decode, Hash)]
 pub struct Descriptor {
-    segments: Vec<String>,
+    pub segments: Vec<String>,
 }
 
 impl Descriptor {
@@ -16,12 +16,23 @@ impl Descriptor {
         self.segments.len()
     }
 
-    pub fn tail(&self) -> Option<&str> {
+    pub fn first(&self) -> Option<&str> {
+        self.segments.first().map(|s| s.as_str())
+    }
+
+    pub fn last(&self) -> Option<&str> {
         self.segments.last().map(|s| s.as_str())
     }
 
-    pub fn pop_tail_unchecked(&mut self) -> String {
+    pub fn pop_last_unchecked(&mut self) -> String {
         self.segments.pop().unwrap()
+    }
+
+    /// Substitute first segment with more segments
+    ///
+    /// Used for import syntax in compiler
+    pub fn sub_first(&mut self, segments: Vec<String>) {
+        self.segments.splice(0..1, segments);
     }
 
     pub fn matches(&self, other: &Descriptor) -> bool {
@@ -68,7 +79,7 @@ impl Descriptor {
 
 impl Display for Descriptor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let string = self.segments.join(".");
+        let string: String = self.into();
         write!(f, "{}", string)
     }
 }
@@ -81,3 +92,9 @@ macro_rules! descriptor {
 }
 
 use descriptor;
+
+impl From<&Descriptor> for String {
+    fn from(value: &Descriptor) -> Self {
+        value.segments.join(".")
+    }
+}

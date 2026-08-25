@@ -5,7 +5,7 @@ use bincode::{
     error::{DecodeError, EncodeError},
 };
 
-use crate::{function::FunctionCode, module::lcp::LCP, serde_header::SerdeHeader};
+use crate::{function::FunctionCode, module::{LCPEntry, lcp::LCP}, serde_header::SerdeHeader};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct ModuleCode {
@@ -41,6 +41,10 @@ impl ModuleCode {
 
     pub fn add_code(&mut self, name: String, code: FunctionCode) {
         self.functions.insert(name, code);
+    }
+
+    pub fn get_lcp_mut(&mut self) -> &'_ mut LCP  {
+        &mut self.lcp
     }
 
     pub fn serialize(&self) -> Result<Vec<u8>, EncodeError> {

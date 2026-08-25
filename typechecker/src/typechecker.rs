@@ -176,7 +176,7 @@ impl<'a> TypeChecker<'a> {
         let expr_ty = match &mut expr.kind {
             ExprKind::Path(ident) => {
                 // TODO: solve other paths that are not variables
-                let ident = ident.tail().unwrap();
+                let ident = ident.last().unwrap();
                 let Some(ty) = self.scope.get(&ident) else {
                     return Err(CompileError::variable_not_found_at(
                         ident,
@@ -214,7 +214,7 @@ impl<'a> TypeChecker<'a> {
         args: &mut [Expr],
     ) -> Result<Descriptor, CompileError> {
         let mut path = function.clone();
-        let tail = path.pop_tail_unchecked();
+        let tail = path.pop_last_unchecked();
         let Some(module) = self.dependencies.get(&path) else {
             return Err(CompileError::module_not_found_at(path, span))
         };

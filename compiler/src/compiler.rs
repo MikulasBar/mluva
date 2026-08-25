@@ -5,25 +5,36 @@ use common::ast::{
     BinaryOp, Expr, ExprKind, Pattern, PatternKind, Statement, StatementKind, UnaryOp,
 };
 use common::function::{FunctionCode, FunctionSigniture, Parameter};
-use common::module::{LCPEntry, ModuleAST, ModuleCode, ModuleSigniture};
+use common::module::{LCP, LCPEntry, ModuleAST, ModuleCode, ModuleSigniture};
 use common::{CompileError, Descriptor, Instruction, Word};
 
+use crate::lcp_key::LCPKey;
 use crate::local_slot::LocalSlot;
 
 pub struct Compiler<'a> {
     ast: &'a ModuleAST,
     dependencies: &'a HashMap<Descriptor, ModuleSigniture>,
     code: ModuleCode,
-    lcp_slots: HashMap<LCPEntry, u32>,
+    lcp_slots: HashMap<LCPKey, u32>,
+    next_lcp_slot: u32,
+    import_map: HashMap<String, Descriptor>,
 }
 
 impl<'a> Compiler<'a> {
     pub fn new(ast: &'a ModuleAST, dependencies: &'a HashMap<Descriptor, ModuleSigniture>) -> Self {
+        let import_map = ast
+            .imports()
+            .iter()
+            .map(|desc| (desc.last().unwrap().to_string(), desc.clone()))
+            .collect();
+
         Self {
             ast,
             dependencies,
             code: ModuleCode::empty(),
             lcp_slots: HashMap::new(),
+            next_lcp_slot: 0,
+            import_map,
         }
     }
 
@@ -32,10 +43,7 @@ impl<'a> Compiler<'a> {
             self.compile_function(name)?;
         }
 
-        let Compiler {
-            code,
-            ..
-        } = self;
+        let Compiler { code, .. } = self;
 
         Ok(code)
     }
@@ -46,14 +54,19 @@ impl<'a> Compiler<'a> {
             .get_function_sig(&name)
             .expect("Function signiture should exist");
 
-        let body = self.ast.get_function_body(&name).expect("Function body should exist");
+        let body = self
+            .ast
+            .get_function_body(&name)
+            .expect("Function body should exist");
 
         let code = FunctionCompiler::new(
             self.dependencies,
             body,
             signiture,
+            self.code.get_lcp_mut(),
             &mut self.lcp_slots,
-            &mut self.code,
+            &mut self.next_lcp_slot,
+            &mut self.import_map,
         )
         .compile()?;
 
@@ -67,11 +80,13 @@ struct FunctionCompiler<'b> {
     dependencies: &'b HashMap<Descriptor, ModuleSigniture>,
     body: &'b [Statement],
     signiture: &'b FunctionSigniture,
-    lcp_slots: &'b mut HashMap<LCPEntry, u32>,
+    lcp: &'b mut LCP,
+    lcp_slots: &'b mut HashMap<LCPKey, u32>,
+    next_lcp_slot: &'b mut u32,
     locals: HashMap<String, LocalSlot>,
     next_local_index: u32,
+    import_map: &'b mut HashMap<String, Descriptor>,
     code: FunctionCode,
-    mod_code: &'b mut ModuleCode,
 }
 
 impl<'b> FunctionCompiler<'b> {
@@ -79,8 +94,10 @@ impl<'b> FunctionCompiler<'b> {
         dependencies: &'b HashMap<Descriptor, ModuleSigniture>,
         body: &'b [Statement],
         signiture: &'b FunctionSigniture,
-        lcp_slots: &'b mut HashMap<LCPEntry, u32>,
-        mod_code: &'b mut ModuleCode,
+        lcp: &'b mut LCP,
+        lcp_slots: &'b mut HashMap<LCPKey, u32>,
+        next_lcp_slot: &'b mut u32,
+        import_map: &'b mut HashMap<String, Descriptor>,
     ) -> Self {
         Self {
             dependencies,
@@ -88,9 +105,11 @@ impl<'b> FunctionCompiler<'b> {
             signiture,
             locals: HashMap::new(),
             code: FunctionCode::empty(),
+            lcp,
             lcp_slots,
-            mod_code,
+            next_lcp_slot,
             next_local_index: 0,
+            import_map,
         }
     }
 
@@ -106,13 +125,21 @@ impl<'b> FunctionCompiler<'b> {
         self.emit(Instruction::Drop);
     }
 
+    fn get_lcp_slot(&mut self, entry: LCPEntry) -> u32 {
+        let key = lcp_entry_to_key(&entry);
+        *self.lcp_slots.entry(key).or_insert_with(|| {
+            let i = *self.next_lcp_slot;
+            *self.next_lcp_slot += 1;
+            self.lcp.add(entry);
+            i
+        })
+    }
+
     fn get_local_slot(&mut self, name: &str) -> LocalSlot {
         *self.locals.entry(name.to_string()).or_insert_with(|| {
             let i = self.next_local_index;
             self.next_local_index += 1;
-            LocalSlot {
-                index: i as u32,
-            }
+            LocalSlot { index: i as u32 }
         })
     }
 
@@ -298,15 +325,20 @@ impl<'b> FunctionCompiler<'b> {
                 self.emit(Instruction::LoadConst(Word::from_bool(*val)));
             }
 
+            // Needs to create String and Array class first
+            // And native functions ...
             ExprKind::StringLiteral(_) => todo!(),
             ExprKind::ArrayLiteral(_) => todo!(),
 
             ExprKind::Path(path) => {
                 if path.len() > 1 {
-                    return Err(CompileError::other_at("Path with multiple segments is not allowed", expr.span))
+                    return Err(CompileError::other_at(
+                        "Path with multiple segments in expression is not allowed",
+                        expr.span,
+                    ));
                 }
 
-                let slot = self.get_local_slot(path.tail().unwrap());
+                let slot = self.get_local_slot(path.last().unwrap());
                 self.emit(Instruction::LoadLocal { slot: slot.index });
             }
 
@@ -323,50 +355,35 @@ impl<'b> FunctionCompiler<'b> {
                 self.emit(op_instruction);
             }
 
+            // TODO: optimize this
             ExprKind::FunctionCall { function, args } => {
                 for arg in args {
                     self.compile_expr(arg)?;
                 }
 
-                self.emit(Instruction::FunctionCall(todo!()));
+                let mut function = function.clone();
+
+                // substitute imported path
+                if function.len() > 1 {
+                    if let Some(path) = self.import_map.get(function.first().unwrap()) {
+                        function.sub_first(path.segments.clone());
+                    }
+                };
+
+                let function_entry = LCPEntry::UnresolvedFunction {
+                    path: function.to_string(),
+                };
+                let function_slot = self.get_lcp_slot(function_entry);
+
+                self.emit(Instruction::FunctionCall(function_slot));
             }
-
-            // ExprKind::ForeignFunctionCall {
-            //     module_name,
-            //     func_name,
-            //     args,
-            // } => {
-            //     for arg in args {
-            //         self.compile_expr(arg)?;
-            //     }
-
-            //     let Some(call_slot) = self
-            //         .dependencies
-            //         .get(module_name)
-            //         .and_then(|module| module.get_fn_slot(func_name))
-            //     else {
-            //         return Err(CompileError::unknown_foreign_function_at(
-            //             module_name,
-            //             func_name,
-            //             expr.span,
-            //         ));
-            //     };
-
-            //     self.string_slots
-            //         .insert(module_name.clone(), self.next_local_index);
-
-            //     self.emit(Instruction::ForeignCall {
-            //         module_name_slot: self.next_local_index,
-            //         call_slot,
-            //     });
-            //     self.next_local_index += 1;
-            // }
         }
 
         Ok(())
     }
 }
 
+// TODO: refactor this shit
 fn bin_op_to_instruction(op: &BinaryOp, result_type: &Descriptor) -> Instruction {
     match op {
         BinaryOp::Add if result_type.is_i32_type() => Instruction::I32Add,
@@ -405,5 +422,15 @@ fn un_op_to_instruction(op: &UnaryOp, result_type: &Descriptor) -> Instruction {
         UnaryOp::Negate if result_type.is_i32_type() => Instruction::F32Negate,
         UnaryOp::Not if result_type.is_bool_type() => Instruction::BoolNot,
         _ => panic!("Unsupported unary operation"),
+    }
+}
+
+fn lcp_entry_to_key(entry: &LCPEntry) -> LCPKey {
+    match entry.clone() {
+        LCPEntry::ResolvedClass(_) | LCPEntry::ResolvedFunction(_) => unreachable!(),
+        LCPEntry::String(str) => LCPKey::String(str),
+        LCPEntry::UnresolvedClass { path } => LCPKey::Class(path),
+        LCPEntry::UnresolvedFunction { path } => LCPKey::Function(path),
+        LCPEntry::UnresolvedInterface { path } => LCPKey::Interface(path),
     }
 }

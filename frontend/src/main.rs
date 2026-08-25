@@ -20,7 +20,7 @@ fn main() {
     let x I32 = 6565
     let y = 356
 
-    x = sum(x, y)
+    x = mymodule.sum(x, y)
 }
 ";
 
@@ -31,7 +31,7 @@ fn main() {
     match result {
         Ok(ast) => {
             println!("AST: {:#?}", ast);
-        },
+        }
         Err(e) => {
             let mut files = SimpleFiles::new();
 

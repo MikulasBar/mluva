@@ -2,7 +2,7 @@ use bincode::{Decode, Encode};
 
 use crate::word::Word;
 
-#[derive(Debug, Clone, PartialEq, Encode, Decode)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Encode, Decode)]
 #[repr(u8)]
 pub enum Instruction {
     Store {
