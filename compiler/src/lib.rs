@@ -1,3 +1,5 @@
-pub mod compiler;
-mod local_slot;
+mod compiler;
 mod lcp_key;
+mod local_slot;
+
+pub use compiler::Compiler;

@@ -1,9 +1,9 @@
 use crate::expect_token;
-use common::{Descriptor, ast::*};
 use common::CompileError;
 use common::diagnostics::{FileId, Span};
 use common::function::{FunctionSigniture, Parameter};
 use common::module::ModuleAST;
+use common::{Descriptor, ast::*};
 use common::{Token, TokenKind};
 
 pub struct Parser<'a> {
@@ -86,12 +86,13 @@ impl<'a> Parser<'a> {
                     } else {
                         self.parse_type()?.0
                     };
-                    
+
                     expect_token!(TokenKind::BraceL in self);
                     let body = self.parse_statements(TokenKind::BraceR)?;
                     expect_token!(TokenKind::BraceR in self);
 
-                    let signiture = FunctionSigniture::new(return_ty, params, token_span.join(paren_r_span));
+                    let signiture =
+                        FunctionSigniture::new(return_ty, params, token_span.join(paren_r_span));
 
                     self.ast.add_function(name, signiture, body);
                 }
@@ -172,21 +173,18 @@ impl<'a> Parser<'a> {
                 }
 
                 TokenKind::Let => {
-                    println!("Let decl");
                     expect_token!(TokenKind::Let in self);
                     let pattern = self.parse_pattern()?;
                     let mut ty = None;
                     let saved_index = self.index;
 
                     if let Ok((desc, _)) = self.parse_type() {
-                        println!("type acquired: {:?}", desc);
                         ty = Some(desc);
                     } else {
                         self.index = saved_index;
                     }
 
                     expect_token!(TokenKind::Assign in self);
-                    println!("= acquired");
                     let expr = self.parse_expr()?;
                     expect_token!(TokenKind::EOL in self);
 
@@ -233,7 +231,11 @@ impl<'a> Parser<'a> {
                 expect_token!(TokenKind::Assign in self);
                 let value = self.parse_expr()?;
                 expect_token!(TokenKind::EOL, end_span in self);
-                return Ok(Statement::var_assign(assignee, value, start_span.join(end_span)))
+                return Ok(Statement::var_assign(
+                    assignee,
+                    value,
+                    start_span.join(end_span),
+                ));
             }
         }
 
@@ -267,14 +269,12 @@ impl<'a> Parser<'a> {
                 let res = Ok(Pattern::var(ident.clone(), token_span));
                 self.skip();
                 res
-            },
-
-            _ => {
-                Err(CompileError::unexpected_token_at(
-                    self.next().unwrap().kind,
-                    token_span,
-                ))
             }
+
+            _ => Err(CompileError::unexpected_token_at(
+                self.next().unwrap().kind,
+                token_span,
+            )),
         }
     }
 
@@ -513,7 +513,7 @@ impl<'a> Parser<'a> {
 
         while let Some(TokenKind::Dot) = self.peek_kind() {
             self.skip();
-            
+
             if let Some(TokenKind::Ident(_)) = self.peek_kind() {
                 expect_token!(TokenKind::Ident(ident), ident_span in self);
                 segments.push(ident);
@@ -524,7 +524,9 @@ impl<'a> Parser<'a> {
         }
 
         if segments.is_empty() {
-            return Err(CompileError::other("Found empty descriptor, this is likely internal error of 'parse_descriptor' usage"));
+            return Err(CompileError::other(
+                "Found empty descriptor, this is likely internal error of 'parse_descriptor' usage",
+            ));
         }
 
         Ok((Descriptor::new(segments), span))

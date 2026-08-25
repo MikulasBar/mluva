@@ -179,6 +179,8 @@ version = "0.1.0"
 dependencies = [
  "codespan-reporting",
  "common",
+ "compiler",
+ "typechecker",
 ]
 
 [[package]]
