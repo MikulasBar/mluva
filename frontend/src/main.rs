@@ -25,7 +25,7 @@ fn main() {
     let x I32 = 6565
     let y = 356
 
-    x = mymodule.sum(x, y)
+    x = mymodule.sum(x, y) + sum(x, 98)
 }
 ";
 
@@ -55,6 +55,7 @@ fn process_result<T>(result: Result<T, CompileError>) -> T {
 
 fn build_deps() -> HashMap<Descriptor, ModuleSigniture> {
     let mut deps = HashMap::new();
+    let descriptor = descriptor!("mylib", "mymodule");
 
     let mymodule_source = "
         fn sum(a I32, b I32) I32 {
@@ -62,16 +63,17 @@ fn build_deps() -> HashMap<Descriptor, ModuleSigniture> {
         }
     ";
 
-    let ast = parse_source(mymodule_source, 1).unwrap();
+    let ast = parse_source(mymodule_source, descriptor.clone(), 1).unwrap();
 
-    deps.insert(descriptor!("mylib", "mymodule"), ast.to_signiture());
+    deps.insert(descriptor, ast.to_signiture());
 
     deps
 }
 
 fn main() {
-    println!("sfsgs");
-    let mut ast = process_result(parse_source(SOURCE, 0));
+    println!("");
+    let descriptor = descriptor!("main_module");
+    let mut ast = process_result(parse_source(SOURCE, descriptor, 0));
     println!("frontend clean...");
     let dependencies = build_deps();
 

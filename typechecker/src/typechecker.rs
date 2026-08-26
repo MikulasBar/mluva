@@ -239,20 +239,31 @@ impl<'a> TypeChecker<'a> {
         function: &mut Descriptor,
         args: &mut [Expr],
     ) -> Result<Descriptor, CompileError> {
-        let Some(import) = self.import_map.get(function.first().unwrap()) else {
-            return Err(CompileError::module_not_found_at(function.clone(), span));
-        };
+        let sig = if function.len() == 1 {
+            let Some(sig) = self.ast.get_function_sig(function.first().unwrap()) else {
+                return Err(CompileError::function_not_found_at(function.clone(), span));
+            };
 
-        function.sub_first(import.segments.clone());
-        let mut path = function.clone();
-        let tail = path.pop_last_unchecked();
+            sig
+        } else {
+            let Some(import) = self.import_map.get(function.first().unwrap()) else {
+                return Err(CompileError::module_not_found_at(function.clone(), span));
+            };
 
-        let Some(module) = self.dependencies.get(&path) else {
-            return Err(CompileError::module_not_found_at(path, span));
-        };
+            function.sub_first(import.segments.clone());
 
-        let Some(sig) = module.get_function(&tail) else {
-            return Err(CompileError::function_not_found_at(function.clone(), span));
+            let mut path = function.clone();
+            let tail = path.pop_last_unchecked();
+
+            let Some(module) = self.dependencies.get(&path) else {
+                return Err(CompileError::module_not_found_at(path, span));
+            };
+
+            let Some(sig) = module.get_function(&tail) else {
+                return Err(CompileError::function_not_found_at(function.clone(), span));
+            };
+
+            sig
         };
 
         let arg_types: Vec<(Descriptor, Span)> = args

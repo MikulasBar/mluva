@@ -14,12 +14,12 @@ pub struct Parser<'a> {
 }
 
 impl<'a> Parser<'a> {
-    pub fn new(tokens: &'a [Token], file_id: FileId) -> Self {
+    pub fn new(tokens: &'a [Token], module_descriptor: Descriptor, file_id: FileId) -> Self {
         Self {
             file_id,
             tokens,
             index: 0,
-            ast: ModuleAST::empty(),
+            ast: ModuleAST::empty(module_descriptor),
         }
     }
 

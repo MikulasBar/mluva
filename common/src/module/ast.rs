@@ -7,14 +7,16 @@ use crate::{
 
 #[derive(Debug)]
 pub struct ModuleAST {
+    pub module_descriptor: Descriptor,
     imports: Vec<(Descriptor, Span)>,
     function_bodies: HashMap<String, Vec<Statement>>,
     signiture: ModuleSigniture,
 }
 
 impl ModuleAST {
-    pub fn empty() -> Self {
+    pub fn empty(module_descriptor: Descriptor) -> Self {
         Self {
+            module_descriptor,
             imports: vec![],
             function_bodies: HashMap::new(),
             signiture: ModuleSigniture::empty(),

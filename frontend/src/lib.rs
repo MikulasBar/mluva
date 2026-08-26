@@ -1,4 +1,4 @@
-use common::{CompileError, module::ModuleAST};
+use common::{CompileError, Descriptor, module::ModuleAST};
 
 use crate::{lexer::tokenize, parser::Parser};
 
@@ -44,7 +44,11 @@ macro_rules! expect_token {
     };
 }
 
-pub fn parse_source(source: &str, file_id: usize) -> Result<ModuleAST, CompileError> {
+pub fn parse_source(
+    source: &str,
+    module_descriptor: Descriptor,
+    file_id: usize,
+) -> Result<ModuleAST, CompileError> {
     let tokens = tokenize(source, file_id)?;
-    Parser::new(&tokens, file_id).parse()
+    Parser::new(&tokens, module_descriptor, file_id).parse()
 }

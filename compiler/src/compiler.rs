@@ -31,8 +31,10 @@ impl<'a> Compiler<'a> {
     }
 
     pub fn compile(mut self) -> Result<ModuleCode, CompileError> {
+        let module_path = self.ast.module_descriptor.to_string();
+
         for name in self.ast.function_names() {
-            self.compile_function(name)?;
+            self.compile_function(&module_path, name)?;
         }
 
         let Compiler { code, .. } = self;
@@ -40,7 +42,7 @@ impl<'a> Compiler<'a> {
         Ok(code)
     }
 
-    fn compile_function(&mut self, name: String) -> Result<(), CompileError> {
+    fn compile_function(&mut self, module_path: &str, name: String) -> Result<(), CompileError> {
         let signiture = self
             .ast
             .get_function_sig(&name)
@@ -58,6 +60,7 @@ impl<'a> Compiler<'a> {
             self.code.get_lcp_mut(),
             &mut self.lcp_slots,
             &mut self.next_lcp_slot,
+            &module_path,
         )
         .compile()?;
 
@@ -77,6 +80,7 @@ struct FunctionCompiler<'b> {
     locals: HashMap<String, LocalSlot>,
     next_local_index: u32,
     code: FunctionCode,
+    module_path: &'b str,
 }
 
 impl<'b> FunctionCompiler<'b> {
@@ -87,6 +91,7 @@ impl<'b> FunctionCompiler<'b> {
         lcp: &'b mut LCP,
         lcp_slots: &'b mut HashMap<LCPKey, u32>,
         next_lcp_slot: &'b mut u32,
+        module_path: &'b str,
     ) -> Self {
         Self {
             dependencies,
@@ -98,6 +103,7 @@ impl<'b> FunctionCompiler<'b> {
             lcp_slots,
             next_lcp_slot,
             next_local_index: 0,
+            module_path,
         }
     }
 
@@ -341,9 +347,13 @@ impl<'b> FunctionCompiler<'b> {
                     self.compile_expr(arg)?;
                 }
 
-                let function_entry = LCPEntry::UnresolvedFunction {
-                    path: function.to_string(),
+                let path = if function.len() == 1 {
+                    format!("{}.{}", self.module_path, function.to_string())
+                } else {
+                    function.to_string()
                 };
+
+                let function_entry = LCPEntry::UnresolvedFunction { path };
                 let function_slot = self.get_lcp_slot(function_entry);
 
                 self.emit(Instruction::FunctionCall(function_slot));

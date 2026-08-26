@@ -1,11 +1,11 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use bincode::{
     Decode, Encode,
     error::{DecodeError, EncodeError},
 };
 
-use crate::{function::FunctionCode, module::{LCPEntry, lcp::LCP}, serde_header::SerdeHeader};
+use crate::{function::FunctionCode, module::lcp::LCP, serde_header::SerdeHeader};
 
 #[derive(Debug, Clone, Encode, Decode)]
 pub struct ModuleCode {
@@ -21,14 +21,8 @@ impl ModuleCode {
         }
     }
 
-    pub fn new(
-        lcp: LCP,
-        functions: HashMap<String, FunctionCode>,
-    ) -> Self {
-        Self {
-            lcp,
-            functions,
-        }
+    pub fn new(lcp: LCP, functions: HashMap<String, FunctionCode>) -> Self {
+        Self { lcp, functions }
     }
 
     pub fn get_main_code(&self) -> Option<&FunctionCode> {
@@ -43,7 +37,7 @@ impl ModuleCode {
         self.functions.insert(name, code);
     }
 
-    pub fn get_lcp_mut(&mut self) -> &'_ mut LCP  {
+    pub fn get_lcp_mut(&mut self) -> &'_ mut LCP {
         &mut self.lcp
     }
 
